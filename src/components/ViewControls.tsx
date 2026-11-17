@@ -7,9 +7,12 @@ interface Props {
   backdrop: Backdrop
   onThumbSize: (s: ThumbSize) => void
   onBackdrop: (b: Backdrop) => void
+  cssOpen: boolean
+  cssActive: boolean
+  onCssToggle: () => void
 }
 
-export function ViewControls({ thumbSize, backdrop, onThumbSize, onBackdrop }: Props) {
+export function ViewControls({ thumbSize, backdrop, onThumbSize, onBackdrop, cssOpen, cssActive, onCssToggle }: Props) {
   return (
     <div className="view-controls">
       <Segmented
@@ -31,6 +34,10 @@ export function ViewControls({ thumbSize, backdrop, onThumbSize, onBackdrop }: P
           { value: "dark", label: <IconMoon />, title: "Dark checkerboard" }
         ]}
       />
+      <button type="button" className={`flag flag--lg${cssOpen ? " is-on" : ""}`} aria-pressed={cssOpen}
+        title="Preview CSS: style the previews, e.g. set custom properties" onClick={onCssToggle}>
+        CSS{cssActive && <span className="flag__dot" />}
+      </button>
     </div>
   )
 }

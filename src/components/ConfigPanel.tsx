@@ -4,6 +4,7 @@ import type { PresetActions } from "../hooks/useAppSettings"
 import type { AppSettings, Preset } from "../lib/types"
 import { PluginList } from "./PluginList"
 import { PresetSelect } from "./PresetSelect"
+import { ReplaceList } from "./ReplaceList"
 import { Toggle } from "./Toggle"
 
 interface Props {
@@ -67,6 +68,10 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
               onChange={(e) => edit((x) => ({ ...x, floatPrecision: Number(e.target.value) }))} />
             <span className="range__value">{s.floatPrecision}</span>
           </label>
+        </section>
+
+        <section className="panel__section">
+          <ReplaceList rules={s.replacements} onChange={(replacements) => edit((x) => ({ ...x, replacements }))} />
         </section>
 
         <section className="panel__section">

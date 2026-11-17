@@ -390,3 +390,59 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
 .toast--success { border-color: var(--success-border); }
 .toast--error { border-color: var(--error-border); color: var(--error); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* ── Find & replace ──────────────────────────────────────────── */
+
+.input--mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+
+.rules { display: flex; flex-direction: column; gap: 8px; }
+.rules__empty { font-size: 11px; }
+.rules .link { display: inline-flex; align-items: center; gap: 3px; }
+
+.rule {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.rule.is-off { opacity: .55; }
+.rule.is-invalid { border-color: var(--error-border); }
+.rule__row { display: flex; align-items: center; gap: 6px; }
+.rule__row--indent { padding-left: 20px; }
+.rule__row .btn--icon { padding: 3px; }
+.rule__opts { gap: 4px; }
+.rule__error { padding-left: 20px; color: var(--error); font-size: 11px; user-select: text; }
+
+.flag {
+  height: 20px; padding: 0 6px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-xs);
+  background: var(--bg);
+  color: var(--text-3);
+  font-size: 10.5px; font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.flag:hover { color: var(--text); }
+.flag.is-on { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); }
+
+/* ── Preview CSS ─────────────────────────────────────────────── */
+
+.flag--lg { height: 26px; padding: 0 8px; font-size: 11px; position: relative; }
+.flag__dot {
+  position: absolute; top: -3px; right: -3px;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1.5px solid var(--bg);
+}
+
+.css-bar {
+  flex: none;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.css-bar__head { display: flex; align-items: center; gap: 10px; font-size: 11px; }
+.css-bar__input { height: 72px; padding: 6px 8px; resize: vertical; line-height: 1.45; user-select: text; }

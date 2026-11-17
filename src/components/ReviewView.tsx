@@ -1,10 +1,9 @@
-import { memo } from "react"
+import { memo, type ReactNode } from "react"
 import { IconBack } from "../icons"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { AppSettings, Backdrop, Preset, SvgItem } from "../lib/types"
 import { defaultLabel, PresetSelect } from "./PresetSelect"
 import { REVIEW_PX, Thumb } from "./Thumb"
-import { ViewControls } from "./ViewControls"
 
 interface Props {
   items: SvgItem[]
@@ -13,7 +12,8 @@ interface Props {
   onBack: () => void
   onPreset: (ids: string[], presetId: string | null) => void
   onNewPreset: (item: SvgItem) => void
-  onView: (patch: Partial<Pick<AppSettings, "thumbSize" | "backdrop">>) => void
+  viewControls: ReactNode
+  cssBar: ReactNode
 }
 
 export function ReviewView({ items, settings, defaultPreset, ...p }: Props) {
@@ -46,13 +46,9 @@ export function ReviewView({ items, settings, defaultPreset, ...p }: Props) {
               value={shared} onChange={(id) => p.onPreset(ids, id)} />
           )}
         </label>
-        <ViewControls
-          thumbSize={settings.thumbSize}
-          backdrop={settings.backdrop}
-          onThumbSize={(thumbSize) => p.onView({ thumbSize })}
-          onBackdrop={(backdrop) => p.onView({ backdrop })}
-        />
+        {p.viewControls}
       </div>
+      {p.cssBar}
 
       <div className="review__scroll">
         {items.map((item) => (
@@ -110,6 +106,7 @@ const ReviewRow = memo(function ReviewRow({ item, px, backdrop, presets, default
                 <>
                   {formatBytes(after)}{" "}
                   <span className={`pill ${pct > 0 ? "pill--success" : "pill--warning"}`}>{formatSaving(item.size, after)}</span>
+                  {item.result?.replaced ? <span className="pill" title="Find & replace matches">{plural(item.result.replaced, "replacement")}</span> : null}
                 </>
               ) : "…"}
           </figcaption>

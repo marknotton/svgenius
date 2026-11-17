@@ -1,10 +1,12 @@
-import { toSvgoConfig } from "./settings"
+import { activeReplacements, toSvgoConfig } from "./settings"
 import type { SvgoSettings } from "./types"
 import type { OptimiseRequest, OptimiseResponse } from "./optimiser.worker"
 
 // ── Worker pool ───────────────────────────────────────────────────────────────
 
-interface Pending { resolve: (data: string) => void, reject: (err: Error) => void }
+export interface WorkerOutput { data: string, replaced: number }
+
+interface Pending { resolve: (out: WorkerOutput) => void, reject: (err: Error) => void }
 
 const POOL_SIZE = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1))
 
@@ -21,7 +23,7 @@ function getWorker() {
         const job = pending.get(e.data.id)
         if (!job) return
         pending.delete(e.data.id)
-        if (e.data.ok) job.resolve(e.data.data)
+        if (e.data.ok) job.resolve({ data: e.data.data, replaced: e.data.replaced })
         else job.reject(new Error(e.data.error))
       }
       return w
@@ -32,10 +34,10 @@ function getWorker() {
 }
 
 export function optimiseSvg(svg: string, settings: SvgoSettings) {
-  return new Promise<string>((resolve, reject) => {
+  return new Promise<WorkerOutput>((resolve, reject) => {
     const id = nextId++
     pending.set(id, { resolve, reject })
-    const req: OptimiseRequest = { id, svg, config: toSvgoConfig(settings) }
+    const req: OptimiseRequest = { id, svg, config: toSvgoConfig(settings), replacements: activeReplacements(settings) }
     getWorker().postMessage(req)
   })
 }

@@ -9,8 +9,10 @@ import { useDialogs } from "./components/Dialogs"
 import { DropOverlay, EmptyState } from "./components/EmptyState"
 import { FileList } from "./components/FileList"
 import { Footer } from "./components/Footer"
+import { PreviewCssBar, PreviewCssContext } from "./components/PreviewCss"
 import { ReviewView } from "./components/ReviewView"
 import { Toasts, useToasts } from "./components/Toast"
+import { ViewControls } from "./components/ViewControls"
 import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/useAppSettings"
 import { useItems } from "./hooks/useItems"
 import { planExport } from "./lib/exportPlan"
@@ -294,74 +296,109 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     if (ok) clear()
   }
 
-  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbSize" | "backdrop">>) => update((s) => ({ ...s, ...patch }))
+  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbSize" | "backdrop" | "previewCss" | "previewCssEnabled">>) =>
+    update((s) => ({ ...s, ...patch }))
+
+  // ── Preview CSS ─────────────────────────────────────────────────────────────
+
+  const [cssOpen, setCssOpen] = useState(false)
+  const [appliedCss, setAppliedCss] = useState("")
+  const wantedCss = settings.previewCssEnabled ? settings.previewCss : ""
+  useEffect(() => {
+    const t = setTimeout(() => setAppliedCss(wantedCss), 200)
+    return () => clearTimeout(t)
+  }, [wantedCss])
+
+  const viewControls = (
+    <ViewControls
+      thumbSize={settings.thumbSize}
+      backdrop={settings.backdrop}
+      onThumbSize={(thumbSize) => setViewPrefs({ thumbSize })}
+      onBackdrop={(backdrop) => setViewPrefs({ backdrop })}
+      cssOpen={cssOpen}
+      cssActive={!!wantedCss.trim()}
+      onCssToggle={() => setCssOpen((o) => !o)}
+    />
+  )
+  const cssBar = cssOpen && (
+    <PreviewCssBar
+      css={settings.previewCss}
+      enabled={settings.previewCssEnabled}
+      onCss={(previewCss) => setViewPrefs({ previewCss })}
+      onEnabled={(previewCssEnabled) => setViewPrefs({ previewCssEnabled })}
+    />
+  )
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="app">
-      <AppBar subtitle={view === "review" ? "Review" : undefined} />
-      <div className="workspace">
-        <main className="workspace__main">
-          {view === "review" ? (
-            <ReviewView
-              items={reviewItems}
-              settings={settings}
-              defaultPreset={defaultPreset}
-              onBack={() => setView("list")}
-              onPreset={setPreset}
-              onNewPreset={newPresetForItem}
-              onView={setViewPrefs}
-            />
-          ) : items.length === 0 ? (
-            <EmptyState onAddFiles={addFiles} onAddFolder={addFolder} />
-          ) : (
-            <FileList
-              items={items}
-              selection={selection}
-              settings={settings}
-              defaultPreset={defaultPreset}
-              isStale={isStale}
-              onToggle={toggle}
-              onSelectAll={selectAll}
-              onPreset={(id, presetId) => setPreset([id], presetId)}
-              onNewPreset={newPresetForItem}
-              onDefaultPreset={actions.setDefault}
-              onAddFiles={addFiles}
-              onAddFolder={addFolder}
-              onRemove={removeItems}
-              onView={setViewPrefs}
-            />
-          )}
-        </main>
-        <ConfigPanel
-          settings={settings}
-          preset={editing}
-          usage={usage}
-          actions={actions}
-          onNew={newPreset}
-          onRename={renamePreset}
-          onDelete={deletePreset}
-          onImport={importPresets}
-          onExport={exportPresets}
+    <PreviewCssContext.Provider value={appliedCss}>
+      <div className="app">
+        <AppBar subtitle={view === "review" ? "Review" : undefined} />
+        <div className="workspace">
+          <main className="workspace__main">
+            {view === "review" ? (
+              <ReviewView
+                items={reviewItems}
+                settings={settings}
+                defaultPreset={defaultPreset}
+                onBack={() => setView("list")}
+                onPreset={setPreset}
+                onNewPreset={newPresetForItem}
+                viewControls={viewControls}
+                cssBar={cssBar}
+              />
+            ) : items.length === 0 ? (
+              <EmptyState onAddFiles={addFiles} onAddFolder={addFolder} />
+            ) : (
+              <FileList
+                items={items}
+                selection={selection}
+                settings={settings}
+                defaultPreset={defaultPreset}
+                isStale={isStale}
+                onToggle={toggle}
+                onSelectAll={selectAll}
+                onPreset={(id, presetId) => setPreset([id], presetId)}
+                onNewPreset={newPresetForItem}
+                onDefaultPreset={actions.setDefault}
+                onAddFiles={addFiles}
+                onAddFolder={addFolder}
+                onRemove={removeItems}
+                viewControls={viewControls}
+                cssBar={cssBar}
+              />
+            )}
+          </main>
+          <ConfigPanel
+            settings={settings}
+            preset={editing}
+            usage={usage}
+            actions={actions}
+            onNew={newPreset}
+            onRename={renamePreset}
+            onDelete={deletePreset}
+            onImport={importPresets}
+            onExport={exportPresets}
+          />
+        </div>
+        <Footer
+          view={view}
+          items={items}
+          targets={targets}
+          selectionCount={selection.size}
+          busy={busy}
+          keepStructure={settings.keepStructure}
+          onKeepStructure={(keepStructure) => update((s) => ({ ...s, keepStructure }))}
+          onOptimise={() => run(targets)}
+          onReview={openReview}
+          onRerun={() => run(targets, true)}
+          onExport={doExport}
         />
+        {dragging && <DropOverlay />}
+        {dialogs.node}
+        <Toasts toasts={toasts} dismiss={dismiss} />
       </div>
-      <Footer
-        view={view}
-        items={items}
-        targets={targets}
-        selectionCount={selection.size}
-        busy={busy}
-        keepStructure={settings.keepStructure}
-        onKeepStructure={(keepStructure) => update((s) => ({ ...s, keepStructure }))}
-        onOptimise={() => run(targets)}
-        onReview={openReview}
-        onRerun={() => run(targets, true)}
-        onExport={doExport}
-      />
-      {dragging && <DropOverlay />}
-      {dialogs.node}
-      <Toasts toasts={toasts} dismiss={dismiss} />
-    </div>
+    </PreviewCssContext.Provider>
   )
 }

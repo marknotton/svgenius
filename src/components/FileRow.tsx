@@ -68,6 +68,7 @@ function Stats({ item, stale }: { item: SvgItem, stale: boolean }) {
   return (
     <div className={`file-row__stats${stale ? " is-stale" : ""}`} title={stale ? "Settings have changed since this ran" : undefined}>
       <span className="text-3 strike">{formatBytes(item.size)}</span>
+      {item.result.replaced > 0 && <span className="pill" title="Find & replace matches">{item.result.replaced}×</span>}
       <span>{formatBytes(item.result.size)}</span>
       <span className={`pill ${pct > 0 ? "pill--success" : "pill--warning"}`}>{formatSaving(item.size, item.result.size)}</span>
     </div>

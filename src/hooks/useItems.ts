@@ -75,9 +75,9 @@ export function useItems() {
       runs.current.set(item.id, run)
       patch(item.id, { status: "running", error: undefined })
       try {
-        const output = await optimiseSvg(item.source as string, settings)
+        const { data: output, replaced } = await optimiseSvg(item.source as string, settings)
         if (runs.current.get(item.id) !== run) return
-        const result = { output, size: byteLength(output), key: settingsKey(settings) }
+        const result = { output, size: byteLength(output), replaced, key: settingsKey(settings) }
         results.set(item.id, result)
         patch(item.id, { status: "done", result })
       } catch (e) {

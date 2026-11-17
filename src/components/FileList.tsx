@@ -1,11 +1,10 @@
-import type { MouseEvent } from "react"
+import type { MouseEvent, ReactNode } from "react"
 import { IconFile, IconFolder, IconTrash } from "../icons"
 import { plural } from "../lib/format"
 import type { AppSettings, Preset, SvgItem } from "../lib/types"
 import { FileRow } from "./FileRow"
 import { PresetSelect } from "./PresetSelect"
 import { THUMB_PX } from "./Thumb"
-import { ViewControls } from "./ViewControls"
 
 interface Props {
   items: SvgItem[]
@@ -21,7 +20,8 @@ interface Props {
   onAddFiles: () => void
   onAddFolder: () => void
   onRemove: () => void
-  onView: (patch: Partial<Pick<AppSettings, "thumbSize" | "backdrop">>) => void
+  viewControls: ReactNode
+  cssBar: ReactNode
 }
 
 export function FileList(p: Props) {
@@ -57,13 +57,9 @@ export function FileList(p: Props) {
           <PresetSelect label="Default preset" presets={settings.presets} value={settings.defaultPresetId}
             onChange={(id) => id && p.onDefaultPreset(id)} />
         </label>
-        <ViewControls
-          thumbSize={settings.thumbSize}
-          backdrop={settings.backdrop}
-          onThumbSize={(thumbSize) => p.onView({ thumbSize })}
-          onBackdrop={(backdrop) => p.onView({ backdrop })}
-        />
+        {p.viewControls}
       </div>
+      {p.cssBar}
 
       <ul className={`file-list file-list--${settings.thumbSize}`}>
         {items.map((item) => (

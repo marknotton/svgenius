@@ -1,6 +1,6 @@
 import type { Config } from "svgo/browser"
 import { PLUGINS, PLUGIN_NAMES } from "./plugins"
-import type { AppSettings, Preset, SvgoSettings } from "./types"
+import type { AppSettings, Preset, Replacement, SvgoSettings } from "./types"
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
@@ -11,8 +11,13 @@ export function defaultSvgoSettings(): SvgoSettings {
     multipass: true,
     floatPrecision: DEFAULT_PRECISION,
     pretty: false,
-    plugins: Object.fromEntries(PLUGINS.map((p) => [p.name, p.defaultOn]))
+    plugins: Object.fromEntries(PLUGINS.map((p) => [p.name, p.defaultOn])),
+    replacements: []
   }
+}
+
+export function createReplacement(): Replacement {
+  return { id: newId(), enabled: true, find: "", replace: "", caseSensitive: true, replaceAll: true, regex: false, stage: "before" }
 }
 
 export const newId = () => crypto.randomUUID()
@@ -30,7 +35,9 @@ export function defaultAppSettings(): AppSettings {
     editingPresetId: preset.id,
     thumbSize: "medium",
     backdrop: "light",
-    keepStructure: true
+    keepStructure: true,
+    previewCss: "",
+    previewCssEnabled: true
   }
 }
 
@@ -50,9 +57,15 @@ export function toSvgoConfig(settings: SvgoSettings): Config {
   }
 }
 
+/** Rules that will actually do something, minus UI-only fields */
+export function activeReplacements(settings: SvgoSettings) {
+  return settings.replacements.filter((r) => r.enabled && r.find)
+}
+
 /** Stable fingerprint, used to spot results produced by older settings */
 export function settingsKey(settings: SvgoSettings) {
-  return JSON.stringify(toSvgoConfig(settings))
+  const rules = activeReplacements(settings).map(({ id: _id, enabled: _e, ...r }) => r)
+  return JSON.stringify([toSvgoConfig(settings), rules])
 }
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -72,11 +85,31 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
     }
   }
   const precision = Number(raw.floatPrecision)
+  const replacements = Array.isArray(raw.replacements)
+    ? raw.replacements.map(sanitiseReplacement).filter((r): r is Replacement => r !== null)
+    : []
   return {
+    replacements,
     multipass: typeof raw.multipass === "boolean" ? raw.multipass : base.multipass,
     pretty: typeof raw.pretty === "boolean" ? raw.pretty : base.pretty,
     floatPrecision: Number.isInteger(precision) && precision >= 0 && precision <= 8 ? precision : base.floatPrecision,
     plugins
+  }
+}
+
+function sanitiseReplacement(raw: unknown): Replacement | null {
+  if (!isObj(raw)) return null
+  const base = createReplacement()
+  const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d)
+  return {
+    id: typeof raw.id === "string" && raw.id ? raw.id : base.id,
+    enabled: bool(raw.enabled, true),
+    find: typeof raw.find === "string" ? raw.find : "",
+    replace: typeof raw.replace === "string" ? raw.replace : "",
+    caseSensitive: bool(raw.caseSensitive, base.caseSensitive),
+    replaceAll: bool(raw.replaceAll, base.replaceAll),
+    regex: bool(raw.regex, false),
+    stage: raw.stage === "after" ? "after" : "before"
   }
 }
 
@@ -107,7 +140,9 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     editingPresetId: pick(raw.editingPresetId),
     thumbSize: raw.thumbSize === "tiny" || raw.thumbSize === "large" ? raw.thumbSize : "medium",
     backdrop: raw.backdrop === "dark" ? "dark" : "light",
-    keepStructure: typeof raw.keepStructure === "boolean" ? raw.keepStructure : true
+    keepStructure: typeof raw.keepStructure === "boolean" ? raw.keepStructure : true,
+    previewCss: typeof raw.previewCss === "string" ? raw.previewCss : "",
+    previewCssEnabled: typeof raw.previewCssEnabled === "boolean" ? raw.previewCssEnabled : true
   }
 }
 
