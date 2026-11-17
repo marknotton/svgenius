@@ -1,0 +1,304 @@
+use std::fs;
+use std::path::{Component, Path, PathBuf};
+use std::sync::{Arc, Mutex};
+
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Manager, State};
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use tauri::{Emitter, RunEvent};
+
+// ── Shared state ──────────────────────────────────────────────────────────────
+
+/// Paths handed to the app by Finder ("Open With") before the UI was ready.
+type PendingOpenFiles = Arc<Mutex<Vec<String>>>;
+
+const SETTINGS_FILE: &str = "settings.json";
+const MAX_SVG_BYTES: u64 = 25 * 1024 * 1024;
+
+// ── Payloads ──────────────────────────────────────────────────────────────────
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ScannedFile {
+    path: String,
+    name: String,
+    /// Path relative to whatever the user picked, used to rebuild folder
+    /// structure on export. A dropped folder keeps its own name as the root.
+    rel_path: String,
+    size: u64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportFile {
+    rel_path: String,
+    contents: String,
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+fn is_svg(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("svg"))
+        .unwrap_or(false)
+}
+
+fn is_hidden(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.starts_with('.'))
+        .unwrap_or(false)
+}
+
+fn to_slash(path: &Path) -> String {
+    path.components()
+        .filter_map(|c| match c {
+            Component::Normal(s) => Some(s.to_string_lossy().into_owned()),
+            _ => None,
+        })
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+fn walk_dir(root: &Path, base: &Path, out: &mut Vec<ScannedFile>) {
+    let Ok(entries) = fs::read_dir(root) else { return };
+    let mut entries: Vec<_> = entries.flatten().map(|e| e.path()).collect();
+    entries.sort();
+    for path in entries {
+        if is_hidden(&path) {
+            continue;
+        }
+        // Don't follow symlinked folders, avoids loops
+        let Ok(meta) = fs::symlink_metadata(&path) else { continue };
+        if meta.is_dir() {
+            if path.file_name().map(|n| n == "node_modules").unwrap_or(false) {
+                continue;
+            }
+            walk_dir(&path, base, out);
+        } else if is_svg(&path) {
+            push_file(&path, base, out);
+        }
+    }
+}
+
+fn push_file(path: &Path, base: &Path, out: &mut Vec<ScannedFile>) {
+    let Ok(meta) = fs::metadata(path) else { return };
+    if !meta.is_file() {
+        return;
+    }
+    let rel = path.strip_prefix(base).map(to_slash).unwrap_or_else(|_| {
+        path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+    });
+    out.push(ScannedFile {
+        path: path.to_string_lossy().into_owned(),
+        name: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+        rel_path: rel,
+        size: meta.len(),
+    });
+}
+
+/// Only allow plain relative paths for export, so nothing escapes the output folder.
+fn safe_join(base: &Path, rel: &str) -> Result<PathBuf, String> {
+    let rel_path = Path::new(rel);
+    if rel_path.components().any(|c| !matches!(c, Component::Normal(_))) {
+        return Err(format!("Refusing unsafe export path: {rel}"));
+    }
+    if !is_svg(rel_path) {
+        return Err(format!("Only .svg files can be exported: {rel}"));
+    }
+    Ok(base.join(rel_path))
+}
+
+fn ensure_json(path: &Path) -> Result<(), String> {
+    let ok = path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("json"))
+        .unwrap_or(false);
+    if ok { Ok(()) } else { Err("Settings files must end in .json".into()) }
+}
+
+fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let tmp = path.with_extension("tmp");
+    fs::write(&tmp, contents).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, path).map_err(|e| e.to_string())
+}
+
+fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_config_dir()
+        .map(|d| d.join(SETTINGS_FILE))
+        .map_err(|e| e.to_string())
+}
+
+// ── Commands: files ───────────────────────────────────────────────────────────
+
+/// Expands a mix of files and folders into a flat list of SVGs.
+#[tauri::command]
+fn scan_paths(paths: Vec<String>) -> Vec<ScannedFile> {
+    let mut out = Vec::new();
+    for p in paths {
+        let path = PathBuf::from(&p);
+        if path.is_dir() {
+            let base = path.parent().map(Path::to_path_buf).unwrap_or_else(|| path.clone());
+            walk_dir(&path, &base, &mut out);
+        } else if is_svg(&path) {
+            let base = path.parent().map(Path::to_path_buf).unwrap_or_default();
+            push_file(&path, &base, &mut out);
+        }
+    }
+    out
+}
+
+#[tauri::command]
+fn read_svg(path: String) -> Result<String, String> {
+    let path = PathBuf::from(path);
+    if !is_svg(&path) {
+        return Err("Not an .svg file".into());
+    }
+    let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
+    if meta.len() > MAX_SVG_BYTES {
+        return Err("File is larger than 25 MB".into());
+    }
+    fs::read_to_string(&path).map_err(|e| e.to_string())
+}
+
+/// Which of these relative paths already exist inside `out_dir`.
+#[tauri::command]
+fn existing_files(out_dir: String, rel_paths: Vec<String>) -> Result<Vec<String>, String> {
+    let base = PathBuf::from(out_dir);
+    let mut found = Vec::new();
+    for rel in rel_paths {
+        if safe_join(&base, &rel)?.exists() {
+            found.push(rel);
+        }
+    }
+    Ok(found)
+}
+
+#[tauri::command]
+fn export_files(out_dir: String, files: Vec<ExportFile>) -> Result<Vec<String>, String> {
+    let base = PathBuf::from(out_dir);
+    if !base.is_dir() {
+        return Err("Export folder doesn't exist".into());
+    }
+    let mut written = Vec::with_capacity(files.len());
+    for f in files {
+        let target = safe_join(&base, &f.rel_path)?;
+        write_atomic(&target, &f.contents).map_err(|e| format!("{}: {e}", f.rel_path))?;
+        written.push(target.to_string_lossy().into_owned());
+    }
+    Ok(written)
+}
+
+// ── Commands: settings ────────────────────────────────────────────────────────
+
+#[tauri::command]
+fn load_settings(app: AppHandle) -> Result<Option<String>, String> {
+    let path = settings_path(&app)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    fs::read_to_string(path).map(Some).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save_settings(app: AppHandle, json: String) -> Result<(), String> {
+    write_atomic(&settings_path(&app)?, &json)
+}
+
+#[tauri::command]
+fn read_json_file(path: String) -> Result<String, String> {
+    let path = PathBuf::from(path);
+    ensure_json(&path)?;
+    fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn write_json_file(path: String, contents: String) -> Result<(), String> {
+    let path = PathBuf::from(path);
+    ensure_json(&path)?;
+    fs::write(path, contents).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn take_pending_open_files(state: State<'_, PendingOpenFiles>) -> Vec<String> {
+    std::mem::take(&mut *state.lock().unwrap())
+}
+
+// ── App entry point ───────────────────────────────────────────────────────────
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    let pending: PendingOpenFiles = Arc::new(Mutex::new(Vec::new()));
+
+    let app = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .manage(pending)
+        .invoke_handler(tauri::generate_handler![
+            scan_paths,
+            read_svg,
+            existing_files,
+            export_files,
+            load_settings,
+            save_settings,
+            read_json_file,
+            write_json_file,
+            take_pending_open_files
+        ])
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|_app_handle, _event| {
+        // Finder "Open With" / dropping SVGs on the Dock icon
+        #[cfg(any(target_os = "macos", target_os = "ios"))]
+        if let RunEvent::Opened { urls } = _event {
+            let paths: Vec<String> = urls
+                .into_iter()
+                .filter_map(|u| u.to_file_path().ok())
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect();
+            if !paths.is_empty() {
+                let _ = _app_handle.emit("files:opened", paths.clone());
+                _app_handle.state::<PendingOpenFiles>().lock().unwrap().extend(paths);
+            }
+        }
+    });
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn safe_join_rejects_escapes() {
+        let base = Path::new("/tmp/out");
+        assert!(safe_join(base, "../evil.svg").is_err());
+        assert!(safe_join(base, "/etc/evil.svg").is_err());
+        assert!(safe_join(base, "icons/ok.txt").is_err());
+        assert_eq!(safe_join(base, "icons/ok.svg").unwrap(), base.join("icons/ok.svg"));
+    }
+
+    #[test]
+    fn scan_keeps_folder_name_as_root() {
+        let dir = std::env::temp_dir().join("svgenius-scan-test");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(dir.join("icons/sub")).unwrap();
+        fs::create_dir_all(dir.join("icons/.hidden")).unwrap();
+        fs::write(dir.join("icons/a.svg"), "<svg/>").unwrap();
+        fs::write(dir.join("icons/sub/b.SVG"), "<svg/>").unwrap();
+        fs::write(dir.join("icons/.hidden/c.svg"), "<svg/>").unwrap();
+        fs::write(dir.join("icons/notes.txt"), "nope").unwrap();
+
+        let found = scan_paths(vec![dir.join("icons").to_string_lossy().into_owned()]);
+        let rels: Vec<_> = found.iter().map(|f| f.rel_path.as_str()).collect();
+        assert_eq!(rels, vec!["icons/a.svg", "icons/sub/b.SVG"]);
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
