@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { IconInfo } from "../icons"
 import { PLUGINS, type PluginInfo } from "../lib/plugins"
 import { isPluginOn } from "../lib/settings"
 import type { SvgoSettings } from "../lib/types"
@@ -17,10 +18,16 @@ const GROUPS: Array<{ id: PluginInfo["group"], title: string }> = [
 
 export function PluginList({ settings, onToggle, onSetGroup }: Props) {
   const [filter, setFilter] = useState("")
+  const [details, setDetails] = useState(false)
   const q = filter.trim().toLowerCase()
 
   return (
     <div className="plugins">
+      <div className="plugins__head">
+        <span className="panel__label">SVGO plugins</span>
+        <button type="button" className={`flag${details ? " is-on" : ""}`} aria-pressed={details}
+          title="Show what each plugin does" onClick={() => setDetails((d) => !d)}><IconInfo /> Details</button>
+      </div>
       <input
         className="input input--sm"
         type="search"
@@ -42,13 +49,15 @@ export function PluginList({ settings, onToggle, onSetGroup }: Props) {
               </button>
             </div>
             {shown.map((p) => (
-              <Toggle
-                key={p.name}
-                label={p.label}
-                hint={`${p.name}: ${p.description}`}
-                checked={isPluginOn(settings, p.name)}
-                onChange={(on) => onToggle(p.name, on)}
-              />
+              <div key={p.name} className="plugin">
+                <Toggle
+                  label={p.label}
+                  hint={`${p.name}: ${p.description}`}
+                  checked={isPluginOn(settings, p.name)}
+                  onChange={(on) => onToggle(p.name, on)}
+                />
+                {details && <p className="plugin__desc text-3">{p.description} <code>{p.name}</code></p>}
+              </div>
             ))}
           </div>
         )

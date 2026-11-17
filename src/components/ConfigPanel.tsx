@@ -2,13 +2,8 @@ import { IconDownload, IconPencil, IconPlus, IconReset, IconStar, IconTrash, Ico
 import { plural } from "../lib/format"
 import type { PresetActions } from "../hooks/useAppSettings"
 import type { AppSettings, CustomPlugin, Preset } from "../lib/types"
-import { AttrRuleList } from "./AttrRuleList"
-import { CustomPluginList } from "./CustomPluginList"
-import { PluginList } from "./PluginList"
+import { PresetEditor } from "./PresetEditor"
 import { PresetSelect } from "./PresetSelect"
-import { ReplaceList } from "./ReplaceList"
-import { SizeTrim } from "./SizeTrim"
-import { Toggle } from "./Toggle"
 
 interface Props {
   settings: AppSettings
@@ -61,55 +56,8 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
       </div>
 
       <div className="panel__scroll">
-        <section className="panel__section">
-          <div className="panel__label">Output</div>
-          <Toggle label="Multipass" hint="Run the plugins repeatedly until nothing more is saved"
-            checked={s.multipass} onChange={(v) => edit((x) => ({ ...x, multipass: v }))} />
-          <Toggle label="Pretty print" hint="Indent the markup. Bigger files, easier to read"
-            checked={s.pretty} onChange={(v) => edit((x) => ({ ...x, pretty: v }))} />
-          <label className="range" title="Decimal places kept in numbers, paths and transforms">
-            <span className="range__label">Precision</span>
-            <input type="range" min={0} max={8} step={1} value={s.floatPrecision}
-              onChange={(e) => edit((x) => ({ ...x, floatPrecision: Number(e.target.value) }))} />
-            <span className="range__value">{s.floatPrecision}</span>
-          </label>
-        </section>
-
-        <section className="panel__section">
-          <SizeTrim trim={s.trim} onChange={(patch) => edit((x) => ({ ...x, trim: { ...x.trim, ...patch } }))} />
-        </section>
-
-        <section className="panel__section">
-          <ReplaceList rules={s.replacements} onChange={(replacements) => edit((x) => ({ ...x, replacements }))} />
-        </section>
-
-        <section className="panel__section">
-          <AttrRuleList rules={s.attrRules} onChange={(attrRules) => edit((x) => ({ ...x, attrRules }))} />
-        </section>
-
-        <section className="panel__section">
-          <CustomPluginList
-            plugins={settings.customPlugins}
-            settings={s}
-            onLoad={p.onLoadPlugin}
-            onRemove={p.onRemovePlugin}
-            onChange={(id, patch) => edit((x) => ({
-              ...x,
-              custom: { ...x.custom, [id]: { on: x.custom[id]?.on ?? false, params: x.custom[id]?.params ?? "", ...patch } }
-            }))}
-          />
-        </section>
-
-        <section className="panel__section">
-          <PluginList
-            settings={s}
-            onToggle={(name, on) => edit((x) => ({ ...x, plugins: { ...x.plugins, [name]: on } }))}
-            onSetGroup={(names, on) => edit((x) => ({
-              ...x,
-              plugins: { ...x.plugins, ...Object.fromEntries(names.map((n) => [n, on])) }
-            }))}
-          />
-        </section>
+        <PresetEditor settings={s} edit={edit} customPlugins={settings.customPlugins}
+          onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} />
       </div>
 
       <div className="panel__foot">

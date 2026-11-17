@@ -1,4 +1,5 @@
-import { IconPlus, IconTrash } from "../icons"
+import { useDragSort } from "../hooks/useDragSort"
+import { IconGrip, IconPlus, IconTrash } from "../icons"
 import { ElementPicker } from "./ElementPicker"
 import { ACTIONS, CONDITIONS, isRuleReady } from "../lib/attrRules"
 import { createAttrRule } from "../lib/settings"
@@ -14,6 +15,7 @@ interface Props {
 export function AttrRuleList({ rules, onChange }: Props) {
   const patch = (id: string, p: Partial<AttrRule>) => onChange(rules.map((r) => (r.id === id ? { ...r, ...p } : r)))
   const active = rules.filter((r) => r.enabled && isRuleReady(r)).length
+  const sort = useDragSort(rules, onChange)
 
   return (
     <div className="rules">
@@ -25,6 +27,7 @@ export function AttrRuleList({ rules, onChange }: Props) {
       {rules.length === 0 && (
         <p className="rules__empty text-3">Recipes like “every path lacking fill → add fill="currentColor"” or “remove data-name”.</p>
       )}
+      {rules.length > 1 && <p className="rules__empty text-3">Rules run top to bottom. Drag the handle to reorder.</p>}
 
       {rules.map((r, i) => {
         const cond = CONDITIONS.find((c) => c.value === r.when) ?? CONDITIONS[0]
@@ -32,8 +35,9 @@ export function AttrRuleList({ rules, onChange }: Props) {
         const ready = isRuleReady(r)
         const n = i + 1
         return (
-          <div key={r.id} className={`rule${r.enabled ? "" : " is-off"}`}>
+          <div key={r.id} className={`rule${r.enabled ? "" : " is-off"}`} {...sort.rowProps(r.id)}>
             <div className="rule__row">
+              {rules.length > 1 && <span className="rule__grip" title="Drag to reorder. Rules run top to bottom" {...sort.handleProps(r.id)}><IconGrip /></span>}
               <input type="checkbox" className="checkbox" checked={r.enabled} title={r.enabled ? "Rule on" : "Rule off"}
                 aria-label={`Attribute rule ${n} enabled`} onChange={(e) => patch(r.id, { enabled: e.target.checked })} />
               <span className="rule__word">For</span>

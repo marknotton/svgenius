@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState } from "react"
 import { byteLength } from "../lib/format"
 import { CONCURRENCY, optimiseSvg, runLimited } from "../lib/optimiser"
-import { defaultBespoke, newId } from "../lib/settings"
+import { newId } from "../lib/settings"
 import { errorMessage, readSvg, scanPaths } from "../lib/tauri"
 import { postProcess } from "../lib/trim"
-import type { Bespoke, OptimiseResult, RunSpec, SvgItem } from "../lib/types"
+import type { OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "../lib/types"
 
 // ── File list + optimisation queue ────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ export function useItems() {
     const known = new Set(itemsRef.current.map((i) => i.path))
     const fresh: SvgItem[] = scanned
       .filter((f) => !known.has(f.path) && (known.add(f.path), true))
-      .map((f) => ({ ...f, id: newId(), status: "loading", presetId: null, rev: 0, bespoke: defaultBespoke() }))
+      .map((f) => ({ ...f, id: newId(), status: "loading", presetId: null, rev: 0 }))
     if (fresh.length === 0) return 0
     setItems((list) => [...list, ...fresh])
 
@@ -50,7 +50,7 @@ export function useItems() {
 
   const setPreset = useCallback((ids: string[], presetId: string | null) => {
     const set = new Set(ids)
-    setItems((list) => list.map((i) => (set.has(i.id) ? { ...i, presetId } : i)))
+    setItems((list) => list.map((i) => (set.has(i.id) ? { ...i, presetId, config: undefined } : i)))
   }, [])
 
   /** In-app edit of the markup. Never written back to the original file */
@@ -66,7 +66,8 @@ export function useItems() {
       : i)))
   }, [])
 
-  const setBespoke = useCallback((id: string, bespoke: Bespoke) => patch(id, { bespoke }), [patch])
+  /** Give a file its own settings (or undefined to go back to its preset) */
+  const setConfig = useCallback((id: string, config: SvgoSettings | undefined) => patch(id, { config }), [patch])
 
   /**
    * Optimises the given items. Already up-to-date results are skipped unless
@@ -92,7 +93,7 @@ export function useItems() {
       patch(item.id, { status: "running", error: undefined })
       try {
         const { data, replaced } = await optimiseSvg(item.source as string, spec)
-        const output = await postProcess(data, spec.svgo, spec.bespoke)
+        const output = await postProcess(data, spec.svgo)
         if (runs.current.get(item.id) !== run) return
         const result = { output, size: byteLength(output), replaced, key: spec.key }
         results.set(item.id, result)
@@ -105,5 +106,5 @@ export function useItems() {
     return results
   }, [patch])
 
-  return { items, itemsRef, addPaths, remove, clear, setPreset, editSource, revertSource, setBespoke, optimise }
+  return { items, itemsRef, addPaths, remove, clear, setPreset, editSource, revertSource, setConfig, optimise }
 }

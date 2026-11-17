@@ -1,19 +1,23 @@
-import { IconDownload, IconEye, IconPlay, IconRefresh } from "../icons"
+import { IconDownload, IconPlay } from "../icons"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { SvgItem } from "../lib/types"
 
+// ── Footer: totals, Optimise, Export ──────────────────────────────────────────
+// Export only writes finished results, so it waits until every file it would
+// export has been optimised with the current settings.
+
 interface Props {
-  view: "list" | "review"
   items: SvgItem[]
   targets: SvgItem[]
+  /** How many of the targets have an up-to-date result */
+  ready: number
+  /** Targets that failed */
+  failed: number
   selectionCount: number
   busy: boolean
   keepStructure: boolean
   onKeepStructure: (v: boolean) => void
   onOptimise: () => void
-  onReview: () => void
-  canReviewAll: boolean
-  onRerun: () => void
   onExport: () => void
 }
 
@@ -22,7 +26,9 @@ export function Footer(p: Props) {
   const before = done.reduce((n, i) => n + i.size, 0)
   const after = done.reduce((n, i) => n + (i.result?.size ?? 0), 0)
   const n = p.targets.length
-  const scope = p.view === "list" && p.selectionCount === 0 ? "all " : ""
+  const scope = p.selectionCount === 0 ? "all " : ""
+  const outstanding = n - p.ready - p.failed
+  const canExport = n > 0 && p.ready > 0 && outstanding === 0 && !p.busy
 
   return (
     <footer className="footer">
@@ -40,22 +46,21 @@ export function Footer(p: Props) {
         Keep folder structure
       </label>
 
-      {p.view === "list" && (p.selectionCount > 0 || p.canReviewAll) && (
-        <button className="btn btn--secondary" onClick={p.onReview} disabled={p.busy}>
-          <IconEye /> {p.selectionCount > 0 ? `Review ${plural(p.selectionCount, "item")}` : "Review all"}
-        </button>
+      {n > 0 && (
+        <span className={`footer__status${outstanding ? " is-pending" : ""}`}>
+          {outstanding > 0
+            ? `${plural(outstanding, "file")} to optimise before export`
+            : `${p.ready}/${n} ready${p.failed ? `, ${p.failed} with errors` : ""}`}
+        </span>
       )}
-      {p.view === "list" ? (
-        <button className="btn btn--secondary" onClick={p.onOptimise} disabled={n === 0 || p.busy}>
-          {p.busy ? <span className="spinner spinner--sm" /> : <IconPlay />} Optimise {scope}{plural(n, "file")}
-        </button>
-      ) : (
-        <button className="btn btn--secondary" onClick={p.onRerun} disabled={n === 0 || p.busy}>
-          {p.busy ? <span className="spinner spinner--sm" /> : <IconRefresh />} Re-run
-        </button>
-      )}
-      <button className="btn btn--primary" onClick={p.onExport} disabled={n === 0 || p.busy}>
-        <IconDownload /> Export {scope}{plural(n, "file")}…
+
+      <button className={`btn ${outstanding > 0 ? "btn--primary" : "btn--secondary"}`} onClick={p.onOptimise} disabled={n === 0 || p.busy || outstanding === 0}
+        title="Run every file with its current settings. Live mode only updates the rows on screen">
+        {p.busy ? <span className="spinner spinner--sm" /> : <IconPlay />} Optimise {scope}{plural(n, "file")}
+      </button>
+      <button className={`btn ${outstanding > 0 ? "btn--secondary" : "btn--primary"}`} onClick={p.onExport} disabled={!canExport}
+        title={canExport ? "Save the optimised files to a folder" : "Optimise first, so every exported file matches its current settings"}>
+        <IconDownload /> Export {scope}{plural(n - p.failed, "file")}…
       </button>
     </footer>
   )

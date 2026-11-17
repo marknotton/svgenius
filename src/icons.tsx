@@ -1,3 +1,4 @@
+import logoUrl from "./assets/logo.png"
 import type { SVGProps } from "react"
 
 // ── Inline icons ──────────────────────────────────────────────────────────────
@@ -35,11 +36,9 @@ export const IconCode = (p: P) => <Icon {...p}><path d="m5.5 4.5-3.5 3.5 3.5 3.5
 export const IconCopy = (p: P) => <Icon {...p}><rect x="5.5" y="5.5" width="8" height="8" rx="1" /><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2" /></Icon>
 export const IconSliders = (p: P) => <Icon {...p}><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" /><circle cx="10" cy="4.5" r="1.5" /><circle cx="6" cy="11.5" r="1.5" /></Icon>
 
-export const Logo = (p: P) => (
-  <svg width="18" height="18" viewBox="0 0 32 32" aria-hidden="true" {...p}>
-    <rect width="32" height="32" rx="8" fill="var(--accent)" />
-    <path d="M9 21.5c1.2 1.3 3 2 5 2 3 0 5-1.5 5-3.75 0-4.75-9.5-2.75-9.5-7.5C9.5 10 11.5 8.5 14.25 8.5c1.75 0 3.25.6 4.25 1.6"
-      fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
-    <circle cx="23" cy="21" r="2.25" fill="#fff" />
-  </svg>
+export const Logo = ({ width = 16, height = 16 }: { width?: number, height?: number }) => (
+  <img src={logoUrl} width={width} height={height} alt="" aria-hidden="true" draggable={false} style={{ display: "block" }} />
 )
+export const IconGrip = (p: P) => <Icon width={12} height={12} {...p}><circle cx="6" cy="4" r=".9" fill="currentColor" /><circle cx="10" cy="4" r=".9" fill="currentColor" /><circle cx="6" cy="8" r=".9" fill="currentColor" /><circle cx="10" cy="8" r=".9" fill="currentColor" /><circle cx="6" cy="12" r=".9" fill="currentColor" /><circle cx="10" cy="12" r=".9" fill="currentColor" /></Icon>
+export const IconGear = (p: P) => <Icon {...p}><circle cx="8" cy="8" r="2.25" /><path d="M8 1.75v1.5M8 12.75v1.5M14.25 8h-1.5M3.25 8h-1.5M12.42 3.58l-1.06 1.06M4.64 11.36l-1.06 1.06M12.42 12.42l-1.06-1.06M4.64 4.64 3.58 3.58" /><circle cx="8" cy="8" r="4.5" /></Icon>
+export const IconInfo = (p: P) => <Icon width={13} height={13} {...p}><circle cx="8" cy="8" r="6" /><path d="M8 7.25v4M8 4.9v.1" /></Icon>

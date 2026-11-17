@@ -5,6 +5,7 @@ import { open, save } from "@tauri-apps/plugin-dialog"
 import { revealItemInDir } from "@tauri-apps/plugin-opener"
 import { AppBar } from "./components/AppBar"
 import { ConfigPanel } from "./components/ConfigPanel"
+import { ContextMenu, type MenuState } from "./components/ContextMenu"
 import { useDialogs } from "./components/Dialogs"
 import { clampSidebar, Divider } from "./components/Divider"
 import { DropOverlay, EmptyState } from "./components/EmptyState"
@@ -12,18 +13,19 @@ import { FileInspector } from "./components/FileInspector"
 import { FileList } from "./components/FileList"
 import { Footer } from "./components/Footer"
 import { PreviewCssBar, PreviewCssContext } from "./components/PreviewCss"
-import { ReviewView } from "./components/ReviewView"
+import { SettingsDialog } from "./components/SettingsDialog"
 import { Toasts, useToasts } from "./components/Toast"
 import { ViewControls } from "./components/ViewControls"
 import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/useAppSettings"
 import { useItems } from "./hooks/useItems"
 import { planExport } from "./lib/exportPlan"
 import { plural } from "./lib/format"
-import { buildExport, defaultLayout, hashCode, isDefaultBespoke, mergeImport, newId, PREVIEW_PX, runSpec, SIDEBAR } from "./lib/settings"
+import { activeCustom, buildExport, defaultLayout, hashCode, mergeImport, newId, PREVIEW_PX, runSpec, SIDEBAR } from "./lib/settings"
+import { fileTags } from "./lib/tags"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
 import { errorMessage, existingFiles, exportFiles, readJsonFile, readPluginFile, takePendingOpenFiles, writeJsonFile } from "./lib/tauri"
-import type { AppSettings, CustomPlugin, SvgItem } from "./lib/types"
+import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "./lib/types"
 
 export default function App() {
   const { settings, update, loadError } = useAppSettings()
@@ -38,13 +40,13 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, itemsRef, addPaths, remove, clear, setPreset, editSource, revertSource, setBespoke, optimise } = useItems()
+  const { items, itemsRef, addPaths, remove, clear, setPreset, editSource, revertSource, setConfig, optimise } = useItems()
   const dialogs = useDialogs()
   const { toasts, push, dismiss } = useToasts()
   const actions = useMemo(() => presetActions(update), [update])
 
-  const [view, setView] = useState<"list" | "review">("list")
-  const [reviewIds, setReviewIds] = useState<string[]>([])
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [menu, setMenu] = useState<MenuState | null>(null)
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -62,18 +64,26 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     () => new Map(settings.presets.map((p) => [p.id, runSpec(p.settings, settings.customPlugins)])),
     [settings.presets, settings.customPlugins]
   )
-  // Per-file spec: the preset's, plus any in-app edits and bespoke transform
+  /** The settings a file actually runs with: its own, or its preset's */
+  const settingsFor = useCallback((item: SvgItem): SvgoSettings => item.config ?? presetFor(item).settings, [presetFor])
+  // Per-file spec: the file's own settings or its preset's, plus any in-app edits
   const resolve = useCallback((item: SvgItem) => {
-    const base = specs.get(presetFor(item).id) ?? runSpec(presetFor(item).settings, settings.customPlugins)
-    const bespoke = isDefaultBespoke(item.bespoke) ? undefined : item.bespoke
-    return { ...base, bespoke, key: `${base.key}|r${item.rev}|${bespoke ? JSON.stringify(bespoke) : ""}` }
+    const base = item.config
+      ? runSpec(item.config, settings.customPlugins)
+      : specs.get(presetFor(item).id) ?? runSpec(presetFor(item).settings, settings.customPlugins)
+    return { ...base, key: `${base.key}|r${item.rev}` }
   }, [specs, presetFor, settings.customPlugins])
+  const tagsFor = useCallback((item: SvgItem) => {
+    const s = settingsFor(item)
+    return fileTags(item, s, activeCustom(s, settings.customPlugins).length)
+  }, [settingsFor, settings.customPlugins])
   const isStale = useCallback(
     (item: SvgItem) => !!item.result && item.result.key !== resolve(item).key,
     [resolve]
   )
 
-  const usage = items.filter((i) => presetFor(i).id === editing.id).length
+  const usageOf = useCallback((id: string) => items.filter((i) => !i.config && presetFor(i).id === id).length, [items, presetFor])
+  const usage = usageOf(editing.id)
 
   // ── Adding files ────────────────────────────────────────────────────────────
 
@@ -175,12 +185,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   const selectAll = (all: boolean) => setSelection(all ? new Set(items.map((i) => i.id)) : new Set())
 
-  const reviewItems = useMemo(() => {
-    const ids = new Set(reviewIds)
-    return items.filter((i) => ids.has(i.id))
-  }, [items, reviewIds])
-
-  const targets = view === "review" ? reviewItems : selection.size ? items.filter((i) => selection.has(i.id)) : items
+  const targets = selection.size ? items.filter((i) => selection.has(i.id)) : items
 
   // ── Running ─────────────────────────────────────────────────────────────────
 
@@ -191,12 +196,6 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     } finally {
       setBusy(false)
     }
-  }
-
-  const openReview = (all = false) => {
-    const ids = items.filter((i) => all || selection.has(i.id)).map((i) => i.id)
-    setReviewIds(ids)
-    setView("review")
   }
 
   // ── Live updates ────────────────────────────────────────────────────────────
@@ -210,13 +209,11 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   }, [resolve])
 
   const liveIds = useMemo(() => {
-    const pool = view === "review"
-      ? reviewItems
-      : settings.liveUpdates ? items.filter((i) => visibleIds.has(i.id)) : []
+    const pool = settings.liveUpdates ? items.filter((i) => visibleIds.has(i.id)) : []
     const focused = items.find((i) => i.id === focusId)
     const list = focused && !pool.includes(focused) ? [...pool, focused] : pool
     return list.filter(needsRun).map((i) => i.id).join(",")
-  }, [view, reviewItems, items, visibleIds, focusId, settings.liveUpdates, needsRun])
+  }, [items, visibleIds, focusId, settings.liveUpdates, needsRun])
 
   useEffect(() => {
     if (!liveIds) return
@@ -231,10 +228,16 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   // ── Export ──────────────────────────────────────────────────────────────────
 
+  const isFresh = useCallback((i: SvgItem) => !!i.result && i.result.key === resolve(i).key && i.status !== "running", [resolve])
+  const readyCount = targets.filter(isFresh).length
+  const failedCount = targets.filter((i) => i.status === "error").length
+
+  // Export writes the results already on screen; the footer only enables it
+  // once every target is up to date
   const doExport = async () => {
     const list = targets
-    const results = await run(list)
-    const ready = list.filter((i) => results.has(i.id))
+    const ready = list.filter(isFresh)
+    const results = new Map(ready.map((i) => [i.id, i.result]))
     if (ready.length === 0) {
       push({ tone: "error", text: "Nothing to export. Check the files for errors." })
       return
@@ -306,6 +309,11 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     if (name && name !== editing.name) actions.rename(editing.id, uniqueName(settings, name))
   }
 
+  const removePreset = (id: string) => {
+    setPreset(items.filter((i) => i.presetId === id && !i.config).map((i) => i.id), null)
+    actions.remove(id)
+  }
+
   const deletePreset = async () => {
     const ok = await dialogs.confirm({
       title: `Delete “${editing.name}”?`,
@@ -313,10 +321,25 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       confirmLabel: "Delete",
       danger: true
     })
-    if (!ok) return
-    const id = editing.id
-    setPreset(items.filter((i) => i.presetId === id).map((i) => i.id), null)
-    actions.remove(id)
+    if (ok) removePreset(editing.id)
+  }
+
+  // ── A file's own settings ───────────────────────────────────────────────────
+
+  const customiseItem = (item: SvgItem) => setConfig(item.id, structuredClone(presetFor(item).settings))
+
+  const saveItemAsPreset = async (item: SvgItem) => {
+    if (!item.config) return
+    const name = await dialogs.prompt({
+      title: "Save as preset",
+      hint: `${item.name}'s settings become a preset you can use on other files.`,
+      initial: uniqueName(settings, item.name.replace(/\.svg$/i, "")),
+      confirmLabel: "Save"
+    })
+    if (!name) return
+    const preset = actions.create(uniqueName(settings, name), item.config)
+    setPreset([item.id], preset.id)
+    push({ tone: "success", text: `Saved “${preset.name}” and switched ${item.name} to it` })
   }
 
   const importPresets = async () => {
@@ -384,13 +407,62 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     }))
   }
 
+  const removeIds = useCallback((ids: Set<string>) => {
+    remove(ids)
+    push({ tone: "info", text: `Removed ${plural(ids.size, "file")} from the list` })
+  }, [remove, push])
+
   const removeItems = async () => {
-    if (selection.size) return remove(selection)
+    if (selection.size) return removeIds(selection)
     const ok = await dialogs.confirm({ title: "Clear the list?", body: "Files on disk aren't touched.", confirmLabel: "Clear" })
     if (ok) clear()
   }
 
-  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbPx" | "reviewPx" | "inspectorPx" | "listCompare" | "backdrop" | "previewCss" | "previewCssEnabled" | "circleOverlay" | "circleClip">>) =>
+  // Delete / Backspace removes the selected files (not while typing)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement
+      if (t.closest("input, textarea, select, [contenteditable]") || document.querySelector(".modal")) return
+      if ((e.key === "Delete" || e.key === "Backspace") && selection.size) {
+        e.preventDefault()
+        removeIds(selection)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [selection, removeIds])
+
+  // Right-click a row
+  const rowMenu = useCallback((id: string, e: MouseEvent) => {
+    e.preventDefault()
+    const item = itemsRef.current.find((i) => i.id === id)
+    if (!item) return
+    const inSelection = selection.has(id) && selection.size > 1
+    setMenu({
+      x: e.clientX,
+      y: e.clientY,
+      items: [
+        { label: "Inspect", run: () => { setSelection(new Set([id])); setFocusId(id); setSidebarTab("file") } },
+        { label: "Reveal in Finder", run: () => { revealItemInDir(item.path).catch(() => {}) } },
+        "-",
+        { label: "Remove from list", run: () => removeIds(new Set([id])) },
+        ...(inSelection ? [{ label: `Remove ${plural(selection.size, "selected file")}`, danger: true, run: () => removeIds(new Set(selection)) }] : [])
+      ]
+    })
+  }, [itemsRef, selection, removeIds])
+
+  // Settings: ⌘, from the menu or the keyboard
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    listen("menu:settings", () => setSettingsOpen(true)).then((fn) => { unlisten = fn }).catch(() => {})
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ",") { e.preventDefault(); setSettingsOpen(true) }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => { unlisten?.(); window.removeEventListener("keydown", onKey) }
+  }, [])
+
+  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbPx" | "inspectorPx" | "listCompare" | "showDetails" | "backdrop" | "previewCss" | "previewCssEnabled" | "circleOverlay" | "circleClip">>) =>
     update((s) => ({ ...s, ...patch }))
 
   // ── Layout ──────────────────────────────────────────────────────────────────
@@ -428,13 +500,13 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   const viewControls = (
     <ViewControls
-      size={view === "review" ? settings.reviewPx : settings.thumbPx}
-      sizeRange={view === "review" ? PREVIEW_PX.review : PREVIEW_PX.list}
-      onSize={(px) => view === "review"
-        ? setViewPrefs({ reviewPx: px < 0 ? PREVIEW_PX.review.default : px })
-        : setViewPrefs({ thumbPx: px < 0 ? PREVIEW_PX.list.default : px })}
+      size={settings.thumbPx}
+      sizeRange={PREVIEW_PX.list}
+      onSize={(px) => setViewPrefs({ thumbPx: px < 0 ? PREVIEW_PX.list.default : px })}
       compare={settings.listCompare}
-      onCompare={view === "list" ? () => setViewPrefs({ listCompare: !settings.listCompare }) : undefined}
+      onCompare={() => setViewPrefs({ listCompare: !settings.listCompare })}
+      details={settings.showDetails}
+      onDetails={() => setViewPrefs({ showDetails: !settings.showDetails })}
       backdrop={settings.backdrop}
       onBackdrop={(backdrop) => setViewPrefs({ backdrop })}
       circle={settings.circleOverlay}
@@ -460,21 +532,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   return (
     <PreviewCssContext.Provider value={appliedCss}>
       <div className={`app${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px` } as CSSProperties}>
-        <AppBar subtitle={view === "review" ? "Review" : undefined} />
+        <AppBar onSettings={() => setSettingsOpen(true)} />
         <div className="workspace">
           <main className="workspace__main">
-            {view === "review" ? (
-              <ReviewView
-                items={reviewItems}
-                settings={settings}
-                defaultPreset={defaultPreset}
-                onBack={() => setView("list")}
-                onPreset={setPreset}
-                onNewPreset={newPresetForItem}
-                viewControls={viewControls}
-                cssBar={cssBar}
-              />
-            ) : items.length === 0 ? (
+            {items.length === 0 ? (
               <EmptyState onAddFiles={addFiles} onAddFolder={addFolder} />
             ) : (
               <FileList
@@ -497,7 +558,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onSelectAll={selectAll}
                 onPreset={(id, presetId) => setPreset([id], presetId)}
                 onNewPreset={newPresetForItem}
-                onDefaultPreset={actions.setDefault}
+                onContextMenu={rowMenu}
+                tagsFor={tagsFor}
                 onAddFiles={addFiles}
                 onAddFolder={addFolder}
                 onRemove={removeItems}
@@ -532,7 +594,15 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onNewPreset={() => newPresetForItem(focused)}
                 onEdit={(source) => editSource(focused.id, source)}
                 onRevert={() => revertSource(focused.id)}
-                onBespoke={(b) => setBespoke(focused.id, b)}
+                tags={tagsFor(focused)}
+                presetName={presetFor(focused).name}
+                onCustomise={() => customiseItem(focused)}
+                onConfig={(fn) => { if (focused.config) setConfig(focused.id, fn(focused.config)) }}
+                onSaveAsPreset={() => saveItemAsPreset(focused)}
+                onUsePreset={() => setPreset([focused.id], focused.presetId)}
+                customPlugins={settings.customPlugins}
+                onLoadPlugin={loadPlugin}
+                onRemovePlugin={removePlugin}
               />
             ) : (
               <ConfigPanel
@@ -552,24 +622,34 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
           </aside>
         </div>
         <Footer
-          view={view}
           items={items}
           targets={targets}
+          ready={readyCount}
+          failed={failedCount}
           selectionCount={selection.size}
           busy={busy}
           keepStructure={settings.keepStructure}
           onKeepStructure={(keepStructure) => update((s) => ({ ...s, keepStructure }))}
           onOptimise={async () => {
             const res = await run(targets)
-            if (view === "list" && res.size > 0) {
-              push({ tone: "success", text: `Optimised ${plural(res.size, "file")}`, action: { label: "Review", run: () => openReview(selection.size === 0) } })
-            }
+            if (res.size > 0) push({ tone: "success", text: `Optimised ${plural(res.size, "file")}. Ready to export` })
           }}
-          onReview={() => openReview(selection.size === 0)}
-          canReviewAll={items.some((i) => i.result)}
-          onRerun={() => run(targets, true)}
           onExport={doExport}
         />
+        {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
+        {settingsOpen && (
+          <SettingsDialog
+            settings={settings}
+            update={update}
+            actions={actions}
+            usage={usageOf}
+            onDeletePreset={removePreset}
+            onImport={importPresets}
+            onExport={exportPresets}
+            onResetLayout={resetLayout}
+            onClose={() => setSettingsOpen(false)}
+          />
+        )}
         {dragging && <DropOverlay />}
         {dialogs.node}
         <Toasts toasts={toasts} dismiss={dismiss} />

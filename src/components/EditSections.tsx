@@ -4,7 +4,7 @@ import { Segmented } from "./Segmented"
 import { SliderField } from "./SliderField"
 import { Toggle } from "./Toggle"
 
-// ── Edit: size, artwork transform and trim, for every file using the preset ──
+// ── Edit viewBox (size, trim) and Edit contents (artwork transform, extra markup) ──
 
 interface Props {
   trim: TrimSettings
@@ -13,22 +13,18 @@ interface Props {
 
 const isScale = (n: number) => validScale(n) !== null
 
-export const isDefaultEdit = (t: TrimSettings) =>
-  !t.enabled && t.scale === 1 && t.artScale === 1 && t.offsetX === 0 && t.offsetY === 0
-
-export function SizeTrim({ trim, onChange }: Props) {
+export function EditViewBox({ trim, onChange }: Props) {
+  const pristine = !trim.enabled && trim.scale === 1 && trim.padding === 0
   return (
     <>
       <div className="plugins__head">
-        <span className="panel__label">Edit</span>
-        <button className="link" disabled={isDefaultEdit(trim) && trim.padding === 0}
-          title="Size, artwork scale and position back to normal, trim off"
-          onClick={() => onChange({ enabled: false, padding: 0, scale: 1, artScale: 1, offsetX: 0, offsetY: 0 })}>Reset</button>
+        <span className="panel__label">Edit viewBox</span>
+        <button className="link" disabled={pristine} title="Size back to 1×, trim off"
+          onClick={() => onChange({ enabled: false, padding: 0, scale: 1 })}>Reset</button>
       </div>
-
-      <div className="edit-group__label text-3" title="The SVG itself: its width, height and viewBox">Canvas · viewBox</div>
+      <p className="rules__empty text-3">The SVG itself: its width, height and viewBox. New sizes flash on the rows.</p>
       <SliderField label="Size" value={trim.scale} min={0.1} max={4} step={0.05} suffix="×" accept={isScale}
-        hint="Scales the whole SVG: width and height change, the viewBox doesn't, so the artwork grows with it. Click the number to type any value."
+        hint="Multiplies the width and height. The viewBox doesn't change, so the artwork grows with it. Click the number to type any value."
         onChange={(scale) => { if (isScale(scale)) onChange({ scale }) }} />
       <Toggle label="Trim whitespace" hint="Crops the viewBox to the visible artwork (strokes and effects included)"
         checked={trim.enabled} onChange={(enabled) => onChange({ enabled })} />
@@ -59,14 +55,32 @@ export function SizeTrim({ trim, onChange }: Props) {
           </div>
         </>
       )}
+    </>
+  )
+}
 
-      <div className="edit-group__label text-3" title="The drawing inside the viewBox">Artwork · inside the viewBox</div>
+export function EditContents({ trim, onChange, markup, onMarkup }: Props & { markup: string, onMarkup: (v: string) => void }) {
+  const pristine = trim.artScale === 1 && trim.offsetX === 0 && trim.offsetY === 0 && !markup.trim()
+  return (
+    <>
+      <div className="plugins__head">
+        <span className="panel__label">Edit contents</span>
+        <button className="link" disabled={pristine} title="Artwork back to normal, extra markup cleared"
+          onClick={() => { onChange({ artScale: 1, offsetX: 0, offsetY: 0 }); onMarkup("") }}>Reset</button>
+      </div>
+      <p className="rules__empty text-3">The drawing inside the viewBox. The SVG's size stays the same.</p>
       <ArtworkFields scale={trim.artScale} x={trim.offsetX} y={trim.offsetY}
         onChange={(p) => onChange({
           ...(p.scale !== undefined && { artScale: p.scale }),
           ...(p.x !== undefined && { offsetX: p.x }),
           ...(p.y !== undefined && { offsetY: p.y })
         })} />
+      <label className="append-markup">
+        <span className="range__label">Add markup</span>
+        <textarea className="input input--mono" spellCheck={false} rows={3} value={markup}
+          placeholder={'<title>Logo</title>  (added just before </svg>)'}
+          onChange={(e) => onMarkup(e.target.value)} />
+      </label>
     </>
   )
 }

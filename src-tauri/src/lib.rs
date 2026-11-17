@@ -274,11 +274,15 @@ fn build_menu(app: &App) -> tauri::Result<()> {
         .website(Some("https://github.com/marknotton/svgenius"))
         .build();
 
+    let settings = MenuItemBuilder::with_id("settings", "Settings…")
+        .accelerator("CmdOrCtrl+,")
+        .build(app)?;
     let reset_layout = MenuItemBuilder::with_id("reset-layout", "Reset Layout").build(app)?;
 
     let app_menu = SubmenuBuilder::new(app, "SVGenius")
         .about(Some(about))
         .separator()
+        .item(&settings)
         .item(&reset_layout)
         .separator()
         .services()
@@ -314,8 +318,10 @@ fn build_menu(app: &App) -> tauri::Result<()> {
     app.set_menu(menu)?;
 
     app.on_menu_event(|app, event| {
-        if event.id() == "reset-layout" {
-            let _ = app.emit("menu:reset-layout", ());
+        match event.id().as_ref() {
+            "reset-layout" => { let _ = app.emit("menu:reset-layout", ()); }
+            "settings" => { let _ = app.emit("menu:settings", ()); }
+            _ => {}
         }
     });
     Ok(())

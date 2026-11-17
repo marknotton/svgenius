@@ -7,8 +7,10 @@ interface Props {
   sizeRange: { min: number, max: number }
   onSize: (px: number) => void
   /** List view only: before and after thumbnails side by side */
-  compare?: boolean
-  onCompare?: () => void
+  compare: boolean
+  onCompare: () => void
+  details: boolean
+  onDetails: () => void
   backdrop: Backdrop
   onBackdrop: (b: Backdrop) => void
   circle: boolean
@@ -20,7 +22,7 @@ interface Props {
   onCssToggle: () => void
 }
 
-export function ViewControls({ size, sizeRange, onSize, compare, onCompare, backdrop, onBackdrop, circle, onCircle, clip, onClip, cssOpen, cssActive, onCssToggle }: Props) {
+export function ViewControls({ size, sizeRange, onSize, compare, onCompare, details, onDetails, backdrop, onBackdrop, circle, onCircle, clip, onClip, cssOpen, cssActive, onCssToggle }: Props) {
   return (
     <div className="view-controls">
       <label className="view-size" title={`Preview size: ${size}px. Double-click to reset`}>
@@ -30,12 +32,14 @@ export function ViewControls({ size, sizeRange, onSize, compare, onCompare, back
           onDoubleClick={() => onSize(-1)} />
         <IconImageLg />
       </label>
-      {onCompare && (
-        <button type="button" className={`flag flag--lg${compare ? " is-on" : ""}`} aria-pressed={!!compare}
-          title="Show before and after thumbnails in the list" onClick={onCompare}>
-          Before / after
-        </button>
-      )}
+      <button type="button" className={`flag flag--lg${compare ? " is-on" : ""}`} aria-pressed={compare}
+        title="Show before and after thumbnails in the list" onClick={onCompare}>
+        Before / after
+      </button>
+      <button type="button" className={`flag flag--lg${details ? " is-on" : ""}`} aria-pressed={details}
+        title="Show what's been done to each file: size changes, trims, rule changes, edits" onClick={onDetails}>
+        Details
+      </button>
       <Segmented
         label="Preview background"
         value={backdrop}

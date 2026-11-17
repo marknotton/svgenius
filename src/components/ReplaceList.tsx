@@ -1,5 +1,6 @@
 import type { ReactNode } from "react"
-import { IconPlus, IconTrash } from "../icons"
+import { useDragSort } from "../hooks/useDragSort"
+import { IconGrip, IconPlus, IconTrash } from "../icons"
 import { ruleError } from "../lib/replace"
 import { createReplacement } from "../lib/settings"
 import type { Replacement } from "../lib/types"
@@ -18,6 +19,7 @@ export function ReplaceList({ rules, onChange }: Props) {
   const add = () => onChange([...rules, createReplacement()])
   const remove = (id: string) => onChange(rules.filter((r) => r.id !== id))
   const active = rules.filter((r) => r.enabled && r.find).length
+  const sort = useDragSort(rules, onChange)
 
   return (
     <div className="rules">
@@ -27,12 +29,14 @@ export function ReplaceList({ rules, onChange }: Props) {
       </div>
 
       {rules.length === 0 && <p className="rules__empty text-3">Swap strings in every file, e.g. colours, IDs or class names.</p>}
+      {rules.length > 1 && <p className="rules__empty text-3">Rules run top to bottom. Drag the handle to reorder.</p>}
 
       {rules.map((r, i) => {
         const error = ruleError(r)
         return (
-          <div key={r.id} className={`rule${r.enabled ? "" : " is-off"}${error ? " is-invalid" : ""}`}>
+          <div key={r.id} className={`rule${r.enabled ? "" : " is-off"}${error ? " is-invalid" : ""}`} {...sort.rowProps(r.id)}>
             <div className="rule__row">
+              {rules.length > 1 && <span className="rule__grip" title="Drag to reorder. Rules run top to bottom" {...sort.handleProps(r.id)}><IconGrip /></span>}
               <input type="checkbox" className="checkbox" checked={r.enabled} title={r.enabled ? "Rule on" : "Rule off"}
                 aria-label={`Rule ${i + 1} enabled`} onChange={(e) => patch(r.id, { enabled: e.target.checked })} />
               <input className="input input--sm input--mono" placeholder={r.regex ? "Find (regex)" : "Find"} value={r.find}

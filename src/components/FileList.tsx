@@ -2,9 +2,9 @@ import { useEffect, useRef, type MouseEvent, type ReactNode } from "react"
 import { LIVE_BUFFER_PX } from "../lib/config"
 import { IconFile, IconFolder, IconTrash } from "../icons"
 import { plural } from "../lib/format"
+import type { FileTag } from "../lib/tags"
 import type { AppSettings, Preset, SvgItem } from "../lib/types"
 import { FileRow } from "./FileRow"
-import { PresetSelect } from "./PresetSelect"
 
 interface Props {
   items: SvgItem[]
@@ -20,13 +20,16 @@ interface Props {
   onSelectAll: (all: boolean) => void
   onPreset: (id: string, presetId: string | null) => void
   onNewPreset: (item: SvgItem) => void
-  onDefaultPreset: (id: string) => void
+  onContextMenu: (id: string, e: MouseEvent) => void
+  tagsFor: (item: SvgItem) => FileTag[]
   onAddFiles: () => void
   onAddFolder: () => void
   onRemove: () => void
   viewControls: ReactNode
   cssBar: ReactNode
 }
+
+const NO_TAGS: FileTag[] = []
 
 export function FileList(p: Props) {
   const { items, selection, settings } = p
@@ -89,11 +92,6 @@ export function FileList(p: Props) {
         </div>
         <div className="toolbar__spacer" />
         {p.liveToggle}
-        <label className="field-inline" title="Used by every file that hasn't got its own preset">
-          <span>Default preset</span>
-          <PresetSelect label="Default preset" presets={settings.presets} value={settings.defaultPresetId}
-            onChange={(id) => id && p.onDefaultPreset(id)} />
-        </label>
         {p.viewControls}
       </div>
       {p.cssBar}
@@ -109,6 +107,9 @@ export function FileList(p: Props) {
             stale={p.isStale(item)}
             thumbPx={settings.thumbPx}
             compare={settings.listCompare}
+            details={settings.showDetails}
+            tags={settings.showDetails ? p.tagsFor(item) : NO_TAGS}
+            onContextMenu={p.onContextMenu}
             backdrop={settings.backdrop}
             presets={settings.presets}
             defaultPreset={p.defaultPreset}

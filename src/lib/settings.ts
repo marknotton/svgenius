@@ -15,6 +15,7 @@ export function defaultSvgoSettings(): SvgoSettings {
     replacements: [],
     attrRules: [],
     trim: { enabled: false, padding: 0, unit: "%", aspect: "fit", scale: 1, artScale: 1, offsetX: 0, offsetY: 0 },
+    appendMarkup: "",
     custom: {}
   }
 }
@@ -57,7 +58,6 @@ export const SIDEBAR = { default: 300, min: 260, max: 640 }
 /** Preview size sliders: [min, default, max] in px. Typing a value can go past max */
 export const PREVIEW_PX = {
   list: { min: 24, default: 64, max: 320 },
-  review: { min: 80, default: 220, max: 800 },
   inspector: { min: 48, default: 112, max: 400 }
 }
 const OLD_THUMB_SIZES: Record<string, [number, number]> = { tiny: [32, 140], medium: [64, 220], large: [128, 340] }
@@ -70,11 +70,6 @@ export function validScale(v: unknown) {
   return typeof n === "number" && Number.isFinite(n) && n >= SCALE_LIMITS.min && n <= SCALE_LIMITS.max ? n : null
 }
 
-export const defaultBespoke = () => ({ scale: 1, offsetX: 0, offsetY: 0 })
-
-export const isDefaultBespoke = (b: { scale: number, offsetX: number, offsetY: number }) =>
-  b.scale === 1 && b.offsetX === 0 && b.offsetY === 0
-
 /** The bits "Reset layout" puts back */
 export function defaultLayout() {
   return {
@@ -84,9 +79,9 @@ export function defaultLayout() {
     circleOverlay: false,
     circleClip: false,
     thumbPx: PREVIEW_PX.list.default,
-    reviewPx: PREVIEW_PX.review.default,
     inspectorPx: PREVIEW_PX.inspector.default,
     listCompare: false,
+    showDetails: false,
     backdrop: "light" as const
   }
 }
@@ -125,7 +120,7 @@ export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
   const t = settings.trim
   const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.scale, t.artScale, t.offsetX, t.offsetY]
-  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()])])
+  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim()])
 }
 
 export function runSpec(settings: SvgoSettings, plugins: CustomPlugin[]): RunSpec {
@@ -185,6 +180,7 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
       offsetX: clampNum(trimRaw.offsetX, -1e4, 1e4, 0),
       offsetY: clampNum(trimRaw.offsetY, -1e4, 1e4, 0)
     },
+    appendMarkup: typeof raw.appendMarkup === "string" ? raw.appendMarkup : "",
     custom,
     attrRules,
     replacements,
@@ -279,9 +275,9 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     editingPresetId: pick(raw.editingPresetId),
     // Older settings stored S/M/L
     thumbPx: clampNum(raw.thumbPx, PREVIEW_PX.list.min, 2000, OLD_THUMB_SIZES[String(raw.thumbSize)]?.[0] ?? PREVIEW_PX.list.default),
-    reviewPx: clampNum(raw.reviewPx, PREVIEW_PX.review.min, 4000, OLD_THUMB_SIZES[String(raw.thumbSize)]?.[1] ?? PREVIEW_PX.review.default),
     inspectorPx: clampNum(raw.inspectorPx, PREVIEW_PX.inspector.min, 2000, PREVIEW_PX.inspector.default),
     listCompare: raw.listCompare === true,
+    showDetails: raw.showDetails === true,
     backdrop: raw.backdrop === "dark" ? "dark" : "light",
     keepStructure: typeof raw.keepStructure === "boolean" ? raw.keepStructure : true,
     previewCss: typeof raw.previewCss === "string" ? raw.previewCss : "",

@@ -1,17 +1,18 @@
 import { useMemo, useState } from "react"
 import { IconCopy, IconReset, IconX } from "../icons"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
-import { defaultBespoke, isDefaultBespoke, PREVIEW_PX } from "../lib/settings"
+import { PREVIEW_PX } from "../lib/settings"
+import type { FileTag } from "../lib/tags"
 import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "../lib/svgRoot"
-import type { Backdrop, Bespoke, Preset, SvgItem } from "../lib/types"
+import type { Backdrop, CustomPlugin, Preset, SvgItem, SvgoSettings } from "../lib/types"
 import { PresetSelect } from "./PresetSelect"
 import { Segmented } from "./Segmented"
-import { ArtworkFields } from "./SizeTrim"
+import { PresetEditor } from "./PresetEditor"
 import { SliderField } from "./SliderField"
 import { Thumb } from "./Thumb"
 
 // ── Per-file inspector ────────────────────────────────────────────────────────
-// Info, preset, bespoke transform and a live markup editor for one file.
+// Info, tags, a live markup editor and the file's preset or own settings.
 
 interface Props {
   item: SvgItem
@@ -25,7 +26,17 @@ interface Props {
   onNewPreset: () => void
   onEdit: (source: string) => void
   onRevert: () => void
-  onBespoke: (b: Bespoke) => void
+  tags: FileTag[]
+  /** Name of the preset in use (when the file has no settings of its own) */
+  presetName: string
+  /** Copy the preset's settings into the file, so they can be changed */
+  onCustomise: () => void
+  onConfig: (fn: (s: SvgoSettings) => SvgoSettings) => void
+  onSaveAsPreset: () => void
+  onUsePreset: () => void
+  customPlugins: CustomPlugin[]
+  onLoadPlugin: () => void
+  onRemovePlugin: (p: CustomPlugin) => void
 }
 
 function viewBoxOf(svg?: string) {
@@ -42,8 +53,6 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
   const before = useMemo(() => ({ size: svgSize(item.source), vb: viewBoxOf(item.source) }), [item.source])
   const after = useMemo(() => ({ size: svgSize(out), vb: viewBoxOf(out) }), [out])
   const edited = item.fileSource !== undefined && item.source !== item.fileSource
-  const b = item.bespoke
-  const setB = (patch: Partial<Bespoke>) => p.onBespoke({ ...b, ...patch })
 
   const copy = async () => {
     if (!out) return
@@ -90,31 +99,17 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             <dt>viewBox</dt><dd>{dims(before.vb)}{out && <> → {dims(after.vb)}</>}</dd>
             {!!item.result?.replaced && <><dt>Rule changes</dt><dd>{plural(item.result.replaced, "change")}</dd></>}
           </dl>
-          <label className="field-row">
-            <span>Preset</span>
-            <PresetSelect label={`Preset for ${item.name}`} presets={presets} defaultPreset={defaultPreset}
-              value={item.presetId} onChange={p.onPreset} onCreateNew={p.onNewPreset} newLabel="New preset for this file…" />
-          </label>
-        </section>
-
-        <section className="panel__section">
-          <div className="plugins__head">
-            <span className="panel__label">Edit this file</span>
-            <button className="link" onClick={() => p.onBespoke(defaultBespoke())} disabled={isDefaultBespoke(b)}>Reset</button>
-          </div>
-          <ArtworkFields scale={b.scale} x={b.offsetX} y={b.offsetY}
-            onChange={(v) => setB({
-              ...(v.scale !== undefined && { scale: v.scale }),
-              ...(v.x !== undefined && { offsetX: v.x }),
-              ...(v.y !== undefined && { offsetY: v.y })
-            })} />
-          <p className="text-3 inspector__hint">Adds to the preset's Edit settings, for this file only.</p>
+          {p.tags.length > 0 && (
+            <div className="tags">
+              {p.tags.map((t) => <span key={t.label} className={`tag${t.tone ? ` tag--${t.tone}` : ""}`} title={t.title}>{t.label}</span>)}
+            </div>
+          )}
         </section>
 
         <section className="panel__section inspector__code">
           <div className="plugins__head">
             <Segmented label="Markup" value={tab} onChange={setTab}
-              options={[{ value: "source", label: "Source (before)" }, { value: "output", label: "Output (after)" }]} />
+              options={[{ value: "source", label: "Before (editable)" }, { value: "output", label: "After" }]} />
             {tab === "source" && edited && <button className="link" onClick={p.onRevert} title="Throw away edits and reload the file's markup"><IconReset width={11} height={11} /> Revert</button>}
             {tab === "output" && <button className="link" onClick={copy} disabled={!out}><IconCopy width={11} height={11} /> {copied ? "Copied" : "Copy"}</button>}
           </div>
@@ -131,6 +126,34 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
           )}
           {item.status === "error" && <p className="rule__error">{item.error}</p>}
         </section>
+
+        <section className="panel__section">
+          <div className="panel__label">Settings for this file</div>
+          {item.config ? (
+            <>
+              <p className="text-3 inspector__hint">This file has its own copy of every setting. Changes here only affect it.</p>
+              <div className="inspector__own">
+                <button className="btn btn--secondary btn--sm" onClick={p.onSaveAsPreset} title="Turn these settings into a preset you can use on other files">Save as preset…</button>
+                <button className="btn btn--ghost btn--sm" onClick={p.onUsePreset} title="Drop this file's own settings">Use a preset again</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <label className="field-row">
+                <span>Preset</span>
+                <PresetSelect label={`Preset for ${item.name}`} presets={presets} defaultPreset={defaultPreset}
+                  value={item.presetId} onChange={p.onPreset} onCreateNew={p.onNewPreset} newLabel="New preset for this file…" />
+              </label>
+              <button className="btn btn--secondary btn--sm inspector__customise" onClick={p.onCustomise}
+                title={`Starts as a copy of “${p.presetName}”`}>Customise this file…</button>
+              <p className="text-3 inspector__hint">Gives this file every preset setting to change on its own, starting from “{p.presetName}”.</p>
+            </>
+          )}
+        </section>
+        {item.config && (
+          <PresetEditor settings={item.config} edit={p.onConfig} customPlugins={p.customPlugins}
+            onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} />
+        )}
       </div>
     </div>
   )

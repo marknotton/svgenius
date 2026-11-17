@@ -48,8 +48,8 @@ export interface TrimSettings {
   offsetY: number
 }
 
-/** Per-file tweaks, applied after everything else */
-export interface Bespoke {
+/** Scale and move the artwork inside its viewBox */
+export interface ArtTransform {
   /** Scales the artwork inside its viewBox, around the centre */
   scale: number
   /** Moves the artwork, as % of the viewBox width/height */
@@ -68,6 +68,8 @@ export interface SvgoSettings {
   attrRules: AttrRule[]
   /** Crop the viewBox to the visible artwork, then pad (or inset) it */
   trim: TrimSettings
+  /** Raw markup added to every file, just before </svg> */
+  appendMarkup: string
   /** Custom plugin id → on/off and its params as JSON text */
   custom: Record<string, { on: boolean, params: string }>
 }
@@ -87,7 +89,7 @@ export interface CustomPlugin {
 export interface CustomRun { name: string, code: string, hash: string, params: string }
 
 /** Everything needed to optimise one file */
-export interface RunSpec { svgo: SvgoSettings, custom: CustomRun[], key: string, bespoke?: Bespoke }
+export interface RunSpec { svgo: SvgoSettings, custom: CustomRun[], key: string }
 
 export interface Preset {
   id: string
@@ -103,12 +105,13 @@ export interface AppSettings {
   customPlugins: CustomPlugin[]
   /** The preset currently open in the config panel */
   editingPresetId: string
-  /** Preview sizes in px: file list rows, review panes, inspector before/after */
+  /** Preview sizes in px: file list rows, inspector before/after */
   thumbPx: number
-  reviewPx: number
   inspectorPx: number
   /** Show before and after thumbnails in the file list */
   listCompare: boolean
+  /** Show tags and dimensions detail on each row */
+  showDetails: boolean
   backdrop: Backdrop
   keepStructure: boolean
   /** CSS injected into previews only */
@@ -154,5 +157,6 @@ export interface SvgItem extends ScannedFile {
   fileSource?: string
   /** Bumped on every in-app edit of the source */
   rev: number
-  bespoke: Bespoke
+  /** This file's own settings, used instead of its preset */
+  config?: SvgoSettings
 }

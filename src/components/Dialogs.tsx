@@ -31,7 +31,7 @@ export function useDialogs() {
   return { node, prompt, confirm }
 }
 
-function Modal({ children, onCancel }: { children: ReactNode, onCancel: () => void }) {
+export function Modal({ children, onCancel }: { children: ReactNode, onCancel: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel() }
     window.addEventListener("keydown", onKey)

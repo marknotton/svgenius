@@ -1,8 +1,8 @@
 import type { MouseEvent } from "react"
 import { getCurrentWindow } from "@tauri-apps/api/window"
-import { Logo } from "../icons"
+import { IconGear, Logo } from "../icons"
 
-export function AppBar({ subtitle }: { subtitle?: string }) {
+export function AppBar({ onSettings }: { onSettings: () => void }) {
   const drag = (e: MouseEvent) => {
     if (e.button === 0 && e.target === e.currentTarget) getCurrentWindow().startDragging().catch(() => {})
   }
@@ -10,8 +10,8 @@ export function AppBar({ subtitle }: { subtitle?: string }) {
     <header className="appbar" data-tauri-drag-region onMouseDown={drag}>
       <span className="appbar__title" data-tauri-drag-region>
         <Logo width={14} height={14} /> SVGenius
-        {subtitle && <span className="text-3"> · {subtitle}</span>}
       </span>
+      <button className="btn btn--icon appbar__settings" title="Settings (⌘,)" aria-label="Settings" onClick={onSettings}><IconGear /></button>
     </header>
   )
 }

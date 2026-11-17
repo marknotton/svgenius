@@ -1,6 +1,6 @@
 import { svgDataUrl } from "./format"
 import { fmtNum, getAttr, parseLength, parseViewBox, replaceRoot, rootTag, setAttr, type ViewBox } from "./svgRoot"
-import type { Bespoke, SvgoSettings, TrimSettings } from "./types"
+import type { ArtTransform, SvgoSettings, TrimSettings } from "./types"
 
 // ── Trim whitespace ───────────────────────────────────────────────────────────
 // Renders the SVG to a canvas and scans for visible pixels, so strokes, filters
@@ -119,10 +119,10 @@ export function scaleSvg(svg: string, scale: number, precision: number) {
   return replaceRoot(svg, out)
 }
 
-// ── Per-file transform ────────────────────────────────────────────────────────
+// ── Artwork transform ────────────────────────────────────────────────────────
 
 /** Wraps the artwork in a <g> that scales around the viewBox centre and offsets it */
-export function transformSvg(svg: string, b: Bespoke) {
+export function transformSvg(svg: string, b: ArtTransform) {
   if (b.scale === 1 && b.offsetX === 0 && b.offsetY === 0) return svg
   const tag = rootTag(svg)
   if (!tag) return svg
@@ -145,17 +145,23 @@ export function transformSvg(svg: string, b: Bespoke) {
   return `${svg.slice(0, start)}<g transform="${t}">${svg.slice(start, end)}</g>${svg.slice(end)}`
 }
 
+/** Adds raw markup just before the closing </svg> */
+export function appendMarkup(svg: string, markup: string) {
+  const extra = markup.trim()
+  if (!extra) return svg
+  const end = svg.lastIndexOf("</svg>")
+  if (end < 0) return svg
+  return `${svg.slice(0, end)}${extra}${svg.slice(end)}`
+}
+
 /** Everything that happens after SVGO, in order */
-export async function postProcess(svg: string, settings: SvgoSettings, bespoke?: Bespoke) {
-  let out = svg
-  if (settings.trim.enabled) out = await trimSvg(out, settings.trim, settings.floatPrecision)
-  // The preset's artwork transform and the file's own one combine into one <g>
+export async function postProcess(svg: string, settings: SvgoSettings) {
   const t = settings.trim
-  out = transformSvg(out, {
-    scale: t.artScale * (bespoke?.scale ?? 1),
-    offsetX: t.offsetX + (bespoke?.offsetX ?? 0),
-    offsetY: t.offsetY + (bespoke?.offsetY ?? 0)
-  })
-  out = scaleSvg(out, settings.trim.scale, settings.floatPrecision)
+  let out = svg
+  if (t.enabled) out = await trimSvg(out, t, settings.floatPrecision)
+  out = transformSvg(out, { scale: t.artScale, offsetX: t.offsetX, offsetY: t.offsetY })
+  // Outside the artwork group, so it isn't moved or scaled with it
+  out = appendMarkup(out, settings.appendMarkup)
+  out = scaleSvg(out, t.scale, settings.floatPrecision)
   return out
 }
