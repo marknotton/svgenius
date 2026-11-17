@@ -149,7 +149,13 @@ export function transformSvg(svg: string, b: Bespoke) {
 export async function postProcess(svg: string, settings: SvgoSettings, bespoke?: Bespoke) {
   let out = svg
   if (settings.trim.enabled) out = await trimSvg(out, settings.trim, settings.floatPrecision)
-  if (bespoke) out = transformSvg(out, bespoke)
+  // The preset's artwork transform and the file's own one combine into one <g>
+  const t = settings.trim
+  out = transformSvg(out, {
+    scale: t.artScale * (bespoke?.scale ?? 1),
+    offsetX: t.offsetX + (bespoke?.offsetX ?? 0),
+    offsetY: t.offsetY + (bespoke?.offsetY ?? 0)
+  })
   out = scaleSvg(out, settings.trim.scale, settings.floatPrecision)
   return out
 }

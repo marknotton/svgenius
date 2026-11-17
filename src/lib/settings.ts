@@ -14,7 +14,7 @@ export function defaultSvgoSettings(): SvgoSettings {
     plugins: Object.fromEntries(PLUGINS.map((p) => [p.name, p.defaultOn])),
     replacements: [],
     attrRules: [],
-    trim: { enabled: false, padding: 0, unit: "%", aspect: "fit", scale: 1 },
+    trim: { enabled: false, padding: 0, unit: "%", aspect: "fit", scale: 1, artScale: 1, offsetX: 0, offsetY: 0 },
     custom: {}
   }
 }
@@ -54,6 +54,14 @@ export function defaultAppSettings(): AppSettings {
 
 export const SIDEBAR = { default: 300, min: 260, max: 640 }
 
+/** Preview size sliders: [min, default, max] in px. Typing a value can go past max */
+export const PREVIEW_PX = {
+  list: { min: 24, default: 64, max: 320 },
+  review: { min: 80, default: 220, max: 800 },
+  inspector: { min: 48, default: 112, max: 400 }
+}
+const OLD_THUMB_SIZES: Record<string, [number, number]> = { tiny: [32, 140], medium: [64, 220], large: [128, 340] }
+
 export const SCALE_LIMITS = { min: 0.0001, max: 1000 }
 
 /** A usable scale factor, or null */
@@ -75,7 +83,10 @@ export function defaultLayout() {
     sidebarWidth: SIDEBAR.default,
     circleOverlay: false,
     circleClip: false,
-    thumbSize: "medium" as const,
+    thumbPx: PREVIEW_PX.list.default,
+    reviewPx: PREVIEW_PX.review.default,
+    inspectorPx: PREVIEW_PX.inspector.default,
+    listCompare: false,
     backdrop: "light" as const
   }
 }
@@ -113,7 +124,7 @@ export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const rules = activeReplacements(settings).map(({ id: _id, enabled: _e, ...r }) => r)
   const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
   const t = settings.trim
-  const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.scale]
+  const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.scale, t.artScale, t.offsetX, t.offsetY]
   return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()])])
 }
 
@@ -169,7 +180,10 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
       padding: clampNum(trimRaw.padding, -1e6, 1e6, 0),
       unit: trimRaw.unit === "px" ? "px" : "%",
       aspect: trimRaw.aspect === "preserve" ? "preserve" : "fit",
-      scale: validScale(trimRaw.scale) ?? 1
+      scale: validScale(trimRaw.scale) ?? 1,
+      artScale: validScale(trimRaw.artScale) ?? 1,
+      offsetX: clampNum(trimRaw.offsetX, -1e4, 1e4, 0),
+      offsetY: clampNum(trimRaw.offsetY, -1e4, 1e4, 0)
     },
     custom,
     attrRules,
@@ -199,7 +213,8 @@ function sanitiseAttrRule(raw: unknown): AttrRule | null {
     thenAttr: str(raw.thenAttr),
     thenValue: str(raw.thenValue),
     caseSensitive: typeof raw.caseSensitive === "boolean" ? raw.caseSensitive : true,
-    stage: raw.stage === "after" ? "after" : "before"
+    // Rules always run on the original markup now (the Before/After SVGO switch is gone)
+    stage: "before"
   }
 }
 
@@ -215,7 +230,8 @@ function sanitiseReplacement(raw: unknown): Replacement | null {
     caseSensitive: bool(raw.caseSensitive, base.caseSensitive),
     replaceAll: bool(raw.replaceAll, base.replaceAll),
     regex: bool(raw.regex, false),
-    stage: raw.stage === "after" ? "after" : "before"
+    // Rules always run on the original markup now (the Before/After SVGO switch is gone)
+    stage: "before"
   }
 }
 
@@ -261,7 +277,11 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     customPlugins: sanitiseCustomList(raw.customPlugins),
     defaultPresetId: pick(raw.defaultPresetId),
     editingPresetId: pick(raw.editingPresetId),
-    thumbSize: raw.thumbSize === "tiny" || raw.thumbSize === "large" ? raw.thumbSize : "medium",
+    // Older settings stored S/M/L
+    thumbPx: clampNum(raw.thumbPx, PREVIEW_PX.list.min, 2000, OLD_THUMB_SIZES[String(raw.thumbSize)]?.[0] ?? PREVIEW_PX.list.default),
+    reviewPx: clampNum(raw.reviewPx, PREVIEW_PX.review.min, 4000, OLD_THUMB_SIZES[String(raw.thumbSize)]?.[1] ?? PREVIEW_PX.review.default),
+    inspectorPx: clampNum(raw.inspectorPx, PREVIEW_PX.inspector.min, 2000, PREVIEW_PX.inspector.default),
+    listCompare: raw.listCompare === true,
     backdrop: raw.backdrop === "dark" ? "dark" : "light",
     keepStructure: typeof raw.keepStructure === "boolean" ? raw.keepStructure : true,
     previewCss: typeof raw.previewCss === "string" ? raw.previewCss : "",

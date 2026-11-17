@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react"
 import { IconCopy, IconReset, IconX } from "../icons"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
-import { defaultBespoke, isDefaultBespoke } from "../lib/settings"
+import { defaultBespoke, isDefaultBespoke, PREVIEW_PX } from "../lib/settings"
 import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "../lib/svgRoot"
 import type { Backdrop, Bespoke, Preset, SvgItem } from "../lib/types"
 import { PresetSelect } from "./PresetSelect"
 import { Segmented } from "./Segmented"
+import { ArtworkFields } from "./SizeTrim"
 import { SliderField } from "./SliderField"
 import { Thumb } from "./Thumb"
 
@@ -17,6 +18,8 @@ interface Props {
   presets: Preset[]
   defaultPreset: Preset
   backdrop: Backdrop
+  previewPx: number
+  onPreviewPx: (px: number) => void
   onClose: () => void
   onPreset: (presetId: string | null) => void
   onNewPreset: () => void
@@ -32,7 +35,7 @@ function viewBoxOf(svg?: string) {
 
 const dims = (s: { w: number, h: number } | null) => (s ? `${fmtNum(s.w, 2)} × ${fmtNum(s.h, 2)}` : "–")
 
-export function FileInspector({ item, presets, defaultPreset, backdrop, ...p }: Props) {
+export function FileInspector({ item, presets, defaultPreset, backdrop, previewPx, ...p }: Props) {
   const [tab, setTab] = useState<"source" | "output">("source")
   const [copied, setCopied] = useState(false)
   const out = item.result?.output
@@ -60,14 +63,17 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, ...p }: 
         </div>
         <div className="inspector__previews">
           <figure className="pane">
-            <Thumb svg={item.source} size={112} backdrop={backdrop} label={`${item.name} before`} />
+            <Thumb svg={item.source} size={previewPx} backdrop={backdrop} label={`${item.name} before`} />
             <figcaption className="text-2">Before</figcaption>
           </figure>
           <figure className="pane">
-            <Thumb svg={out} size={112} backdrop={backdrop} label={`${item.name} after`} />
+            <Thumb svg={out} size={previewPx} backdrop={backdrop} label={`${item.name} after`} />
             <figcaption className="text-2">After{item.status === "running" && <span className="spinner spinner--xs" />}</figcaption>
           </figure>
         </div>
+        <SliderField label="Preview" value={previewPx} min={PREVIEW_PX.inspector.min} max={PREVIEW_PX.inspector.max} step={4} suffix="px"
+          hint="Size of the before and after previews. Click the number to type any size." accept={(n) => n >= PREVIEW_PX.inspector.min && n <= 2000}
+          onChange={(px) => p.onPreviewPx(Math.round(px))} />
       </div>
 
       <div className="panel__scroll">
@@ -93,21 +99,22 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, ...p }: 
 
         <section className="panel__section">
           <div className="plugins__head">
-            <span className="panel__label">Transform this file</span>
+            <span className="panel__label">Edit this file</span>
             <button className="link" onClick={() => p.onBespoke(defaultBespoke())} disabled={isDefaultBespoke(b)}>Reset</button>
           </div>
-          <SliderField label="Scale" value={b.scale} min={0.001} max={2} step={0.001} hint="Scales the artwork inside its viewBox, around the centre. Click the number to type a value."
-            onChange={(scale) => { if (Number.isFinite(scale) && scale > 0) setB({ scale }) }} />
-          <SliderField label="Move X" value={b.offsetX} min={-50} max={50} step={0.5} suffix="%" hint="Moves the artwork left/right, as % of the viewBox width"
-            onChange={(offsetX) => setB({ offsetX })} />
-          <SliderField label="Move Y" value={b.offsetY} min={-50} max={50} step={0.5} suffix="%" hint="Moves the artwork up/down, as % of the viewBox height"
-            onChange={(offsetY) => setB({ offsetY })} />
+          <ArtworkFields scale={b.scale} x={b.offsetX} y={b.offsetY}
+            onChange={(v) => setB({
+              ...(v.scale !== undefined && { scale: v.scale }),
+              ...(v.x !== undefined && { offsetX: v.x }),
+              ...(v.y !== undefined && { offsetY: v.y })
+            })} />
+          <p className="text-3 inspector__hint">Adds to the preset's Edit settings, for this file only.</p>
         </section>
 
         <section className="panel__section inspector__code">
           <div className="plugins__head">
             <Segmented label="Markup" value={tab} onChange={setTab}
-              options={[{ value: "source", label: "Source" }, { value: "output", label: "Output" }]} />
+              options={[{ value: "source", label: "Source (before)" }, { value: "output", label: "Output (after)" }]} />
             {tab === "source" && edited && <button className="link" onClick={p.onRevert} title="Throw away edits and reload the file's markup"><IconReset width={11} height={11} /> Revert</button>}
             {tab === "output" && <button className="link" onClick={copy} disabled={!out}><IconCopy width={11} height={11} /> {copied ? "Copied" : "Copy"}</button>}
           </div>
@@ -116,7 +123,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, ...p }: 
               <textarea className="input input--mono code" spellCheck={false} value={item.source ?? ""}
                 aria-label="Source markup" onChange={(e) => p.onEdit(e.target.value)} />
               <p className="text-3 inspector__hint">
-                {edited ? "Edited here only. Your original file isn't touched, exports use this version." : "Edit to see changes live. Your original file isn't touched."}
+                {edited ? "Edited here only. Your original file isn't touched, exports use this version." : "The file as it is on disk, before any settings. Edit it to see changes live, the original isn't touched."}
               </p>
             </>
           ) : (

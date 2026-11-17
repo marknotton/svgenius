@@ -11,10 +11,12 @@ interface Props {
   step: number
   suffix?: string
   hint?: string
+  /** Rejects typed values, e.g. scales must be above 0 */
+  accept?: (v: number) => boolean
   onChange: (v: number) => void
 }
 
-export function SliderField({ label, value, min, max, step, suffix, hint, onChange }: Props) {
+export function SliderField({ label, value, min, max, step, suffix, hint, accept, onChange }: Props) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(String(value))
   const input = useRef<HTMLInputElement>(null)
@@ -24,7 +26,7 @@ export function SliderField({ label, value, min, max, step, suffix, hint, onChan
 
   const commit = () => {
     const n = Number(draft)
-    if (draft.trim() !== "" && Number.isFinite(n)) onChange(n)
+    if (draft.trim() !== "" && Number.isFinite(n) && (!accept || accept(n))) onChange(n)
     setEditing(false)
   }
 

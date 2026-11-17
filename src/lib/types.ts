@@ -1,6 +1,5 @@
 // ── Settings ──────────────────────────────────────────────────────────────────
 
-export type ThumbSize = "tiny" | "medium" | "large"
 export type Backdrop = "light" | "dark"
 
 /** A find & replace rule, stored on a preset */
@@ -40,8 +39,13 @@ export interface TrimSettings {
   unit: "%" | "px"
   /** fit = viewBox hugs the artwork; preserve = keep the original aspect ratio */
   aspect: "fit" | "preserve"
-  /** Multiplies the output width/height. 1 = unchanged */
+  /** Multiplies the output width/height (the viewBox is untouched). 1 = unchanged */
   scale: number
+  /** Scales the artwork inside the viewBox, around its centre. 1 = unchanged */
+  artScale: number
+  /** Moves the artwork, as % of the viewBox width/height */
+  offsetX: number
+  offsetY: number
 }
 
 /** Per-file tweaks, applied after everything else */
@@ -99,7 +103,12 @@ export interface AppSettings {
   customPlugins: CustomPlugin[]
   /** The preset currently open in the config panel */
   editingPresetId: string
-  thumbSize: ThumbSize
+  /** Preview sizes in px: file list rows, review panes, inspector before/after */
+  thumbPx: number
+  reviewPx: number
+  inspectorPx: number
+  /** Show before and after thumbnails in the file list */
+  listCompare: boolean
   backdrop: Backdrop
   keepStructure: boolean
   /** CSS injected into previews only */

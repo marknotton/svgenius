@@ -4,7 +4,7 @@ import { IconBack } from "../icons"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { AppSettings, Backdrop, Preset, SvgItem } from "../lib/types"
 import { defaultLabel, PresetSelect } from "./PresetSelect"
-import { REVIEW_PX, Thumb } from "./Thumb"
+import { Thumb } from "./Thumb"
 
 interface Props {
   items: SvgItem[]
@@ -22,7 +22,7 @@ export function ReviewView({ items, settings, defaultPreset, ...p }: Props) {
   const shared = items.every((i) => i.presetId === items[0]?.presetId) ? items[0]?.presetId ?? null : undefined
   const before = items.reduce((n, i) => n + i.size, 0)
   const after = items.reduce((n, i) => n + (i.result?.size ?? i.size), 0)
-  const px = REVIEW_PX[settings.thumbSize]
+  const px = settings.reviewPx
 
   return (
     <section className="list review">

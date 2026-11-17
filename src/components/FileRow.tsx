@@ -11,6 +11,7 @@ interface Props {
   focused: boolean
   stale: boolean
   thumbPx: number
+  compare: boolean
   backdrop: Backdrop
   presets: Preset[]
   defaultPreset: Preset
@@ -46,7 +47,14 @@ export const FileRow = memo(function FileRow(p: Props) {
         onClick={(e) => { e.stopPropagation(); p.onToggle(item.id, e) }}
         onChange={() => {}}
       />
-      <Thumb svg={item.result?.output ?? item.source} size={thumbPx} backdrop={backdrop} label={item.name} />
+      {p.compare ? (
+        <div className="file-row__compare">
+          <Thumb svg={item.source} size={thumbPx} backdrop={backdrop} label={`${item.name} before`} />
+          <Thumb svg={item.result?.output} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
+        </div>
+      ) : (
+        <Thumb svg={item.result?.output ?? item.source} size={thumbPx} backdrop={backdrop} label={item.name} />
+      )}
       <div className="file-row__meta">
         <div className="file-row__name" title={item.path}>{item.name}</div>
         <div className="file-row__dir" title={item.path}>

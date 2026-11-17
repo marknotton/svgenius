@@ -1,11 +1,15 @@
 import { IconCircle, IconClip, IconMoon, IconSun } from "../icons"
-import type { Backdrop, ThumbSize } from "../lib/types"
+import type { Backdrop } from "../lib/types"
 import { Segmented } from "./Segmented"
 
 interface Props {
-  thumbSize: ThumbSize
+  size: number
+  sizeRange: { min: number, max: number }
+  onSize: (px: number) => void
+  /** List view only: before and after thumbnails side by side */
+  compare?: boolean
+  onCompare?: () => void
   backdrop: Backdrop
-  onThumbSize: (s: ThumbSize) => void
   onBackdrop: (b: Backdrop) => void
   circle: boolean
   onCircle: () => void
@@ -16,19 +20,22 @@ interface Props {
   onCssToggle: () => void
 }
 
-export function ViewControls({ thumbSize, backdrop, onThumbSize, onBackdrop, circle, onCircle, clip, onClip, cssOpen, cssActive, onCssToggle }: Props) {
+export function ViewControls({ size, sizeRange, onSize, compare, onCompare, backdrop, onBackdrop, circle, onCircle, clip, onClip, cssOpen, cssActive, onCssToggle }: Props) {
   return (
     <div className="view-controls">
-      <Segmented
-        label="Preview size"
-        value={thumbSize}
-        onChange={onThumbSize}
-        options={[
-          { value: "tiny", label: "S", title: "Tiny previews" },
-          { value: "medium", label: "M", title: "Medium previews" },
-          { value: "large", label: "L", title: "Large previews" }
-        ]}
-      />
+      <label className="view-size" title={`Preview size: ${size}px. Double-click to reset`}>
+        <IconImageSm />
+        <input type="range" aria-label="Preview size" min={sizeRange.min} max={sizeRange.max} step={4}
+          value={Math.min(sizeRange.max, size)} onChange={(e) => onSize(Number(e.target.value))}
+          onDoubleClick={() => onSize(-1)} />
+        <IconImageLg />
+      </label>
+      {onCompare && (
+        <button type="button" className={`flag flag--lg${compare ? " is-on" : ""}`} aria-pressed={!!compare}
+          title="Show before and after thumbnails in the list" onClick={onCompare}>
+          Before / after
+        </button>
+      )}
       <Segmented
         label="Preview background"
         value={backdrop}
@@ -53,3 +60,10 @@ export function ViewControls({ thumbSize, backdrop, onThumbSize, onBackdrop, cir
     </div>
   )
 }
+
+const IconImageSm = () => (
+  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2" /></svg>
+)
+const IconImageLg = () => (
+  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="2" /></svg>
+)

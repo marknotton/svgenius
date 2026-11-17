@@ -19,7 +19,7 @@ import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/u
 import { useItems } from "./hooks/useItems"
 import { planExport } from "./lib/exportPlan"
 import { plural } from "./lib/format"
-import { buildExport, defaultLayout, hashCode, isDefaultBespoke, mergeImport, newId, runSpec, SIDEBAR } from "./lib/settings"
+import { buildExport, defaultLayout, hashCode, isDefaultBespoke, mergeImport, newId, PREVIEW_PX, runSpec, SIDEBAR } from "./lib/settings"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
 import { errorMessage, existingFiles, exportFiles, readJsonFile, readPluginFile, takePendingOpenFiles, writeJsonFile } from "./lib/tauri"
@@ -390,7 +390,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     if (ok) clear()
   }
 
-  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbSize" | "backdrop" | "previewCss" | "previewCssEnabled" | "circleOverlay" | "circleClip">>) =>
+  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbPx" | "reviewPx" | "inspectorPx" | "listCompare" | "backdrop" | "previewCss" | "previewCssEnabled" | "circleOverlay" | "circleClip">>) =>
     update((s) => ({ ...s, ...patch }))
 
   // ── Layout ──────────────────────────────────────────────────────────────────
@@ -428,9 +428,14 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   const viewControls = (
     <ViewControls
-      thumbSize={settings.thumbSize}
+      size={view === "review" ? settings.reviewPx : settings.thumbPx}
+      sizeRange={view === "review" ? PREVIEW_PX.review : PREVIEW_PX.list}
+      onSize={(px) => view === "review"
+        ? setViewPrefs({ reviewPx: px < 0 ? PREVIEW_PX.review.default : px })
+        : setViewPrefs({ thumbPx: px < 0 ? PREVIEW_PX.list.default : px })}
+      compare={settings.listCompare}
+      onCompare={view === "list" ? () => setViewPrefs({ listCompare: !settings.listCompare }) : undefined}
       backdrop={settings.backdrop}
-      onThumbSize={(thumbSize) => setViewPrefs({ thumbSize })}
       onBackdrop={(backdrop) => setViewPrefs({ backdrop })}
       circle={settings.circleOverlay}
       onCircle={() => setViewPrefs({ circleOverlay: !settings.circleOverlay })}
@@ -520,6 +525,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 presets={settings.presets}
                 defaultPreset={defaultPreset}
                 backdrop={settings.backdrop}
+                previewPx={settings.inspectorPx}
+                onPreviewPx={(inspectorPx) => setViewPrefs({ inspectorPx })}
                 onClose={() => { setFocusId(null); setSidebarTab("preset") }}
                 onPreset={(presetId) => setPreset([focused.id], presetId)}
                 onNewPreset={() => newPresetForItem(focused)}

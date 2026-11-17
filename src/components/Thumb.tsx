@@ -23,6 +23,3 @@ export const Thumb = memo(function Thumb({ svg, size, backdrop, label }: Props) 
     </div>
   )
 })
-
-export const THUMB_PX = { tiny: 32, medium: 64, large: 128 } as const
-export const REVIEW_PX = { tiny: 140, medium: 220, large: 340 } as const

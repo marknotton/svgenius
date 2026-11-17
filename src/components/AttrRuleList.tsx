@@ -1,6 +1,5 @@
 import { IconPlus, IconTrash } from "../icons"
 import { ElementPicker } from "./ElementPicker"
-import { commonStage, StageToggle } from "./StageToggle"
 import { ACTIONS, CONDITIONS, isRuleReady } from "../lib/attrRules"
 import { createAttrRule } from "../lib/settings"
 import type { AttrRule } from "../lib/types"
@@ -20,12 +19,8 @@ export function AttrRuleList({ rules, onChange }: Props) {
     <div className="rules">
       <div className="plugins__head">
         <span className="panel__label">Attribute rules {rules.length > 0 && <span className="text-3">{active}/{rules.length}</span>}</span>
-        <button className="link" onClick={() => onChange([...rules, { ...createAttrRule(), stage: commonStage(rules.map((r) => r.stage)) }])}><IconPlus width={11} height={11} /> Add rule</button>
+        <button className="link" onClick={() => onChange([...rules, createAttrRule()])}><IconPlus width={11} height={11} /> Add rule</button>
       </div>
-      {rules.length > 0 && (
-        <StageToggle stages={rules.map((r) => r.stage)} onChange={(s) => onChange(rules.map((r) => ({ ...r, stage: s })))}
-          hint="Before: rules see the original markup. After: rules see SVGO's output." />
-      )}
 
       {rules.length === 0 && (
         <p className="rules__empty text-3">Recipes like “every path lacking fill → add fill="currentColor"” or “remove data-name”.</p>

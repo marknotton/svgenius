@@ -5,7 +5,6 @@ import { plural } from "../lib/format"
 import type { AppSettings, Preset, SvgItem } from "../lib/types"
 import { FileRow } from "./FileRow"
 import { PresetSelect } from "./PresetSelect"
-import { THUMB_PX } from "./Thumb"
 
 interface Props {
   items: SvgItem[]
@@ -99,7 +98,7 @@ export function FileList(p: Props) {
       </div>
       {p.cssBar}
 
-      <ul ref={listRef} className={`file-list file-list--${settings.thumbSize}`}>
+      <ul ref={listRef} className={`file-list${settings.thumbPx <= 40 ? " file-list--tiny" : ""}`}>
         {items.map((item) => (
           <FileRow
             key={item.id}
@@ -108,7 +107,8 @@ export function FileList(p: Props) {
             focused={p.focusId === item.id}
             onRowClick={p.onRowClick}
             stale={p.isStale(item)}
-            thumbPx={THUMB_PX[settings.thumbSize]}
+            thumbPx={settings.thumbPx}
+            compare={settings.listCompare}
             backdrop={settings.backdrop}
             presets={settings.presets}
             defaultPreset={p.defaultPreset}

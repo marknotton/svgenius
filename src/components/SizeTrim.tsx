@@ -1,29 +1,35 @@
-import { useEffect, useState } from "react"
-import { SCALE_LIMITS, validScale } from "../lib/settings"
+import { validScale } from "../lib/settings"
 import type { TrimSettings } from "../lib/types"
 import { Segmented } from "./Segmented"
 import { SliderField } from "./SliderField"
 import { Toggle } from "./Toggle"
 
-// ── Size & trim ───────────────────────────────────────────────────────────────
+// ── Edit: size, artwork transform and trim, for every file using the preset ──
 
 interface Props {
   trim: TrimSettings
   onChange: (patch: Partial<TrimSettings>) => void
 }
 
+const isScale = (n: number) => validScale(n) !== null
+
+export const isDefaultEdit = (t: TrimSettings) =>
+  !t.enabled && t.scale === 1 && t.artScale === 1 && t.offsetX === 0 && t.offsetY === 0
+
 export function SizeTrim({ trim, onChange }: Props) {
   return (
     <>
       <div className="plugins__head">
-        <span className="panel__label">Size &amp; trim</span>
-        <button className="link" disabled={!trim.enabled && trim.scale === 1}
-          title="Padding back to 0 and scale back to 1"
-          onClick={() => onChange({ padding: 0, scale: 1 })}>Reset</button>
+        <span className="panel__label">Edit</span>
+        <button className="link" disabled={isDefaultEdit(trim) && trim.padding === 0}
+          title="Size, artwork scale and position back to normal, trim off"
+          onClick={() => onChange({ enabled: false, padding: 0, scale: 1, artScale: 1, offsetX: 0, offsetY: 0 })}>Reset</button>
       </div>
 
-      <ScaleField value={trim.scale} onChange={(scale) => onChange({ scale })} />
-
+      <div className="edit-group__label text-3" title="The SVG itself: its width, height and viewBox">Canvas · viewBox</div>
+      <SliderField label="Size" value={trim.scale} min={0.1} max={4} step={0.05} suffix="×" accept={isScale}
+        hint="Scales the whole SVG: width and height change, the viewBox doesn't, so the artwork grows with it. Click the number to type any value."
+        onChange={(scale) => { if (isScale(scale)) onChange({ scale }) }} />
       <Toggle label="Trim whitespace" hint="Crops the viewBox to the visible artwork (strokes and effects included)"
         checked={trim.enabled} onChange={(enabled) => onChange({ enabled })} />
       {trim.enabled && (
@@ -53,36 +59,32 @@ export function SizeTrim({ trim, onChange }: Props) {
           </div>
         </>
       )}
+
+      <div className="edit-group__label text-3" title="The drawing inside the viewBox">Artwork · inside the viewBox</div>
+      <ArtworkFields scale={trim.artScale} x={trim.offsetX} y={trim.offsetY}
+        onChange={(p) => onChange({
+          ...(p.scale !== undefined && { artScale: p.scale }),
+          ...(p.x !== undefined && { offsetX: p.x }),
+          ...(p.y !== undefined && { offsetY: p.y })
+        })} />
     </>
   )
 }
 
-/** Free-typed scale factor with validation, e.g. 2, 0.5, 0.002 */
-function ScaleField({ value, onChange }: { value: number, onChange: (v: number) => void }) {
-  const [draft, setDraft] = useState(String(value))
-  useEffect(() => { setDraft(String(value)) }, [value])
-  const parsed = validScale(draft)
-  const invalid = draft.trim() !== "" && parsed === null
-
+/** Scale and move the drawing inside its viewBox. Shared by presets and single files */
+export function ArtworkFields({ scale, x, y, onChange }: {
+  scale: number, x: number, y: number
+  onChange: (p: { scale?: number, x?: number, y?: number }) => void
+}) {
   return (
-    <div className="range" title="Multiplies the exported width and height. The artwork scales with them.">
-      <span className="range__label">Scale</span>
-      <span className="toolbar__spacer" />
-      <span className="text-3 scale__x">×</span>
-      <input
-        className={`input input--sm scale__input${invalid ? " is-invalid" : ""}`}
-        inputMode="decimal"
-        value={draft}
-        aria-label="Scale"
-        aria-invalid={invalid}
-        onChange={(e) => {
-          setDraft(e.target.value)
-          const n = validScale(e.target.value)
-          if (n !== null) onChange(n)
-        }}
-        onBlur={() => { if (parsed === null) setDraft(String(value)) }}
-      />
-      {invalid && <span className="scale__error">Use a number from {SCALE_LIMITS.min} to {SCALE_LIMITS.max}</span>}
-    </div>
+    <>
+      <SliderField label="Scale" value={scale} min={0.05} max={3} step={0.01} suffix="×" accept={isScale}
+        hint="Scales the artwork inside the viewBox, around its centre. The SVG's size stays the same. Click the number to type any value."
+        onChange={(v) => { if (isScale(v)) onChange({ scale: v }) }} />
+      <SliderField label="X" value={x} min={-50} max={50} step={0.5} suffix="%" hint="Moves the artwork left/right, as % of the viewBox width"
+        onChange={(v) => onChange({ x: v })} />
+      <SliderField label="Y" value={y} min={-50} max={50} step={0.5} suffix="%" hint="Moves the artwork up/down, as % of the viewBox height"
+        onChange={(v) => onChange({ y: v })} />
+    </>
   )
 }
