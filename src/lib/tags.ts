@@ -26,6 +26,7 @@ export function fileTags(item: SvgItem, settings: SvgoSettings, customOn: number
   if (t.offsetX || t.offsetY) {
     tags.push({ label: "Artwork moved", title: `Moved ${fmtNum(t.offsetX, 2)}% across, ${fmtNum(t.offsetY, 2)}% down` })
   }
+  if (settings.mergeOpacity) tags.push({ label: "Merged transparency", title: "Overlapping translucent shapes share one opacity" })
   if (settings.appendMarkup.trim()) tags.push({ label: "Extra markup", title: "Markup added before </svg>" })
   if (customOn) tags.push({ label: plural(customOn, "custom plugin"), title: "Third-party SVGO plugins switched on" })
   return tags

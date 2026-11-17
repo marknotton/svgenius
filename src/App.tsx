@@ -18,6 +18,7 @@ import { Toasts, useToasts } from "./components/Toast"
 import { ViewControls } from "./components/ViewControls"
 import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/useAppSettings"
 import { useItems } from "./hooks/useItems"
+import { IconX } from "./icons"
 import { planExport } from "./lib/exportPlan"
 import { plural } from "./lib/format"
 import { activeCustom, buildExport, defaultLayout, hashCode, mergeImport, newId, PREVIEW_PX, runSpec, SIDEBAR } from "./lib/settings"
@@ -462,7 +463,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     return () => { unlisten?.(); window.removeEventListener("keydown", onKey) }
   }, [])
 
-  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbPx" | "inspectorPx" | "listCompare" | "showDetails" | "backdrop" | "previewCss" | "previewCssEnabled" | "circleOverlay" | "circleClip">>) =>
+  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbPx" | "galleryPx" | "inspectorPx" | "listCompare" | "showDetails" | "backdrop" | "previewCss" | "previewCssEnabled" | "circleOverlay" | "circleClip">>) =>
     update((s) => ({ ...s, ...patch }))
 
   // ── Layout ──────────────────────────────────────────────────────────────────
@@ -500,9 +501,11 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   const viewControls = (
     <ViewControls
-      size={settings.thumbPx}
-      sizeRange={PREVIEW_PX.list}
-      onSize={(px) => setViewPrefs({ thumbPx: px < 0 ? PREVIEW_PX.list.default : px })}
+      size={settings.showDetails ? settings.thumbPx : settings.galleryPx}
+      sizeRange={settings.showDetails ? PREVIEW_PX.list : PREVIEW_PX.gallery}
+      onSize={(px) => setViewPrefs(settings.showDetails
+        ? { thumbPx: px < 0 ? PREVIEW_PX.list.default : px }
+        : { galleryPx: px < 0 ? PREVIEW_PX.gallery.default : px })}
       compare={settings.listCompare}
       onCompare={() => setViewPrefs({ listCompare: !settings.listCompare })}
       details={settings.showDetails}
@@ -577,9 +580,15 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             <div className="sidebar__tabs" role="tablist">
               <button role="tab" aria-selected={sidebarTab === "preset"} className={`sidebar__tab${sidebarTab === "preset" ? " is-active" : ""}`}
                 onClick={() => setSidebarTab("preset")}>Preset</button>
-              <button role="tab" aria-selected={sidebarTab === "file"} className={`sidebar__tab${sidebarTab === "file" ? " is-active" : ""}`}
-                disabled={!focused} title={focused ? focused.name : "Click a file to inspect it"}
-                onClick={() => setSidebarTab("file")}>{focused ? focused.name : "File"}</button>
+              {focused ? (
+                <div role="tab" aria-selected={sidebarTab === "file"} className={`sidebar__tab sidebar__tab--file${sidebarTab === "file" ? " is-active" : ""}`}>
+                  <button className="sidebar__tab-label" title={focused.path} onClick={() => setSidebarTab("file")}>{focused.name}</button>
+                  <button className="sidebar__tab-close" aria-label="Close file" title="Close file"
+                    onClick={() => { setFocusId(null); setSidebarTab("preset") }}><IconX width={10} height={10} /></button>
+                </div>
+              ) : (
+                <button role="tab" aria-selected={false} className="sidebar__tab" disabled title="Click a file to inspect it">File</button>
+              )}
             </div>
             {sidebarTab === "file" && focused ? (
               <FileInspector
@@ -589,7 +598,6 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 backdrop={settings.backdrop}
                 previewPx={settings.inspectorPx}
                 onPreviewPx={(inspectorPx) => setViewPrefs({ inspectorPx })}
-                onClose={() => { setFocusId(null); setSidebarTab("preset") }}
                 onPreset={(presetId) => setPreset([focused.id], presetId)}
                 onNewPreset={() => newPresetForItem(focused)}
                 onEdit={(source) => editSource(focused.id, source)}

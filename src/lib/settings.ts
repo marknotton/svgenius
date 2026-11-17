@@ -16,6 +16,7 @@ export function defaultSvgoSettings(): SvgoSettings {
     attrRules: [],
     trim: { enabled: false, padding: 0, unit: "%", aspect: "fit", scale: 1, artScale: 1, offsetX: 0, offsetY: 0 },
     appendMarkup: "",
+    mergeOpacity: false,
     custom: {}
   }
 }
@@ -58,6 +59,7 @@ export const SIDEBAR = { default: 300, min: 260, max: 640 }
 /** Preview size sliders: [min, default, max] in px. Typing a value can go past max */
 export const PREVIEW_PX = {
   list: { min: 24, default: 64, max: 320 },
+  gallery: { min: 80, default: 200, max: 800 },
   inspector: { min: 48, default: 112, max: 400 }
 }
 const OLD_THUMB_SIZES: Record<string, [number, number]> = { tiny: [32, 140], medium: [64, 220], large: [128, 340] }
@@ -82,6 +84,7 @@ export function defaultLayout() {
     inspectorPx: PREVIEW_PX.inspector.default,
     listCompare: false,
     showDetails: false,
+    galleryPx: PREVIEW_PX.gallery.default,
     backdrop: "light" as const
   }
 }
@@ -120,7 +123,7 @@ export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
   const t = settings.trim
   const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.scale, t.artScale, t.offsetX, t.offsetY]
-  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim()])
+  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergeOpacity])
 }
 
 export function runSpec(settings: SvgoSettings, plugins: CustomPlugin[]): RunSpec {
@@ -181,6 +184,7 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
       offsetY: clampNum(trimRaw.offsetY, -1e4, 1e4, 0)
     },
     appendMarkup: typeof raw.appendMarkup === "string" ? raw.appendMarkup : "",
+    mergeOpacity: raw.mergeOpacity === true,
     custom,
     attrRules,
     replacements,
@@ -278,6 +282,7 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     inspectorPx: clampNum(raw.inspectorPx, PREVIEW_PX.inspector.min, 2000, PREVIEW_PX.inspector.default),
     listCompare: raw.listCompare === true,
     showDetails: raw.showDetails === true,
+    galleryPx: clampNum(raw.galleryPx, PREVIEW_PX.gallery.min, 4000, PREVIEW_PX.gallery.default),
     backdrop: raw.backdrop === "dark" ? "dark" : "light",
     keepStructure: typeof raw.keepStructure === "boolean" ? raw.keepStructure : true,
     previewCss: typeof raw.previewCss === "string" ? raw.previewCss : "",

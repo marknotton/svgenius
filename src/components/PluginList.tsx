@@ -18,7 +18,7 @@ const GROUPS: Array<{ id: PluginInfo["group"], title: string }> = [
 
 export function PluginList({ settings, onToggle, onSetGroup }: Props) {
   const [filter, setFilter] = useState("")
-  const [details, setDetails] = useState(false)
+  const [details, setDetails] = useState(true)
   const q = filter.trim().toLowerCase()
 
   return (

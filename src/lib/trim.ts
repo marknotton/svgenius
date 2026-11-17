@@ -1,4 +1,5 @@
 import { svgDataUrl } from "./format"
+import { mergeOpacity } from "./opacity"
 import { fmtNum, getAttr, parseLength, parseViewBox, replaceRoot, rootTag, setAttr, type ViewBox } from "./svgRoot"
 import type { ArtTransform, SvgoSettings, TrimSettings } from "./types"
 
@@ -7,7 +8,7 @@ import type { ArtTransform, SvgoSettings, TrimSettings } from "./types"
 // and transforms all count. Runs on the main thread because workers can't
 // decode SVG images.
 
-const SCAN = 1024
+const SCAN = 2048
 
 function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -53,11 +54,29 @@ async function contentBounds(svg: string, vb: ViewBox): Promise<ViewBox | null> 
     }
   }
   if (maxX < 0) return null
-  // Content touching an edge snaps to it exactly, avoiding sub-pixel drift
-  const x0 = minX === 0 ? vb.x : vb.x + minX / scale
-  const y0 = minY === 0 ? vb.y : vb.y + minY / scale
-  const x1 = maxX === cw - 1 ? vb.x + vb.w : vb.x + (maxX + 1) / scale
-  const y1 = maxY === ch - 1 ? vb.y + vb.h : vb.y + (maxY + 1) / scale
+  // Anti-aliased edge pixels are only partly covered. Their strongest alpha
+  // says how much, which gets the bounds to well under a pixel
+  const colCover = (x: number) => {
+    let a = 0
+    for (let y = minY; y <= maxY; y++) a = Math.max(a, data[(y * cw + x) * 4 + 3])
+    return a / 255
+  }
+  const rowCover = (y: number) => {
+    let a = 0
+    for (let x = minX; x <= maxX; x++) a = Math.max(a, data[(y * cw + x) * 4 + 3])
+    return a / 255
+  }
+  // Compared with the next pixel in, so translucent artwork isn't mistaken for a soft edge
+  const frac = (edge: number, inner: number) => (inner > 0 ? Math.min(1, edge / inner) : 1)
+  const fx0 = frac(colCover(minX), minX < maxX ? colCover(minX + 1) : 1)
+  const fx1 = frac(colCover(maxX), maxX > minX ? colCover(maxX - 1) : 1)
+  const fy0 = frac(rowCover(minY), minY < maxY ? rowCover(minY + 1) : 1)
+  const fy1 = frac(rowCover(maxY), maxY > minY ? rowCover(maxY - 1) : 1)
+  // Content touching an edge snaps to it exactly
+  const x0 = minX === 0 ? vb.x : vb.x + (minX + 1 - fx0) / scale
+  const y0 = minY === 0 ? vb.y : vb.y + (minY + 1 - fy0) / scale
+  const x1 = maxX === cw - 1 ? vb.x + vb.w : vb.x + (maxX + fx1) / scale
+  const y1 = maxY === ch - 1 ? vb.y + vb.h : vb.y + (maxY + fy1) / scale
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
 }
 
@@ -157,7 +176,7 @@ export function appendMarkup(svg: string, markup: string) {
 /** Everything that happens after SVGO, in order */
 export async function postProcess(svg: string, settings: SvgoSettings) {
   const t = settings.trim
-  let out = svg
+  let out = settings.mergeOpacity ? mergeOpacity(svg) : svg
   if (t.enabled) out = await trimSvg(out, t, settings.floatPrecision)
   out = transformSvg(out, { scale: t.artScale, offsetX: t.offsetX, offsetY: t.offsetY })
   // Outside the artwork group, so it isn't moved or scaled with it

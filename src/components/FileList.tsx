@@ -96,7 +96,7 @@ export function FileList(p: Props) {
       </div>
       {p.cssBar}
 
-      <ul ref={listRef} className={`file-list${settings.thumbPx <= 40 ? " file-list--tiny" : ""}`}>
+      <ul ref={listRef} className={`file-list${!settings.showDetails ? " file-list--gallery" : settings.thumbPx <= 40 ? " file-list--tiny" : ""}`}>
         {items.map((item) => (
           <FileRow
             key={item.id}
@@ -105,7 +105,7 @@ export function FileList(p: Props) {
             focused={p.focusId === item.id}
             onRowClick={p.onRowClick}
             stale={p.isStale(item)}
-            thumbPx={settings.thumbPx}
+            thumbPx={settings.showDetails ? settings.thumbPx : settings.galleryPx}
             compare={settings.listCompare}
             details={settings.showDetails}
             tags={settings.showDetails ? p.tagsFor(item) : NO_TAGS}

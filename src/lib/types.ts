@@ -70,6 +70,8 @@ export interface SvgoSettings {
   trim: TrimSettings
   /** Raw markup added to every file, just before </svg> */
   appendMarkup: string
+  /** Group neighbouring translucent shapes so their overlaps don't darken */
+  mergeOpacity: boolean
   /** Custom plugin id → on/off and its params as JSON text */
   custom: Record<string, { on: boolean, params: string }>
 }
@@ -110,8 +112,10 @@ export interface AppSettings {
   inspectorPx: number
   /** Show before and after thumbnails in the file list */
   listCompare: boolean
-  /** Show tags and dimensions detail on each row */
+  /** Inspect mode: detailed rows (dimensions, tags, preset). Off = big before/after gallery */
   showDetails: boolean
+  /** Thumbnail size in the gallery (showDetails off) */
+  galleryPx: number
   backdrop: Backdrop
   keepStructure: boolean
   /** CSS injected into previews only */

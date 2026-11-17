@@ -32,14 +32,16 @@ export function ViewControls({ size, sizeRange, onSize, compare, onCompare, deta
           onDoubleClick={() => onSize(-1)} />
         <IconImageLg />
       </label>
-      <button type="button" className={`flag flag--lg${compare ? " is-on" : ""}`} aria-pressed={compare}
-        title="Show before and after thumbnails in the list" onClick={onCompare}>
-        Before / after
-      </button>
       <button type="button" className={`flag flag--lg${details ? " is-on" : ""}`} aria-pressed={details}
-        title="Show what's been done to each file: size changes, trims, rule changes, edits" onClick={onDetails}>
-        Details
+        title="Inspect: compact rows with dimensions, tags of what changed and each file's preset. Off: big before/after previews" onClick={onDetails}>
+        Inspect
       </button>
+      {details && (
+        <button type="button" className={`flag flag--lg${compare ? " is-on" : ""}`} aria-pressed={compare}
+          title="Show before and after thumbnails on each row" onClick={onCompare}>
+          Before / after
+        </button>
+      )}
       <Segmented
         label="Preview background"
         value={backdrop}

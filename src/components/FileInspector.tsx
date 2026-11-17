@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { IconCopy, IconReset, IconX } from "../icons"
+import { IconCopy, IconReset } from "../icons"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import { PREVIEW_PX } from "../lib/settings"
 import type { FileTag } from "../lib/tags"
@@ -21,7 +21,6 @@ interface Props {
   backdrop: Backdrop
   previewPx: number
   onPreviewPx: (px: number) => void
-  onClose: () => void
   onPreset: (presetId: string | null) => void
   onNewPreset: () => void
   onEdit: (source: string) => void
@@ -66,10 +65,6 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
   return (
     <div className="inspector">
       <div className="panel__head inspector__head">
-        <div className="inspector__title">
-          <span className="inspector__name" title={item.path}>{item.name}</span>
-          <button className="btn btn--icon" aria-label="Close file" title="Back to preset settings" onClick={p.onClose}><IconX /></button>
-        </div>
         <div className="inspector__previews">
           <figure className="pane">
             <Thumb svg={item.source} size={previewPx} backdrop={backdrop} label={`${item.name} before`} />

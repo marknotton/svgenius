@@ -41,7 +41,8 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
 
       <section className="panel__section">
         <EditContents trim={s.trim} onChange={trim}
-          markup={s.appendMarkup} onMarkup={(appendMarkup) => edit((x) => ({ ...x, appendMarkup }))} />
+          markup={s.appendMarkup} onMarkup={(appendMarkup) => edit((x) => ({ ...x, appendMarkup }))}
+          merge={s.mergeOpacity} onMerge={(mergeOpacity) => edit((x) => ({ ...x, mergeOpacity }))} />
       </section>
 
       <section className="panel__section">

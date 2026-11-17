@@ -49,6 +49,44 @@ export const FileRow = memo(function FileRow(p: Props) {
     lastDims.current = dims
   }, [dims])
 
+  // Gallery: big before/after previews, just the name and sizes
+  if (!p.details) {
+    return (
+      <li
+        className={`file-card${selected ? " is-selected" : ""}${p.focused ? " is-focused" : ""}`}
+        data-id={item.id}
+        onClick={(e) => p.onRowClick(item.id, e)}
+        onContextMenu={(e) => p.onContextMenu(item.id, e)}
+        aria-selected={selected}
+      >
+        <div className="file-card__head">
+          <input
+            type="checkbox"
+            className="checkbox"
+            checked={selected}
+            aria-label={`Select ${item.name}`}
+            onClick={(e) => { e.stopPropagation(); p.onToggle(item.id, e) }}
+            onChange={() => {}}
+          />
+          <span className="file-card__name" title={item.path}>{item.name}</span>
+          <Stats item={item} stale={stale} />
+        </div>
+        <div className="file-card__panes">
+          <figure className="file-card__pane">
+            <Thumb svg={item.source} size={thumbPx} backdrop={backdrop} label={`${item.name} before`} />
+            <figcaption className="text-3">Before{original && ` · ${fmtNum(original.w, 2)} × ${fmtNum(original.h, 2)}`}</figcaption>
+          </figure>
+          <figure className="file-card__pane">
+            <Thumb svg={item.result?.output} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
+            <figcaption className="text-3">
+              After{size && item.result && <> · <span key={flash} className={`file-row__dims${flash ? " is-flash" : ""}`}>{dims}</span></>}
+            </figcaption>
+          </figure>
+        </div>
+      </li>
+    )
+  }
+
   return (
     <li
       className={`file-row${selected ? " is-selected" : ""}${p.focused ? " is-focused" : ""}`}
