@@ -446,3 +446,9 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
 }
 .css-bar__head { display: flex; align-items: center; gap: 10px; font-size: 11px; }
 .css-bar__input { height: 72px; padding: 6px 8px; resize: vertical; line-height: 1.45; user-select: text; }
+
+/* ── Custom plugins ──────────────────────────────────────────── */
+
+.custom-plugin { display: flex; flex-direction: column; gap: 4px; padding: 2px 0; }
+.custom-plugin__toggle { flex: 1; min-width: 0; }
+.custom-plugin__params { height: 56px; padding: 6px 8px; resize: vertical; user-select: text; }

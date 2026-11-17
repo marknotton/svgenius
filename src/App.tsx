@@ -17,9 +17,10 @@ import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/u
 import { useItems } from "./hooks/useItems"
 import { planExport } from "./lib/exportPlan"
 import { plural } from "./lib/format"
-import { buildExport, mergeImport, settingsKey } from "./lib/settings"
-import { errorMessage, existingFiles, exportFiles, readJsonFile, takePendingOpenFiles, writeJsonFile } from "./lib/tauri"
-import type { AppSettings, SvgItem } from "./lib/types"
+import { buildExport, hashCode, mergeImport, newId, runSpec } from "./lib/settings"
+import { probePlugin } from "./lib/optimiser"
+import { errorMessage, existingFiles, exportFiles, readJsonFile, readPluginFile, takePendingOpenFiles, writeJsonFile } from "./lib/tauri"
+import type { AppSettings, CustomPlugin, SvgItem } from "./lib/types"
 
 export default function App() {
   const { settings, update, loadError } = useAppSettings()
@@ -51,12 +52,14 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const defaultPreset = presetById(settings, settings.defaultPresetId)
   const editing = presetById(settings, settings.editingPresetId)
   const presetFor = useCallback((item: SvgItem) => presetById(settings, item.presetId), [settings])
-  const resolve = useCallback((item: SvgItem) => presetFor(item).settings, [presetFor])
-
-  const keys = useMemo(() => new Map(settings.presets.map((p) => [p.id, settingsKey(p.settings)])), [settings.presets])
+  const specs = useMemo(
+    () => new Map(settings.presets.map((p) => [p.id, runSpec(p.settings, settings.customPlugins)])),
+    [settings.presets, settings.customPlugins]
+  )
+  const resolve = useCallback((item: SvgItem) => specs.get(presetFor(item).id) ?? runSpec(presetFor(item).settings, settings.customPlugins), [specs, presetFor, settings.customPlugins])
   const isStale = useCallback(
-    (item: SvgItem) => !!item.result && item.result.key !== keys.get(presetFor(item).id),
-    [keys, presetFor]
+    (item: SvgItem) => !!item.result && item.result.key !== resolve(item).key,
+    [resolve]
   )
 
   const usage = items.filter((i) => presetFor(i).id === editing.id).length
@@ -290,6 +293,48 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     }
   }
 
+  // ── Custom plugins ──────────────────────────────────────────────────────────
+
+  const loadPlugin = async () => {
+    const path = await open({ filters: [{ name: "SVGO plugin", extensions: ["js", "mjs"] }] })
+    if (typeof path !== "string") return
+    try {
+      const { fileName, code } = await readPluginFile(path)
+      const { name, description } = await probePlugin(code)
+      const existing = settings.customPlugins.find((c) => c.name === name)
+      const plugin: CustomPlugin = { id: existing?.id ?? newId(), name, description, fileName, code, hash: hashCode(code) }
+      update((s) => ({
+        ...s,
+        customPlugins: existing ? s.customPlugins.map((c) => (c.id === plugin.id ? plugin : c)) : [...s.customPlugins, plugin],
+        presets: s.presets.map((p) => (p.id !== editing.id ? p : {
+          ...p,
+          settings: { ...p.settings, custom: { ...p.settings.custom, [plugin.id]: { params: p.settings.custom[plugin.id]?.params ?? "", on: true } } }
+        }))
+      }))
+      push({ tone: "success", text: `${existing ? "Reloaded" : "Loaded"} “${name}” and switched it on for ${editing.name}` })
+    } catch (e) {
+      push({ tone: "error", text: `Couldn't load plugin: ${errorMessage(e)}` })
+    }
+  }
+
+  const removePlugin = async (plugin: CustomPlugin) => {
+    const ok = await dialogs.confirm({
+      title: `Remove “${plugin.name}”?`,
+      body: "It's removed from every preset.",
+      confirmLabel: "Remove",
+      danger: true
+    })
+    if (!ok) return
+    update((s) => ({
+      ...s,
+      customPlugins: s.customPlugins.filter((c) => c.id !== plugin.id),
+      presets: s.presets.map((p) => {
+        const { [plugin.id]: _gone, ...custom } = p.settings.custom
+        return { ...p, settings: { ...p.settings, custom } }
+      })
+    }))
+  }
+
   const removeItems = async () => {
     if (selection.size) return remove(selection)
     const ok = await dialogs.confirm({ title: "Clear the list?", body: "Files on disk aren't touched.", confirmLabel: "Clear" })
@@ -380,6 +425,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             onDelete={deletePreset}
             onImport={importPresets}
             onExport={exportPresets}
+            onLoadPlugin={loadPlugin}
+            onRemovePlugin={removePlugin}
           />
         </div>
         <Footer

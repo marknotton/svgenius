@@ -1,7 +1,8 @@
 import { IconDownload, IconPencil, IconPlus, IconReset, IconStar, IconTrash, IconUpload } from "../icons"
 import { plural } from "../lib/format"
 import type { PresetActions } from "../hooks/useAppSettings"
-import type { AppSettings, Preset } from "../lib/types"
+import type { AppSettings, CustomPlugin, Preset } from "../lib/types"
+import { CustomPluginList } from "./CustomPluginList"
 import { PluginList } from "./PluginList"
 import { PresetSelect } from "./PresetSelect"
 import { ReplaceList } from "./ReplaceList"
@@ -17,6 +18,8 @@ interface Props {
   onDelete: () => void
   onImport: () => void
   onExport: () => void
+  onLoadPlugin: () => void
+  onRemovePlugin: (p: CustomPlugin) => void
 }
 
 export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
@@ -72,6 +75,19 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
 
         <section className="panel__section">
           <ReplaceList rules={s.replacements} onChange={(replacements) => edit((x) => ({ ...x, replacements }))} />
+        </section>
+
+        <section className="panel__section">
+          <CustomPluginList
+            plugins={settings.customPlugins}
+            settings={s}
+            onLoad={p.onLoadPlugin}
+            onRemove={p.onRemovePlugin}
+            onChange={(id, patch) => edit((x) => ({
+              ...x,
+              custom: { ...x.custom, [id]: { on: x.custom[id]?.on ?? false, params: x.custom[id]?.params ?? "", ...patch } }
+            }))}
+          />
         </section>
 
         <section className="panel__section">

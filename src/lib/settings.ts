@@ -1,6 +1,6 @@
 import type { Config } from "svgo/browser"
 import { PLUGINS, PLUGIN_NAMES } from "./plugins"
-import type { AppSettings, Preset, Replacement, SvgoSettings } from "./types"
+import type { AppSettings, CustomPlugin, CustomRun, Preset, Replacement, RunSpec, SvgoSettings } from "./types"
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
@@ -12,7 +12,8 @@ export function defaultSvgoSettings(): SvgoSettings {
     floatPrecision: DEFAULT_PRECISION,
     pretty: false,
     plugins: Object.fromEntries(PLUGINS.map((p) => [p.name, p.defaultOn])),
-    replacements: []
+    replacements: [],
+    custom: {}
   }
 }
 
@@ -31,6 +32,7 @@ export function defaultAppSettings(): AppSettings {
   return {
     version: 1,
     presets: [preset],
+    customPlugins: [],
     defaultPresetId: preset.id,
     editingPresetId: preset.id,
     thumbSize: "medium",
@@ -62,10 +64,28 @@ export function activeReplacements(settings: SvgoSettings) {
   return settings.replacements.filter((r) => r.enabled && r.find)
 }
 
+/** Custom plugins switched on in these settings, in load order */
+export function activeCustom(settings: SvgoSettings, plugins: CustomPlugin[]): CustomRun[] {
+  return plugins
+    .filter((p) => settings.custom[p.id]?.on)
+    .map((p) => ({ name: p.name, code: p.code, hash: p.hash, params: settings.custom[p.id]?.params ?? "" }))
+}
+
 /** Stable fingerprint, used to spot results produced by older settings */
-export function settingsKey(settings: SvgoSettings) {
+export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const rules = activeReplacements(settings).map(({ id: _id, enabled: _e, ...r }) => r)
-  return JSON.stringify([toSvgoConfig(settings), rules])
+  return JSON.stringify([toSvgoConfig(settings), rules, custom.map((c) => [c.hash, c.params.trim()])])
+}
+
+export function runSpec(settings: SvgoSettings, plugins: CustomPlugin[]): RunSpec {
+  const custom = activeCustom(settings, plugins)
+  return { svgo: settings, custom, key: settingsKey(settings, custom) }
+}
+
+export function hashCode(code: string) {
+  let h = 5381
+  for (let i = 0; i < code.length; i++) h = ((h << 5) + h + code.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36)
 }
 
 // ── Validation ────────────────────────────────────────────────────────────────
@@ -88,7 +108,14 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
   const replacements = Array.isArray(raw.replacements)
     ? raw.replacements.map(sanitiseReplacement).filter((r): r is Replacement => r !== null)
     : []
+  const custom: SvgoSettings["custom"] = {}
+  if (isObj(raw.custom)) {
+    for (const [k, v] of Object.entries(raw.custom)) {
+      if (isObj(v)) custom[k] = { on: v.on === true, params: typeof v.params === "string" ? v.params : "" }
+    }
+  }
   return {
+    custom,
     replacements,
     multipass: typeof raw.multipass === "boolean" ? raw.multipass : base.multipass,
     pretty: typeof raw.pretty === "boolean" ? raw.pretty : base.pretty,
@@ -124,6 +151,22 @@ export function sanitisePreset(raw: unknown): Preset | null {
   }
 }
 
+export function sanitiseCustomPlugin(raw: unknown): CustomPlugin | null {
+  if (!isObj(raw) || typeof raw.code !== "string" || typeof raw.name !== "string" || !raw.name) return null
+  return {
+    id: typeof raw.id === "string" && raw.id ? raw.id : newId(),
+    name: raw.name,
+    description: typeof raw.description === "string" ? raw.description : "",
+    fileName: typeof raw.fileName === "string" ? raw.fileName : `${raw.name}.js`,
+    code: raw.code,
+    hash: hashCode(raw.code)
+  }
+}
+
+const sanitiseCustomList = (raw: unknown) => Array.isArray(raw)
+  ? raw.map(sanitiseCustomPlugin).filter((p): p is CustomPlugin => p !== null)
+  : []
+
 export function sanitiseAppSettings(raw: unknown): AppSettings {
   const base = defaultAppSettings()
   if (!isObj(raw)) return base
@@ -136,6 +179,7 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
   return {
     version: 1,
     presets,
+    customPlugins: sanitiseCustomList(raw.customPlugins),
     defaultPresetId: pick(raw.defaultPresetId),
     editingPresetId: pick(raw.editingPresetId),
     thumbSize: raw.thumbSize === "tiny" || raw.thumbSize === "large" ? raw.thumbSize : "medium",
@@ -155,6 +199,7 @@ export interface SettingsFile {
   exportedAt: string
   defaultPresetId: string
   presets: Preset[]
+  customPlugins: CustomPlugin[]
 }
 
 export function buildExport(settings: AppSettings): SettingsFile {
@@ -164,7 +209,8 @@ export function buildExport(settings: AppSettings): SettingsFile {
     version: 1,
     exportedAt: new Date().toISOString(),
     defaultPresetId: settings.defaultPresetId,
-    presets: settings.presets
+    presets: settings.presets,
+    customPlugins: settings.customPlugins
   }
 }
 
@@ -197,5 +243,12 @@ export function mergeImport(current: AppSettings, raw: unknown): { next: AppSett
     presets.push({ ...p, name })
     added++
   }
-  return { next: { ...current, presets }, added, updated }
+  // Custom plugins travel with presets; same id replaces, new ones are added
+  const customPlugins = [...current.customPlugins]
+  for (const c of isObj(raw) ? sanitiseCustomList(raw.customPlugins) : []) {
+    const idx = customPlugins.findIndex((x) => x.id === c.id)
+    if (idx >= 0) customPlugins[idx] = c
+    else customPlugins.push(c)
+  }
+  return { next: { ...current, presets, customPlugins }, added, updated }
 }

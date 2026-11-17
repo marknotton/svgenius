@@ -1,13 +1,13 @@
 import { useCallback, useRef, useState } from "react"
 import { byteLength } from "../lib/format"
 import { CONCURRENCY, optimiseSvg, runLimited } from "../lib/optimiser"
-import { newId, settingsKey } from "../lib/settings"
+import { newId } from "../lib/settings"
 import { errorMessage, readSvg, scanPaths } from "../lib/tauri"
-import type { OptimiseResult, SvgItem, SvgoSettings } from "../lib/types"
+import type { OptimiseResult, RunSpec, SvgItem } from "../lib/types"
 
 // ── File list + optimisation queue ────────────────────────────────────────────
 
-export type ResolveSettings = (item: SvgItem) => SvgoSettings
+export type ResolveSettings = (item: SvgItem) => RunSpec
 
 export function useItems() {
   const [items, setItems] = useState<SvgItem[]>([])
@@ -61,23 +61,23 @@ export function useItems() {
     const results = new Map<string, OptimiseResult>()
     const jobs = itemsRef.current
       .filter((i) => set.has(i.id) && i.source !== undefined)
-      .map((item) => ({ item, settings: resolve(item) }))
-      .filter(({ item, settings }) => {
-        if (!force && item.result && item.result.key === settingsKey(settings)) {
+      .map((item) => ({ item, spec: resolve(item) }))
+      .filter(({ item, spec }) => {
+        if (!force && item.result && item.result.key === spec.key) {
           results.set(item.id, item.result)
           return false
         }
         return true
       })
 
-    await runLimited(jobs, CONCURRENCY, async ({ item, settings }) => {
+    await runLimited(jobs, CONCURRENCY, async ({ item, spec }) => {
       const run = (runs.current.get(item.id) ?? 0) + 1
       runs.current.set(item.id, run)
       patch(item.id, { status: "running", error: undefined })
       try {
-        const { data: output, replaced } = await optimiseSvg(item.source as string, settings)
+        const { data: output, replaced } = await optimiseSvg(item.source as string, spec)
         if (runs.current.get(item.id) !== run) return
-        const result = { output, size: byteLength(output), replaced, key: settingsKey(settings) }
+        const result = { output, size: byteLength(output), replaced, key: spec.key }
         results.set(item.id, result)
         patch(item.id, { status: "done", result })
       } catch (e) {

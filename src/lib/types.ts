@@ -25,7 +25,26 @@ export interface SvgoSettings {
   /** Plugin name → enabled. Missing names fall back to the plugin's default. */
   plugins: Record<string, boolean>
   replacements: Replacement[]
+  /** Custom plugin id → on/off and its params as JSON text */
+  custom: Record<string, { on: boolean, params: string }>
 }
+
+/** A third-party SVGO plugin loaded from a .js/.mjs file */
+export interface CustomPlugin {
+  id: string
+  name: string
+  description: string
+  fileName: string
+  code: string
+  /** Short hash of the code, so results go stale when a plugin is reloaded */
+  hash: string
+}
+
+/** What the worker needs to run one custom plugin */
+export interface CustomRun { name: string, code: string, hash: string, params: string }
+
+/** Everything needed to optimise one file */
+export interface RunSpec { svgo: SvgoSettings, custom: CustomRun[], key: string }
 
 export interface Preset {
   id: string
@@ -38,6 +57,7 @@ export interface AppSettings {
   presets: Preset[]
   /** Used by every file that hasn't been given its own preset */
   defaultPresetId: string
+  customPlugins: CustomPlugin[]
   /** The preset currently open in the config panel */
   editingPresetId: string
   thumbSize: ThumbSize

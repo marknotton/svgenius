@@ -10,11 +10,12 @@ A small macOS-first desktop app for optimising SVGs in bulk with [SVGO](https://
 - Review selected files side by side (before / after) with size savings, tweak settings and see them re-run live
 - Find & replace rules per preset (match case, first or all, optional regex, before or after SVGO)
 - Preview CSS (e.g. `:root { --symbol-colour: red; }`) applied to every preview but never to exported files
+- Third-party SVGO plugins: load a single-file `.js`/`.mjs` plugin (see `examples/plugins/`), toggle it per preset and pass JSON params
 - Import and export presets as JSON
 
 ## Stack
 
-Tauri v2 (Rust) + React 19 + TypeScript, built with Vite and Yarn 4. SVGO runs in Web Workers inside the webview (`svgo/browser`), so there are no sidecars. Rust only handles file IO: scanning folders, reading SVGs, writing exports and the settings file.
+Tauri v2 (Rust) + React 19 + TypeScript, built with Vite and Yarn 4. SVGO runs in Web Workers inside the webview (`svgo/browser`), so there are no sidecars. Custom plugin code is imported from a blob URL inside those workers only (hence `script-src blob:` in the CSP), so it never touches the window or Tauri's IPC. Rust only handles file IO: scanning folders, reading SVGs, writing exports and the settings file.
 
 Settings live in the app config folder (`~/Library/Application Support/studio.yello.svgenius/settings.json` on macOS).
 

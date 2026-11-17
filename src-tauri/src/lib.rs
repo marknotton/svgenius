@@ -14,6 +14,7 @@ type PendingOpenFiles = Arc<Mutex<Vec<String>>>;
 
 const SETTINGS_FILE: &str = "settings.json";
 const MAX_SVG_BYTES: u64 = 25 * 1024 * 1024;
+const MAX_PLUGIN_BYTES: u64 = 2 * 1024 * 1024;
 
 // ── Payloads ──────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,13 @@ struct ScannedFile {
     /// structure on export. A dropped folder keeps its own name as the root.
     rel_path: String,
     size: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PluginFile {
+    file_name: String,
+    code: String,
 }
 
 #[derive(Deserialize)]
@@ -224,6 +232,28 @@ fn write_json_file(path: String, contents: String) -> Result<(), String> {
     fs::write(path, contents).map_err(|e| e.to_string())
 }
 
+/// Reads a third-party SVGO plugin. The code itself only ever runs inside the
+/// frontend's optimiser worker.
+#[tauri::command]
+fn read_plugin_file(path: String) -> Result<PluginFile, String> {
+    let path = PathBuf::from(path);
+    let ok = path.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.eq_ignore_ascii_case("js") || e.eq_ignore_ascii_case("mjs"))
+        .unwrap_or(false);
+    if !ok {
+        return Err("Plugins must be .js or .mjs files".into());
+    }
+    let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
+    if meta.len() > MAX_PLUGIN_BYTES {
+        return Err("Plugin file is larger than 2 MB".into());
+    }
+    Ok(PluginFile {
+        file_name: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+        code: fs::read_to_string(&path).map_err(|e| e.to_string())?,
+    })
+}
+
 #[tauri::command]
 fn take_pending_open_files(state: State<'_, PendingOpenFiles>) -> Vec<String> {
     std::mem::take(&mut *state.lock().unwrap())
@@ -248,6 +278,7 @@ pub fn run() {
             save_settings,
             read_json_file,
             write_json_file,
+            read_plugin_file,
             take_pending_open_files
         ])
         .build(tauri::generate_context!())

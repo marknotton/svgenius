@@ -22,6 +22,9 @@ export const readJsonFile = (path: string) => invoke<string>("read_json_file", {
 export const writeJsonFile = (path: string, contents: string) =>
   invoke<void>("write_json_file", { path, contents })
 
+export const readPluginFile = (path: string) =>
+  invoke<{ fileName: string, code: string }>("read_plugin_file", { path })
+
 export const takePendingOpenFiles = () => invoke<string[]>("take_pending_open_files")
 
 export const errorMessage = (e: unknown) =>
