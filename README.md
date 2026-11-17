@@ -9,6 +9,7 @@ A small macOS-first desktop app for optimising SVGs in bulk with [SVGO](https://
 - Bulk optimise and export, optionally keeping the folder structure
 - Review selected files side by side (before / after) with size savings, tweak settings and see them re-run live
 - Find & replace rules per preset (match case, first or all, optional regex, before or after SVGO)
+- Attribute rules (recipes): for chosen elements (`*` or `path, rect, circle`), if they have / lack / match an attribute, then set, add if missing, remove or rename an attribute, or remove the element
 - Preview CSS (e.g. `:root { --symbol-colour: red; }`) applied to every preview but never to exported files
 - Third-party SVGO plugins: load a single-file `.js`/`.mjs` plugin (see `examples/plugins/`), toggle it per preset and pass JSON params
 - Import and export presets as JSON

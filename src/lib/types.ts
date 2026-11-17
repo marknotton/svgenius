@@ -17,6 +17,22 @@ export interface Replacement {
   stage: "before" | "after"
 }
 
+/** "When <targets> <condition> then <action>" attribute recipe */
+export interface AttrRule {
+  id: string
+  enabled: boolean
+  /** Element names, comma or space separated. Empty or * means every element */
+  targets: string
+  when: "always" | "has" | "lacks" | "equals" | "contains"
+  whenAttr: string
+  whenValue: string
+  then: "set" | "setIfMissing" | "remove" | "rename" | "removeElement"
+  thenAttr: string
+  thenValue: string
+  caseSensitive: boolean
+  stage: "before" | "after"
+}
+
 /** Everything that decides how SVGO treats a file. */
 export interface SvgoSettings {
   multipass: boolean
@@ -25,6 +41,7 @@ export interface SvgoSettings {
   /** Plugin name → enabled. Missing names fall back to the plugin's default. */
   plugins: Record<string, boolean>
   replacements: Replacement[]
+  attrRules: AttrRule[]
   /** Custom plugin id → on/off and its params as JSON text */
   custom: Record<string, { on: boolean, params: string }>
 }
@@ -82,7 +99,7 @@ export type ItemStatus = "loading" | "idle" | "running" | "done" | "error"
 export interface OptimiseResult {
   output: string
   size: number
-  /** How many find & replace matches were made */
+  /** How many find & replace matches and attribute rule changes were made */
   replaced: number
   /** Fingerprint of the settings used, so we can tell when a result is stale */
   key: string

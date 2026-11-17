@@ -452,3 +452,10 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
 .custom-plugin { display: flex; flex-direction: column; gap: 4px; padding: 2px 0; }
 .custom-plugin__toggle { flex: 1; min-width: 0; }
 .custom-plugin__params { height: 56px; padding: 6px 8px; resize: vertical; user-select: text; }
+
+/* ── Attribute rules ─────────────────────────────────────────── */
+
+.rule__word { flex: none; width: 28px; color: var(--text-3); font-size: 11px; }
+.rule__row--deep { padding-left: 54px; }
+.select--sm { height: 26px; font-size: 11px; flex: none; max-width: 130px; }
+.rule__hint { padding-left: 20px; font-size: 11px; }

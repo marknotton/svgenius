@@ -106,7 +106,7 @@ const ReviewRow = memo(function ReviewRow({ item, px, backdrop, presets, default
                 <>
                   {formatBytes(after)}{" "}
                   <span className={`pill ${pct > 0 ? "pill--success" : "pill--warning"}`}>{formatSaving(item.size, after)}</span>
-                  {item.result?.replaced ? <span className="pill" title="Find & replace matches">{plural(item.result.replaced, "replacement")}</span> : null}
+                  {item.result?.replaced ? <span className="pill" title="Find & replace and attribute rule changes">{plural(item.result.replaced, "change")}</span> : null}
                 </>
               ) : "…"}
           </figcaption>

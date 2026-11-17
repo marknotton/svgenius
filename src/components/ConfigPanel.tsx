@@ -2,6 +2,7 @@ import { IconDownload, IconPencil, IconPlus, IconReset, IconStar, IconTrash, Ico
 import { plural } from "../lib/format"
 import type { PresetActions } from "../hooks/useAppSettings"
 import type { AppSettings, CustomPlugin, Preset } from "../lib/types"
+import { AttrRuleList } from "./AttrRuleList"
 import { CustomPluginList } from "./CustomPluginList"
 import { PluginList } from "./PluginList"
 import { PresetSelect } from "./PresetSelect"
@@ -75,6 +76,10 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
 
         <section className="panel__section">
           <ReplaceList rules={s.replacements} onChange={(replacements) => edit((x) => ({ ...x, replacements }))} />
+        </section>
+
+        <section className="panel__section">
+          <AttrRuleList rules={s.attrRules} onChange={(attrRules) => edit((x) => ({ ...x, attrRules }))} />
         </section>
 
         <section className="panel__section">

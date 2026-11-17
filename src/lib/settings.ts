@@ -1,6 +1,6 @@
 import type { Config } from "svgo/browser"
 import { PLUGINS, PLUGIN_NAMES } from "./plugins"
-import type { AppSettings, CustomPlugin, CustomRun, Preset, Replacement, RunSpec, SvgoSettings } from "./types"
+import type { AppSettings, AttrRule, CustomPlugin, CustomRun, Preset, Replacement, RunSpec, SvgoSettings } from "./types"
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
@@ -13,7 +13,17 @@ export function defaultSvgoSettings(): SvgoSettings {
     pretty: false,
     plugins: Object.fromEntries(PLUGINS.map((p) => [p.name, p.defaultOn])),
     replacements: [],
+    attrRules: [],
     custom: {}
+  }
+}
+
+export function createAttrRule(): AttrRule {
+  return {
+    id: newId(), enabled: true, targets: "*",
+    when: "lacks", whenAttr: "", whenValue: "",
+    then: "setIfMissing", thenAttr: "", thenValue: "",
+    caseSensitive: true, stage: "before"
   }
 }
 
@@ -74,7 +84,8 @@ export function activeCustom(settings: SvgoSettings, plugins: CustomPlugin[]): C
 /** Stable fingerprint, used to spot results produced by older settings */
 export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const rules = activeReplacements(settings).map(({ id: _id, enabled: _e, ...r }) => r)
-  return JSON.stringify([toSvgoConfig(settings), rules, custom.map((c) => [c.hash, c.params.trim()])])
+  const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
+  return JSON.stringify([toSvgoConfig(settings), rules, attrs, custom.map((c) => [c.hash, c.params.trim()])])
 }
 
 export function runSpec(settings: SvgoSettings, plugins: CustomPlugin[]): RunSpec {
@@ -114,13 +125,39 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
       if (isObj(v)) custom[k] = { on: v.on === true, params: typeof v.params === "string" ? v.params : "" }
     }
   }
+  const attrRules = Array.isArray(raw.attrRules)
+    ? raw.attrRules.map(sanitiseAttrRule).filter((r): r is AttrRule => r !== null)
+    : []
   return {
     custom,
+    attrRules,
     replacements,
     multipass: typeof raw.multipass === "boolean" ? raw.multipass : base.multipass,
     pretty: typeof raw.pretty === "boolean" ? raw.pretty : base.pretty,
     floatPrecision: Number.isInteger(precision) && precision >= 0 && precision <= 8 ? precision : base.floatPrecision,
     plugins
+  }
+}
+
+const WHENS: AttrRule["when"][] = ["always", "has", "lacks", "equals", "contains"]
+const THENS: AttrRule["then"][] = ["set", "setIfMissing", "remove", "rename", "removeElement"]
+
+function sanitiseAttrRule(raw: unknown): AttrRule | null {
+  if (!isObj(raw)) return null
+  const base = createAttrRule()
+  const str = (v: unknown, d = "") => (typeof v === "string" ? v : d)
+  return {
+    id: str(raw.id) || base.id,
+    enabled: typeof raw.enabled === "boolean" ? raw.enabled : true,
+    targets: str(raw.targets, "*"),
+    when: WHENS.includes(raw.when as AttrRule["when"]) ? raw.when as AttrRule["when"] : base.when,
+    whenAttr: str(raw.whenAttr),
+    whenValue: str(raw.whenValue),
+    then: THENS.includes(raw.then as AttrRule["then"]) ? raw.then as AttrRule["then"] : base.then,
+    thenAttr: str(raw.thenAttr),
+    thenValue: str(raw.thenValue),
+    caseSensitive: typeof raw.caseSensitive === "boolean" ? raw.caseSensitive : true,
+    stage: raw.stage === "after" ? "after" : "before"
   }
 }
 

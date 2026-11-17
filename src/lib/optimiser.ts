@@ -50,6 +50,7 @@ export async function optimiseSvg(svg: string, spec: RunSpec): Promise<WorkerOut
     svg,
     config: toSvgoConfig(spec.svgo),
     replacements: activeReplacements(spec.svgo),
+    attrRules: spec.svgo.attrRules.filter((r) => r.enabled),
     custom: spec.custom
   })
   if (!("data" in res)) throw new Error("Unexpected worker response")

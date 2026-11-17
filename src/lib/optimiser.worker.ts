@@ -1,7 +1,8 @@
 /// <reference lib="webworker" />
 import { optimize, type CustomPlugin as SvgoCustomPlugin } from "svgo/browser"
+import { attrRulesPlugin } from "./attrRules"
 import { applyReplacements } from "./replace"
-import type { CustomRun, Replacement } from "./types"
+import type { AttrRule, CustomRun, Replacement } from "./types"
 
 // ── SVGO worker ───────────────────────────────────────────────────────────────
 // Runs off the main thread so the UI stays responsive during big batches.
@@ -9,7 +10,7 @@ import type { CustomRun, Replacement } from "./types"
 // Custom plugin code runs here too, away from the window and Tauri's IPC.
 
 export type WorkerRequest =
-  | { type: "optimise", id: number, svg: string, config: Parameters<typeof optimize>[1], replacements: Replacement[], custom: CustomRun[] }
+  | { type: "optimise", id: number, svg: string, config: Parameters<typeof optimize>[1], replacements: Replacement[], attrRules: AttrRule[], custom: CustomRun[] }
   | { type: "probe", id: number, code: string }
 
 export type WorkerResponse =
@@ -73,11 +74,24 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         const p = await load(run.code, run.hash)
         extra.push({ name: p.name, fn: p.fn, params: parseParams(run) })
       }
-      const config = { ...req.config, plugins: [...(req.config?.plugins ?? []), ...extra] }
+      // Attribute rules count each change once, even with multipass
+      const before = { count: 0 }
+      const after = { count: 0 }
+      const rulesBefore = req.attrRules.filter((r) => r.stage === "before")
+      const rulesAfter = req.attrRules.filter((r) => r.stage === "after")
+      const config = {
+        ...req.config,
+        plugins: [
+          ...(rulesBefore.length ? [attrRulesPlugin(rulesBefore, before) as unknown as SvgoCustomPlugin] : []),
+          ...(req.config?.plugins ?? []),
+          ...extra,
+          ...(rulesAfter.length ? [attrRulesPlugin(rulesAfter, after) as unknown as SvgoCustomPlugin] : [])
+        ]
+      }
       const pre = applyReplacements(req.svg, req.replacements, "before")
       const optimised = optimize(pre.out, config).data
       const post = applyReplacements(optimised, req.replacements, "after")
-      res = { id: req.id, ok: true, data: post.out, replaced: pre.count + post.count }
+      res = { id: req.id, ok: true, data: post.out, replaced: pre.count + post.count + before.count + after.count }
     }
   } catch (err) {
     res = { id: req.id, ok: false, error: err instanceof Error ? err.message : String(err) }

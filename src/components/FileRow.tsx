@@ -1,5 +1,5 @@
 import { memo, type MouseEvent } from "react"
-import { formatBytes, formatSaving, savingPercent } from "../lib/format"
+import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { Backdrop, Preset, SvgItem } from "../lib/types"
 import { PresetSelect } from "./PresetSelect"
 import { Thumb } from "./Thumb"
@@ -68,7 +68,7 @@ function Stats({ item, stale }: { item: SvgItem, stale: boolean }) {
   return (
     <div className={`file-row__stats${stale ? " is-stale" : ""}`} title={stale ? "Settings have changed since this ran" : undefined}>
       <span className="text-3 strike">{formatBytes(item.size)}</span>
-      {item.result.replaced > 0 && <span className="pill" title="Find & replace matches">{item.result.replaced}×</span>}
+      {item.result.replaced > 0 && <span className="pill" title="Find & replace and attribute rule changes">{plural(item.result.replaced, "change")}</span>}
       <span>{formatBytes(item.result.size)}</span>
       <span className={`pill ${pct > 0 ? "pill--success" : "pill--warning"}`}>{formatSaving(item.size, item.result.size)}</span>
     </div>
