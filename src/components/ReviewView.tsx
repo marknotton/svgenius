@@ -1,5 +1,5 @@
 import { memo, type ReactNode } from "react"
-import { fmtNum, svgSize } from "../lib/svgRoot"
+import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "../lib/svgRoot"
 import { IconBack } from "../icons"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { AppSettings, Backdrop, Preset, SvgItem } from "../lib/types"
@@ -120,5 +120,13 @@ const ReviewRow = memo(function ReviewRow({ item, px, backdrop, presets, default
 
 function Dims({ svg }: { svg?: string }) {
   const size = svgSize(svg)
-  return size ? <span className="text-3">{fmtNum(size.w, 2)} × {fmtNum(size.h, 2)}</span> : null
+  const tag = svg ? rootTag(svg) : null
+  const vb = tag ? parseViewBox(getAttr(tag, "viewBox")) : null
+  if (!size) return null
+  return (
+    <span className="text-3" title="Width × height (viewBox width × height)">
+      {fmtNum(size.w, 2)} × {fmtNum(size.h, 2)}
+      {vb && (Math.abs(vb.w - size.w) > 0.005 || Math.abs(vb.h - size.h) > 0.005) && <> (viewBox {fmtNum(vb.w, 2)} × {fmtNum(vb.h, 2)})</>}
+    </span>
+  )
 }

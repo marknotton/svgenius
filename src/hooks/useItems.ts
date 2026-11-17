@@ -1,14 +1,14 @@
 import { useCallback, useRef, useState } from "react"
 import { byteLength } from "../lib/format"
 import { CONCURRENCY, optimiseSvg, runLimited } from "../lib/optimiser"
-import { trimSvg } from "../lib/trim"
-import { newId } from "../lib/settings"
+import { defaultBespoke, newId } from "../lib/settings"
 import { errorMessage, readSvg, scanPaths } from "../lib/tauri"
-import type { OptimiseResult, RunSpec, SvgItem } from "../lib/types"
+import { postProcess } from "../lib/trim"
+import type { Bespoke, OptimiseResult, RunSpec, SvgItem } from "../lib/types"
 
 // ── File list + optimisation queue ────────────────────────────────────────────
 
-export type ResolveSettings = (item: SvgItem) => RunSpec
+export type ResolveSpec = (item: SvgItem) => RunSpec
 
 export function useItems() {
   const [items, setItems] = useState<SvgItem[]>([])
@@ -27,14 +27,14 @@ export function useItems() {
     const known = new Set(itemsRef.current.map((i) => i.path))
     const fresh: SvgItem[] = scanned
       .filter((f) => !known.has(f.path) && (known.add(f.path), true))
-      .map((f) => ({ ...f, id: newId(), status: "loading", presetId: null }))
+      .map((f) => ({ ...f, id: newId(), status: "loading", presetId: null, rev: 0, bespoke: defaultBespoke() }))
     if (fresh.length === 0) return 0
     setItems((list) => [...list, ...fresh])
 
     await runLimited(fresh, 8, async (item) => {
       try {
         const source = await readSvg(item.path)
-        patch(item.id, { source, size: byteLength(source), status: "idle" })
+        patch(item.id, { source, fileSource: source, size: byteLength(source), status: "idle" })
       } catch (e) {
         patch(item.id, { status: "error", error: errorMessage(e) })
       }
@@ -53,11 +53,26 @@ export function useItems() {
     setItems((list) => list.map((i) => (set.has(i.id) ? { ...i, presetId } : i)))
   }, [])
 
+  /** In-app edit of the markup. Never written back to the original file */
+  const editSource = useCallback((id: string, source: string) => {
+    setItems((list) => list.map((i) => (i.id === id
+      ? { ...i, source, size: byteLength(source), rev: i.rev + 1, status: i.status === "error" ? "idle" : i.status, errorKey: undefined }
+      : i)))
+  }, [])
+
+  const revertSource = useCallback((id: string) => {
+    setItems((list) => list.map((i) => (i.id === id && i.fileSource !== undefined
+      ? { ...i, source: i.fileSource, size: byteLength(i.fileSource), rev: i.rev + 1, errorKey: undefined }
+      : i)))
+  }, [])
+
+  const setBespoke = useCallback((id: string, bespoke: Bespoke) => patch(id, { bespoke }), [patch])
+
   /**
    * Optimises the given items. Already up-to-date results are skipped unless
    * `force`. Resolves with the fresh result for every item that has one.
    */
-  const optimise = useCallback(async (ids: string[], resolve: ResolveSettings, force = false) => {
+  const optimise = useCallback(async (ids: string[], resolve: ResolveSpec, force = false) => {
     const set = new Set(ids)
     const results = new Map<string, OptimiseResult>()
     const jobs = itemsRef.current
@@ -77,18 +92,18 @@ export function useItems() {
       patch(item.id, { status: "running", error: undefined })
       try {
         const { data, replaced } = await optimiseSvg(item.source as string, spec)
-        const output = spec.svgo.trim.enabled ? await trimSvg(data, spec.svgo.trim, spec.svgo.floatPrecision) : data
+        const output = await postProcess(data, spec.svgo, spec.bespoke)
         if (runs.current.get(item.id) !== run) return
         const result = { output, size: byteLength(output), replaced, key: spec.key }
         results.set(item.id, result)
-        patch(item.id, { status: "done", result })
+        patch(item.id, { status: "done", result, errorKey: undefined })
       } catch (e) {
         if (runs.current.get(item.id) !== run) return
-        patch(item.id, { status: "error", error: errorMessage(e), result: undefined })
+        patch(item.id, { status: "error", error: errorMessage(e), errorKey: spec.key })
       }
     })
     return results
   }, [patch])
 
-  return { items, itemsRef, addPaths, remove, clear, setPreset, optimise }
+  return { items, itemsRef, addPaths, remove, clear, setPreset, editSource, revertSource, setBespoke, optimise }
 }

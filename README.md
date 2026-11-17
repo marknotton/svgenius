@@ -6,12 +6,14 @@ A small macOS-first desktop app for optimising SVGs in bulk with [SVGO](https://
 - Tiny / medium / large previews on a light or dark checkerboard
 - Full SVGO plugin settings, saved as named **presets** that persist between launches
 - Give individual files their own preset, or make a new one just for that file
+- Live updates: rows on or near screen re-run as you change settings (buffer in `src/lib/config.ts`)
+- Finder-style selection (click, Cmd-click, Shift-click) and a file inspector with live, editable markup, viewBox info, a per-file preset and a per-file transform (scale, move X/Y)
 - Bulk optimise and export, optionally keeping the folder structure
 - Review selected files side by side (before / after) with size savings, tweak settings and see them re-run live
 - Find & replace rules per preset (match case, first or all, optional regex, before or after SVGO)
 - Attribute rules (recipes): for chosen elements (`*` or `path, rect, circle`), if they have / lack / match an attribute, then set, add if missing, remove or rename an attribute, or remove the element
-- Trim whitespace: crops the viewBox to the visible artwork, with padding (positive) or inset (negative) in % or viewBox units
-- Width × height on every row and in review, plus a circle guide overlay for avatar-style crops
+- Size & trim: output scale factor, plus trim whitespace that crops the viewBox to the visible artwork, with padding (positive) or inset (negative) in % or viewBox units, and fit-content or preserve-aspect-ratio modes
+- Width × height on every row and in review, plus circle guide and circle clip toggles for avatar-style crops
 - Resizable settings sidebar (remembered), app menu with About and Reset Layout
 - Preview CSS (e.g. `:root { --symbol-colour: red; }`) applied to every preview but never to exported files
 - Third-party SVGO plugins: load a single-file `.js`/`.mjs` plugin (see `examples/plugins/`), toggle it per preset and pass JSON params

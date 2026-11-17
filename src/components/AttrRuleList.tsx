@@ -1,4 +1,6 @@
 import { IconPlus, IconTrash } from "../icons"
+import { ElementPicker } from "./ElementPicker"
+import { commonStage, StageToggle } from "./StageToggle"
 import { ACTIONS, CONDITIONS, isRuleReady } from "../lib/attrRules"
 import { createAttrRule } from "../lib/settings"
 import type { AttrRule } from "../lib/types"
@@ -18,8 +20,12 @@ export function AttrRuleList({ rules, onChange }: Props) {
     <div className="rules">
       <div className="plugins__head">
         <span className="panel__label">Attribute rules {rules.length > 0 && <span className="text-3">{active}/{rules.length}</span>}</span>
-        <button className="link" onClick={() => onChange([...rules, createAttrRule()])}><IconPlus width={11} height={11} /> Add rule</button>
+        <button className="link" onClick={() => onChange([...rules, { ...createAttrRule(), stage: commonStage(rules.map((r) => r.stage)) }])}><IconPlus width={11} height={11} /> Add rule</button>
       </div>
+      {rules.length > 0 && (
+        <StageToggle stages={rules.map((r) => r.stage)} onChange={(s) => onChange(rules.map((r) => ({ ...r, stage: s })))}
+          hint="Before: rules see the original markup. After: rules see SVGO's output." />
+      )}
 
       {rules.length === 0 && (
         <p className="rules__empty text-3">Recipes like “every path lacking fill → add fill="currentColor"” or “remove data-name”.</p>
@@ -36,9 +42,7 @@ export function AttrRuleList({ rules, onChange }: Props) {
               <input type="checkbox" className="checkbox" checked={r.enabled} title={r.enabled ? "Rule on" : "Rule off"}
                 aria-label={`Attribute rule ${n} enabled`} onChange={(e) => patch(r.id, { enabled: e.target.checked })} />
               <span className="rule__word">For</span>
-              <input className="input input--sm input--mono" value={r.targets} spellCheck={false}
-                placeholder="* or path, rect, circle" title="Element names, comma separated. * means every element"
-                aria-label={`Attribute rule ${n} elements`} onChange={(e) => patch(r.id, { targets: e.target.value })} />
+              <ElementPicker value={r.targets} label={`Attribute rule ${n} elements`} onChange={(targets) => patch(r.id, { targets })} />
               <button className="btn btn--icon" title="Delete rule" aria-label={`Delete attribute rule ${n}`}
                 onClick={() => onChange(rules.filter((x) => x.id !== r.id))}><IconTrash /></button>
             </div>
@@ -83,12 +87,6 @@ export function AttrRuleList({ rules, onChange }: Props) {
               <button type="button" className={`flag${r.caseSensitive ? " is-on" : ""}`} aria-pressed={r.caseSensitive}
                 title="Match case for element names, attribute names and values"
                 onClick={() => patch(r.id, { caseSensitive: !r.caseSensitive })}>Aa</button>
-              <span className="toolbar__spacer" />
-              <button type="button" className={`flag${r.stage === "after" ? " is-on" : ""}`} aria-pressed={r.stage === "after"}
-                title={r.stage === "before" ? "Runs before SVGO's plugins" : "Runs after SVGO's plugins"}
-                onClick={() => patch(r.id, { stage: r.stage === "before" ? "after" : "before" })}>
-                {r.stage === "before" ? "Before SVGO" : "After SVGO"}
-              </button>
             </div>
             {r.enabled && !ready && <p className="rule__hint text-3">Fill in the attribute names to switch this rule on.</p>}
           </div>

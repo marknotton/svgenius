@@ -1,3 +1,4 @@
+import { parseTargets } from "./elements"
 import type { AttrRule } from "./types"
 
 // ── Attribute rules ───────────────────────────────────────────────────────────
@@ -36,7 +37,6 @@ export function isRuleReady(r: AttrRule) {
 interface XastElement { type: "element", name: string, attributes: Record<string, string>, children: XastNode[] }
 type XastNode = XastElement | { type: string, children?: XastNode[] }
 
-const parseTargets = (s: string) => s.split(/[\s,]+/).map((t) => t.trim()).filter(Boolean)
 
 export function attrRulesPlugin(rules: AttrRule[], counter: { count: number }) {
   const ready = rules.filter((r) => r.enabled && isRuleReady(r)).map((r) => {

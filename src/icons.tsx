@@ -30,6 +30,9 @@ export const IconReset = (p: P) => <Icon {...p}><path d="M2.75 8a5.25 5.25 0 1 0
 export const IconX = (p: P) => <Icon {...p}><path d="m4 4 8 8M12 4l-8 8" /></Icon>
 export const IconReveal = (p: P) => <Icon {...p}><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M11.5 9.5v3a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3" /></Icon>
 export const IconCircle = (p: P) => <Icon width={13} height={13} {...p}><circle cx="8" cy="8" r="5.75" strokeDasharray="2 1.6" /></Icon>
+export const IconClip = (p: P) => <Icon width={13} height={13} {...p}><circle cx="8" cy="8" r="5.75" /><path d="M5 8h6M8 5v6" strokeWidth="1.25" /></Icon>
+export const IconCode = (p: P) => <Icon {...p}><path d="m5.5 4.5-3.5 3.5 3.5 3.5M10.5 4.5l3.5 3.5-3.5 3.5" /></Icon>
+export const IconCopy = (p: P) => <Icon {...p}><rect x="5.5" y="5.5" width="8" height="8" rx="1" /><path d="M10.5 5.5v-2a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2" /></Icon>
 export const IconSliders = (p: P) => <Icon {...p}><path d="M2.5 4.5h6M11.5 4.5h2M2.5 11.5h2M7.5 11.5h6" /><circle cx="10" cy="4.5" r="1.5" /><circle cx="6" cy="11.5" r="1.5" /></Icon>
 
 export const Logo = (p: P) => (

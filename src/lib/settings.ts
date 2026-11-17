@@ -14,7 +14,7 @@ export function defaultSvgoSettings(): SvgoSettings {
     plugins: Object.fromEntries(PLUGINS.map((p) => [p.name, p.defaultOn])),
     replacements: [],
     attrRules: [],
-    trim: { enabled: false, padding: 0, unit: "%" },
+    trim: { enabled: false, padding: 0, unit: "%", aspect: "fit", scale: 1 },
     custom: {}
   }
 }
@@ -47,11 +47,25 @@ export function defaultAppSettings(): AppSettings {
     defaultPresetId: preset.id,
     editingPresetId: preset.id,
     keepStructure: true,
+    liveUpdates: true,
     ...defaultLayout()
   }
 }
 
 export const SIDEBAR = { default: 300, min: 260, max: 640 }
+
+export const SCALE_LIMITS = { min: 0.0001, max: 1000 }
+
+/** A usable scale factor, or null */
+export function validScale(v: unknown) {
+  const n = typeof v === "string" ? Number(v.trim()) : v
+  return typeof n === "number" && Number.isFinite(n) && n >= SCALE_LIMITS.min && n <= SCALE_LIMITS.max ? n : null
+}
+
+export const defaultBespoke = () => ({ scale: 1, offsetX: 0, offsetY: 0 })
+
+export const isDefaultBespoke = (b: { scale: number, offsetX: number, offsetY: number }) =>
+  b.scale === 1 && b.offsetX === 0 && b.offsetY === 0
 
 /** The bits "Reset layout" puts back */
 export function defaultLayout() {
@@ -60,6 +74,7 @@ export function defaultLayout() {
     previewCssEnabled: true,
     sidebarWidth: SIDEBAR.default,
     circleOverlay: false,
+    circleClip: false,
     thumbSize: "medium" as const,
     backdrop: "light" as const
   }
@@ -97,7 +112,8 @@ export function activeCustom(settings: SvgoSettings, plugins: CustomPlugin[]): C
 export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const rules = activeReplacements(settings).map(({ id: _id, enabled: _e, ...r }) => r)
   const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
-  const trim = settings.trim.enabled ? [settings.trim.padding, settings.trim.unit] : null
+  const t = settings.trim
+  const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.scale]
   return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()])])
 }
 
@@ -151,7 +167,9 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
     trim: {
       enabled: trimRaw.enabled === true,
       padding: clampNum(trimRaw.padding, -1e6, 1e6, 0),
-      unit: trimRaw.unit === "px" ? "px" : "%"
+      unit: trimRaw.unit === "px" ? "px" : "%",
+      aspect: trimRaw.aspect === "preserve" ? "preserve" : "fit",
+      scale: validScale(trimRaw.scale) ?? 1
     },
     custom,
     attrRules,
@@ -249,7 +267,9 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     previewCss: typeof raw.previewCss === "string" ? raw.previewCss : "",
     previewCssEnabled: typeof raw.previewCssEnabled === "boolean" ? raw.previewCssEnabled : true,
     sidebarWidth: clampNum(raw.sidebarWidth, SIDEBAR.min, SIDEBAR.max, SIDEBAR.default),
-    circleOverlay: raw.circleOverlay === true
+    circleOverlay: raw.circleOverlay === true,
+    circleClip: raw.circleClip === true,
+    liveUpdates: raw.liveUpdates !== false
   }
 }
 

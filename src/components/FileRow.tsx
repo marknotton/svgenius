@@ -1,5 +1,5 @@
 import { memo, useMemo, type MouseEvent } from "react"
-import { fmtNum, svgSize } from "../lib/svgRoot"
+import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "../lib/svgRoot"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { Backdrop, Preset, SvgItem } from "../lib/types"
 import { PresetSelect } from "./PresetSelect"
@@ -8,12 +8,14 @@ import { Thumb } from "./Thumb"
 interface Props {
   item: SvgItem
   selected: boolean
+  focused: boolean
   stale: boolean
   thumbPx: number
   backdrop: Backdrop
   presets: Preset[]
   defaultPreset: Preset
   onToggle: (id: string, e: MouseEvent) => void
+  onRowClick: (id: string, e: MouseEvent) => void
   onPreset: (id: string, presetId: string | null) => void
   onNewPreset: (item: SvgItem) => void
 }
@@ -23,11 +25,17 @@ export const FileRow = memo(function FileRow(p: Props) {
   const dir = item.relPath.includes("/") ? item.relPath.slice(0, item.relPath.lastIndexOf("/")) : ""
   const shown = item.result?.output ?? item.source
   const size = useMemo(() => svgSize(shown), [shown])
+  const vb = useMemo(() => {
+    const tag = shown ? rootTag(shown) : null
+    return tag ? parseViewBox(getAttr(tag, "viewBox")) : null
+  }, [shown])
+  const vbDiffers = vb && size && (Math.abs(vb.w - size.w) > 0.005 || Math.abs(vb.h - size.h) > 0.005)
 
   return (
     <li
-      className={`file-row${selected ? " is-selected" : ""}`}
-      onClick={(e) => p.onToggle(item.id, e)}
+      className={`file-row${selected ? " is-selected" : ""}${p.focused ? " is-focused" : ""}`}
+      data-id={item.id}
+      onClick={(e) => p.onRowClick(item.id, e)}
       aria-selected={selected}
     >
       <input
@@ -43,6 +51,7 @@ export const FileRow = memo(function FileRow(p: Props) {
         <div className="file-row__name" title={item.path}>{item.name}</div>
         <div className="file-row__dir" title={item.path}>
           {size && <span className="file-row__dims" title="Width × height">{fmtNum(size.w, 2)} × {fmtNum(size.h, 2)}</span>}
+          {vbDiffers && <span className="file-row__dims" title="viewBox width × height"> · viewBox {fmtNum(vb.w, 2)} × {fmtNum(vb.h, 2)}</span>}
           {size && dir && " · "}
           {dir}
         </div>

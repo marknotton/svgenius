@@ -38,6 +38,19 @@ export interface TrimSettings {
   /** Positive adds space around the artwork, negative crops into it */
   padding: number
   unit: "%" | "px"
+  /** fit = viewBox hugs the artwork; preserve = keep the original aspect ratio */
+  aspect: "fit" | "preserve"
+  /** Multiplies the output width/height. 1 = unchanged */
+  scale: number
+}
+
+/** Per-file tweaks, applied after everything else */
+export interface Bespoke {
+  /** Scales the artwork inside its viewBox, around the centre */
+  scale: number
+  /** Moves the artwork, as % of the viewBox width/height */
+  offsetX: number
+  offsetY: number
 }
 
 /** Everything that decides how SVGO treats a file. */
@@ -70,7 +83,7 @@ export interface CustomPlugin {
 export interface CustomRun { name: string, code: string, hash: string, params: string }
 
 /** Everything needed to optimise one file */
-export interface RunSpec { svgo: SvgoSettings, custom: CustomRun[], key: string }
+export interface RunSpec { svgo: SvgoSettings, custom: CustomRun[], key: string, bespoke?: Bespoke }
 
 export interface Preset {
   id: string
@@ -94,6 +107,8 @@ export interface AppSettings {
   previewCssEnabled: boolean
   sidebarWidth: number
   circleOverlay: boolean
+  circleClip: boolean
+  liveUpdates: boolean
 }
 
 // ── Files ─────────────────────────────────────────────────────────────────────
@@ -124,4 +139,11 @@ export interface SvgItem extends ScannedFile {
   /** null means "use the default preset" */
   presetId: string | null
   result?: OptimiseResult
+  /** The settings fingerprint that last failed, so live updates don't retry it forever */
+  errorKey?: string
+  /** Markup as read from disk, kept when the source is edited in the app */
+  fileSource?: string
+  /** Bumped on every in-app edit of the source */
+  rev: number
+  bespoke: Bespoke
 }

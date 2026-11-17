@@ -12,6 +12,7 @@ interface Props {
   onKeepStructure: (v: boolean) => void
   onOptimise: () => void
   onReview: () => void
+  canReviewAll: boolean
   onRerun: () => void
   onExport: () => void
 }
@@ -39,9 +40,9 @@ export function Footer(p: Props) {
         Keep folder structure
       </label>
 
-      {p.view === "list" && p.selectionCount > 0 && (
+      {p.view === "list" && (p.selectionCount > 0 || p.canReviewAll) && (
         <button className="btn btn--secondary" onClick={p.onReview} disabled={p.busy}>
-          <IconEye /> Review {plural(p.selectionCount, "item")}
+          <IconEye /> {p.selectionCount > 0 ? `Review ${plural(p.selectionCount, "item")}` : "Review all"}
         </button>
       )}
       {p.view === "list" ? (

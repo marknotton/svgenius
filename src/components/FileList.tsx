@@ -1,4 +1,5 @@
-import type { MouseEvent, ReactNode } from "react"
+import { useEffect, useRef, type MouseEvent, type ReactNode } from "react"
+import { LIVE_BUFFER_PX } from "../lib/config"
 import { IconFile, IconFolder, IconTrash } from "../icons"
 import { plural } from "../lib/format"
 import type { AppSettings, Preset, SvgItem } from "../lib/types"
@@ -9,6 +10,10 @@ import { THUMB_PX } from "./Thumb"
 interface Props {
   items: SvgItem[]
   selection: Set<string>
+  focusId: string | null
+  onRowClick: (id: string, e: MouseEvent) => void
+  onVisible: (ids: Set<string>) => void
+  liveToggle: ReactNode
   settings: AppSettings
   defaultPreset: Preset
   isStale: (item: SvgItem) => boolean
@@ -28,6 +33,38 @@ export function FileList(p: Props) {
   const { items, selection, settings } = p
   const allSelected = items.length > 0 && selection.size === items.length
   const someSelected = selection.size > 0 && !allSelected
+
+  // ── Which rows are on (or near) screen, for live updates ──────────────────
+  const listRef = useRef<HTMLUListElement>(null)
+  const observer = useRef<IntersectionObserver | null>(null)
+  const visible = useRef(new Set<string>())
+  const onVisible = useRef(p.onVisible)
+  onVisible.current = p.onVisible
+
+  useEffect(() => {
+    const io = new IntersectionObserver((entries) => {
+      let changed = false
+      for (const e of entries) {
+        const id = (e.target as HTMLElement).dataset.id
+        if (!id) continue
+        if (e.isIntersecting && !visible.current.has(id)) { visible.current.add(id); changed = true }
+        else if (!e.isIntersecting && visible.current.delete(id)) changed = true
+      }
+      if (changed) onVisible.current(new Set(visible.current))
+    }, { root: listRef.current, rootMargin: `${LIVE_BUFFER_PX}px 0px` })
+    observer.current = io
+    return () => io.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const io = observer.current
+    if (!io) return
+    const ids = new Set(items.map((i) => i.id))
+    let pruned = false
+    for (const id of visible.current) if (!ids.has(id)) { visible.current.delete(id); pruned = true }
+    if (pruned) onVisible.current(new Set(visible.current))
+    listRef.current?.querySelectorAll<HTMLElement>("[data-id]").forEach((el) => io.observe(el))
+  }, [items])
 
   return (
     <section className="list">
@@ -52,6 +89,7 @@ export function FileList(p: Props) {
           </button>
         </div>
         <div className="toolbar__spacer" />
+        {p.liveToggle}
         <label className="field-inline" title="Used by every file that hasn't got its own preset">
           <span>Default preset</span>
           <PresetSelect label="Default preset" presets={settings.presets} value={settings.defaultPresetId}
@@ -61,12 +99,14 @@ export function FileList(p: Props) {
       </div>
       {p.cssBar}
 
-      <ul className={`file-list file-list--${settings.thumbSize}`}>
+      <ul ref={listRef} className={`file-list file-list--${settings.thumbSize}`}>
         {items.map((item) => (
           <FileRow
             key={item.id}
             item={item}
             selected={selection.has(item.id)}
+            focused={p.focusId === item.id}
+            onRowClick={p.onRowClick}
             stale={p.isStale(item)}
             thumbPx={THUMB_PX[settings.thumbSize]}
             backdrop={settings.backdrop}

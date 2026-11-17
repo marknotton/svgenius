@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 import { IconPlus, IconTrash } from "../icons"
 import { ruleError } from "../lib/replace"
+import { commonStage, StageToggle } from "./StageToggle"
 import { createReplacement } from "../lib/settings"
 import type { Replacement } from "../lib/types"
 
@@ -15,7 +16,8 @@ export function ReplaceList({ rules, onChange }: Props) {
   const patch = (id: string, p: Partial<Replacement>) =>
     onChange(rules.map((r) => (r.id === id ? { ...r, ...p } : r)))
 
-  const add = () => onChange([...rules, createReplacement()])
+  const stage = commonStage(rules.map((r) => r.stage))
+  const add = () => onChange([...rules, { ...createReplacement(), stage }])
   const remove = (id: string) => onChange(rules.filter((r) => r.id !== id))
   const active = rules.filter((r) => r.enabled && r.find).length
 
@@ -25,6 +27,10 @@ export function ReplaceList({ rules, onChange }: Props) {
         <span className="panel__label">Find &amp; replace {rules.length > 0 && <span className="text-3">{active}/{rules.length}</span>}</span>
         <button className="link" onClick={add}><IconPlus width={11} height={11} /> Add rule</button>
       </div>
+      {rules.length > 0 && (
+        <StageToggle stages={rules.map((r) => r.stage)} onChange={(s) => onChange(rules.map((r) => ({ ...r, stage: s })))}
+          hint="Before: match the strings in your original file. After: match SVGO's output (e.g. #FFCC00 becomes #fc0)." />
+      )}
 
       {rules.length === 0 && <p className="rules__empty text-3">Swap strings in every file, e.g. colours, IDs or class names.</p>}
 
@@ -48,11 +54,6 @@ export function ReplaceList({ rules, onChange }: Props) {
               <Flag on={r.regex} title="Treat Find as a regular expression ($1, $& work in Replace)" onClick={() => patch(r.id, { regex: !r.regex })}>.*</Flag>
               <Flag on={r.replaceAll} title={r.replaceAll ? "Replacing every match" : "Replacing the first match only"}
                 onClick={() => patch(r.id, { replaceAll: !r.replaceAll })}>{r.replaceAll ? "All" : "First"}</Flag>
-              <span className="toolbar__spacer" />
-              <Flag on={r.stage === "after"} title={r.stage === "before" ? "Runs on the original markup, before SVGO" : "Runs on SVGO's output"}
-                onClick={() => patch(r.id, { stage: r.stage === "before" ? "after" : "before" })}>
-                {r.stage === "before" ? "Before SVGO" : "After SVGO"}
-              </Flag>
             </div>
             {error && <p className="rule__error">{error}</p>}
           </div>

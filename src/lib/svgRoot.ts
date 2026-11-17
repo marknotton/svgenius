@@ -15,7 +15,8 @@ export function getAttr(tag: string, name: string) {
 export function setAttr(tag: string, name: string, value: string) {
   const re = new RegExp(`(\\s${name}\\s*=\\s*)("[^"]*"|'[^']*')`, "i")
   if (re.test(tag)) return tag.replace(re, `$1"${value}"`)
-  return tag.replace(/^<svg\b/i, `<svg ${name}="${value}"`)
+  // Append, so existing attribute order (xmlns first) is kept
+  return tag.replace(/\s*(\/?)>$/, ` ${name}="${value}"$1>`)
 }
 
 export function replaceRoot(svg: string, tag: string) {

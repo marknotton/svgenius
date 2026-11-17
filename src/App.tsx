@@ -8,6 +8,7 @@ import { ConfigPanel } from "./components/ConfigPanel"
 import { useDialogs } from "./components/Dialogs"
 import { clampSidebar, Divider } from "./components/Divider"
 import { DropOverlay, EmptyState } from "./components/EmptyState"
+import { FileInspector } from "./components/FileInspector"
 import { FileList } from "./components/FileList"
 import { Footer } from "./components/Footer"
 import { PreviewCssBar, PreviewCssContext } from "./components/PreviewCss"
@@ -18,7 +19,8 @@ import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/u
 import { useItems } from "./hooks/useItems"
 import { planExport } from "./lib/exportPlan"
 import { plural } from "./lib/format"
-import { buildExport, defaultLayout, hashCode, mergeImport, newId, runSpec, SIDEBAR } from "./lib/settings"
+import { buildExport, defaultLayout, hashCode, isDefaultBespoke, mergeImport, newId, runSpec, SIDEBAR } from "./lib/settings"
+import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
 import { errorMessage, existingFiles, exportFiles, readJsonFile, readPluginFile, takePendingOpenFiles, writeJsonFile } from "./lib/tauri"
 import type { AppSettings, CustomPlugin, SvgItem } from "./lib/types"
@@ -36,7 +38,7 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, itemsRef, addPaths, remove, clear, setPreset, optimise } = useItems()
+  const { items, itemsRef, addPaths, remove, clear, setPreset, editSource, revertSource, setBespoke, optimise } = useItems()
   const dialogs = useDialogs()
   const { toasts, push, dismiss } = useToasts()
   const actions = useMemo(() => presetActions(update), [update])
@@ -47,6 +49,9 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(false)
   const anchor = useRef<string | null>(null)
+  const [focusId, setFocusId] = useState<string | null>(null)
+  const [sidebarTab, setSidebarTab] = useState<"preset" | "file">("preset")
+  const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set())
 
   // ── Presets ─────────────────────────────────────────────────────────────────
 
@@ -57,7 +62,12 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     () => new Map(settings.presets.map((p) => [p.id, runSpec(p.settings, settings.customPlugins)])),
     [settings.presets, settings.customPlugins]
   )
-  const resolve = useCallback((item: SvgItem) => specs.get(presetFor(item).id) ?? runSpec(presetFor(item).settings, settings.customPlugins), [specs, presetFor, settings.customPlugins])
+  // Per-file spec: the preset's, plus any in-app edits and bespoke transform
+  const resolve = useCallback((item: SvgItem) => {
+    const base = specs.get(presetFor(item).id) ?? runSpec(presetFor(item).settings, settings.customPlugins)
+    const bespoke = isDefaultBespoke(item.bespoke) ? undefined : item.bespoke
+    return { ...base, bespoke, key: `${base.key}|r${item.rev}|${bespoke ? JSON.stringify(bespoke) : ""}` }
+  }, [specs, presetFor, settings.customPlugins])
   const isStale = useCallback(
     (item: SvgItem) => !!item.result && item.result.key !== resolve(item).key,
     [resolve]
@@ -127,25 +137,41 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     })
   }, [items])
 
+  // Finder-style: Shift extends a range from the last clicked row
+  const rangeTo = useCallback((sel: Set<string>, id: string) => {
+    const list = itemsRef.current
+    const a = list.findIndex((i) => i.id === anchor.current)
+    const b = list.findIndex((i) => i.id === id)
+    if (a < 0 || b < 0) return null
+    const next = new Set(sel)
+    const [from, to] = a < b ? [a, b] : [b, a]
+    for (let i = from; i <= to; i++) next.add(list[i].id)
+    return next
+  }, [itemsRef])
+
+  /** Checkbox, or Cmd/Ctrl-click: toggle one row. Shift: add a range */
   const toggle = useCallback((id: string, e: MouseEvent) => {
     setSelection((sel) => {
-      const next = new Set(sel)
-      const list = itemsRef.current
       if (e.shiftKey && anchor.current) {
-        const a = list.findIndex((i) => i.id === anchor.current)
-        const b = list.findIndex((i) => i.id === id)
-        if (a >= 0 && b >= 0) {
-          const [from, to] = a < b ? [a, b] : [b, a]
-          for (let i = from; i <= to; i++) next.add(list[i].id)
-          return next
-        }
+        const range = rangeTo(sel, id)
+        if (range) return range
       }
+      const next = new Set(sel)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       anchor.current = id
       return next
     })
-  }, [itemsRef])
+  }, [rangeTo])
+
+  /** Plain click selects just this row and opens it in the inspector */
+  const rowClick = useCallback((id: string, e: MouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey) return toggle(id, e)
+    setSelection(new Set([id]))
+    anchor.current = id
+    setFocusId(id)
+    setSidebarTab("file")
+  }, [toggle])
 
   const selectAll = (all: boolean) => setSelection(all ? new Set(items.map((i) => i.id)) : new Set())
 
@@ -167,19 +193,41 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     }
   }
 
-  const openReview = () => {
-    const ids = items.filter((i) => selection.has(i.id)).map((i) => i.id)
+  const openReview = (all = false) => {
+    const ids = items.filter((i) => all || selection.has(i.id)).map((i) => i.id)
     setReviewIds(ids)
     setView("review")
   }
 
-  // In review, results follow the settings live
-  const staleInReview = view === "review" ? reviewItems.filter((i) => i.source !== undefined && (!i.result || isStale(i)) && i.status !== "running" && i.status !== "error").map((i) => i.id).join(",") : ""
+  // ── Live updates ────────────────────────────────────────────────────────────
+  // Rows on or near screen (and the inspected file) re-run as settings change.
+  // Off-screen rows catch up when they're scrolled near.
+
+  const needsRun = useCallback((i: SvgItem) => {
+    if (i.source === undefined || i.status === "loading" || i.status === "running") return false
+    const key = resolve(i).key
+    return i.result?.key !== key && i.errorKey !== key
+  }, [resolve])
+
+  const liveIds = useMemo(() => {
+    const pool = view === "review"
+      ? reviewItems
+      : settings.liveUpdates ? items.filter((i) => visibleIds.has(i.id)) : []
+    const focused = items.find((i) => i.id === focusId)
+    const list = focused && !pool.includes(focused) ? [...pool, focused] : pool
+    return list.filter(needsRun).map((i) => i.id).join(",")
+  }, [view, reviewItems, items, visibleIds, focusId, settings.liveUpdates, needsRun])
+
   useEffect(() => {
-    if (!staleInReview) return
-    const t = setTimeout(() => { optimise(staleInReview.split(","), resolve) }, 200)
+    if (!liveIds) return
+    const t = setTimeout(() => { optimise(liveIds.split(","), resolve) }, LIVE_DEBOUNCE_MS)
     return () => clearTimeout(t)
-  }, [staleInReview, optimise, resolve])
+  }, [liveIds, optimise, resolve])
+
+  const focused = items.find((i) => i.id === focusId) ?? null
+  useEffect(() => {
+    if (focusId && !focused) { setFocusId(null); setSidebarTab("preset") }
+  }, [focusId, focused])
 
   // ── Export ──────────────────────────────────────────────────────────────────
 
@@ -342,7 +390,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     if (ok) clear()
   }
 
-  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbSize" | "backdrop" | "previewCss" | "previewCssEnabled" | "circleOverlay">>) =>
+  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbSize" | "backdrop" | "previewCss" | "previewCssEnabled" | "circleOverlay" | "circleClip">>) =>
     update((s) => ({ ...s, ...patch }))
 
   // ── Layout ──────────────────────────────────────────────────────────────────
@@ -386,6 +434,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       onBackdrop={(backdrop) => setViewPrefs({ backdrop })}
       circle={settings.circleOverlay}
       onCircle={() => setViewPrefs({ circleOverlay: !settings.circleOverlay })}
+      clip={settings.circleClip}
+      onClip={() => setViewPrefs({ circleClip: !settings.circleClip })}
       cssOpen={cssOpen}
       cssActive={!!wantedCss.trim()}
       onCssToggle={() => setCssOpen((o) => !o)}
@@ -404,7 +454,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   return (
     <PreviewCssContext.Provider value={appliedCss}>
-      <div className={`app${settings.circleOverlay ? " show-circle" : ""}`} style={{ "--panel-w": `${sidebarWidth}px` } as CSSProperties}>
+      <div className={`app${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px` } as CSSProperties}>
         <AppBar subtitle={view === "review" ? "Review" : undefined} />
         <div className="workspace">
           <main className="workspace__main">
@@ -429,6 +479,16 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 defaultPreset={defaultPreset}
                 isStale={isStale}
                 onToggle={toggle}
+                onRowClick={rowClick}
+                focusId={focusId}
+                onVisible={setVisibleIds}
+                liveToggle={
+                  <label className="footer__check" title="Re-run files on screen as you change settings">
+                    <input type="checkbox" className="checkbox" checked={settings.liveUpdates}
+                      onChange={(e) => update((s) => ({ ...s, liveUpdates: e.target.checked }))} />
+                    Live
+                  </label>
+                }
                 onSelectAll={selectAll}
                 onPreset={(id, presetId) => setPreset([id], presetId)}
                 onNewPreset={newPresetForItem}
@@ -446,19 +506,43 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             onResize={(sidebarWidth) => update((s) => ({ ...s, sidebarWidth }))}
             onReset={() => update((s) => ({ ...s, sidebarWidth: SIDEBAR.default }))}
           />
-          <ConfigPanel
-            settings={settings}
-            preset={editing}
-            usage={usage}
-            actions={actions}
-            onNew={newPreset}
-            onRename={renamePreset}
-            onDelete={deletePreset}
-            onImport={importPresets}
-            onExport={exportPresets}
-            onLoadPlugin={loadPlugin}
-            onRemovePlugin={removePlugin}
-          />
+          <aside className="sidebar">
+            <div className="sidebar__tabs" role="tablist">
+              <button role="tab" aria-selected={sidebarTab === "preset"} className={`sidebar__tab${sidebarTab === "preset" ? " is-active" : ""}`}
+                onClick={() => setSidebarTab("preset")}>Preset</button>
+              <button role="tab" aria-selected={sidebarTab === "file"} className={`sidebar__tab${sidebarTab === "file" ? " is-active" : ""}`}
+                disabled={!focused} title={focused ? focused.name : "Click a file to inspect it"}
+                onClick={() => setSidebarTab("file")}>{focused ? focused.name : "File"}</button>
+            </div>
+            {sidebarTab === "file" && focused ? (
+              <FileInspector
+                item={focused}
+                presets={settings.presets}
+                defaultPreset={defaultPreset}
+                backdrop={settings.backdrop}
+                onClose={() => { setFocusId(null); setSidebarTab("preset") }}
+                onPreset={(presetId) => setPreset([focused.id], presetId)}
+                onNewPreset={() => newPresetForItem(focused)}
+                onEdit={(source) => editSource(focused.id, source)}
+                onRevert={() => revertSource(focused.id)}
+                onBespoke={(b) => setBespoke(focused.id, b)}
+              />
+            ) : (
+              <ConfigPanel
+                settings={settings}
+                preset={editing}
+                usage={usage}
+                actions={actions}
+                onNew={newPreset}
+                onRename={renamePreset}
+                onDelete={deletePreset}
+                onImport={importPresets}
+                onExport={exportPresets}
+                onLoadPlugin={loadPlugin}
+                onRemovePlugin={removePlugin}
+              />
+            )}
+          </aside>
         </div>
         <Footer
           view={view}
@@ -468,8 +552,14 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
           busy={busy}
           keepStructure={settings.keepStructure}
           onKeepStructure={(keepStructure) => update((s) => ({ ...s, keepStructure }))}
-          onOptimise={() => run(targets)}
-          onReview={openReview}
+          onOptimise={async () => {
+            const res = await run(targets)
+            if (view === "list" && res.size > 0) {
+              push({ tone: "success", text: `Optimised ${plural(res.size, "file")}`, action: { label: "Review", run: () => openReview(selection.size === 0) } })
+            }
+          }}
+          onReview={() => openReview(selection.size === 0)}
+          canReviewAll={items.some((i) => i.result)}
           onRerun={() => run(targets, true)}
           onExport={doExport}
         />
