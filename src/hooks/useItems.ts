@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react"
 import { byteLength } from "../lib/format"
 import { CONCURRENCY, optimiseSvg, runLimited } from "../lib/optimiser"
+import { trimSvg } from "../lib/trim"
 import { newId } from "../lib/settings"
 import { errorMessage, readSvg, scanPaths } from "../lib/tauri"
 import type { OptimiseResult, RunSpec, SvgItem } from "../lib/types"
@@ -75,7 +76,8 @@ export function useItems() {
       runs.current.set(item.id, run)
       patch(item.id, { status: "running", error: undefined })
       try {
-        const { data: output, replaced } = await optimiseSvg(item.source as string, spec)
+        const { data, replaced } = await optimiseSvg(item.source as string, spec)
+        const output = spec.svgo.trim.enabled ? await trimSvg(data, spec.svgo.trim, spec.svgo.floatPrecision) : data
         if (runs.current.get(item.id) !== run) return
         const result = { output, size: byteLength(output), replaced, key: spec.key }
         results.set(item.id, result)

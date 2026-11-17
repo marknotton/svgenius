@@ -7,6 +7,8 @@ import { CustomPluginList } from "./CustomPluginList"
 import { PluginList } from "./PluginList"
 import { PresetSelect } from "./PresetSelect"
 import { ReplaceList } from "./ReplaceList"
+import { Segmented } from "./Segmented"
+import { SliderField } from "./SliderField"
 import { Toggle } from "./Toggle"
 
 interface Props {
@@ -72,6 +74,31 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
               onChange={(e) => edit((x) => ({ ...x, floatPrecision: Number(e.target.value) }))} />
             <span className="range__value">{s.floatPrecision}</span>
           </label>
+        </section>
+
+        <section className="panel__section">
+          <Toggle label="Trim whitespace" hint="Crops the viewBox to the visible artwork (strokes and effects included)"
+            checked={s.trim.enabled} onChange={(v) => edit((x) => ({ ...x, trim: { ...x.trim, enabled: v } }))} />
+          {s.trim.enabled && (
+            <>
+              <SliderField
+                label="Padding"
+                hint="Positive adds space around the artwork, negative crops into it. Click the number to type any value."
+                value={s.trim.padding}
+                min={s.trim.unit === "%" ? -25 : -50}
+                max={s.trim.unit === "%" ? 50 : 100}
+                step={s.trim.unit === "%" ? 1 : 0.5}
+                suffix={s.trim.unit}
+                onChange={(padding) => edit((x) => ({ ...x, trim: { ...x.trim, padding } }))}
+              />
+              <div className="trim-unit">
+                <span className="text-3">{s.trim.unit === "%" ? "Percent of the artwork's longest side" : "viewBox units"}</span>
+                <Segmented label="Padding unit" value={s.trim.unit}
+                  onChange={(unit) => edit((x) => ({ ...x, trim: { ...x.trim, unit } }))}
+                  options={[{ value: "%", label: "%" }, { value: "px", label: "px" }]} />
+              </div>
+            </>
+          )}
         </section>
 
         <section className="panel__section">

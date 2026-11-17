@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react"
 import { listen } from "@tauri-apps/api/event"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { open, save } from "@tauri-apps/plugin-dialog"
@@ -6,6 +6,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener"
 import { AppBar } from "./components/AppBar"
 import { ConfigPanel } from "./components/ConfigPanel"
 import { useDialogs } from "./components/Dialogs"
+import { clampSidebar, Divider } from "./components/Divider"
 import { DropOverlay, EmptyState } from "./components/EmptyState"
 import { FileList } from "./components/FileList"
 import { Footer } from "./components/Footer"
@@ -17,7 +18,7 @@ import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/u
 import { useItems } from "./hooks/useItems"
 import { planExport } from "./lib/exportPlan"
 import { plural } from "./lib/format"
-import { buildExport, hashCode, mergeImport, newId, runSpec } from "./lib/settings"
+import { buildExport, defaultLayout, hashCode, mergeImport, newId, runSpec, SIDEBAR } from "./lib/settings"
 import { probePlugin } from "./lib/optimiser"
 import { errorMessage, existingFiles, exportFiles, readJsonFile, readPluginFile, takePendingOpenFiles, writeJsonFile } from "./lib/tauri"
 import type { AppSettings, CustomPlugin, SvgItem } from "./lib/types"
@@ -341,8 +342,31 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     if (ok) clear()
   }
 
-  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbSize" | "backdrop" | "previewCss" | "previewCssEnabled">>) =>
+  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbSize" | "backdrop" | "previewCss" | "previewCssEnabled" | "circleOverlay">>) =>
     update((s) => ({ ...s, ...patch }))
+
+  // ── Layout ──────────────────────────────────────────────────────────────────
+
+  // Keep the stored width but squeeze it if the window is narrow
+  const [winW, setWinW] = useState(window.innerWidth)
+  useEffect(() => {
+    const onResize = () => setWinW(window.innerWidth)
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
+  const sidebarWidth = useMemo(() => clampSidebar(settings.sidebarWidth), [settings.sidebarWidth, winW])
+
+  const resetLayout = useCallback(() => {
+    update((s) => ({ ...s, ...defaultLayout(), previewCss: s.previewCss, previewCssEnabled: s.previewCssEnabled }))
+    setCssOpen(false)
+    push({ tone: "info", text: "Layout reset" })
+  }, [update, push])
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    listen("menu:reset-layout", resetLayout).then((fn) => { unlisten = fn }).catch(() => {})
+    return () => unlisten?.()
+  }, [resetLayout])
 
   // ── Preview CSS ─────────────────────────────────────────────────────────────
 
@@ -360,6 +384,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       backdrop={settings.backdrop}
       onThumbSize={(thumbSize) => setViewPrefs({ thumbSize })}
       onBackdrop={(backdrop) => setViewPrefs({ backdrop })}
+      circle={settings.circleOverlay}
+      onCircle={() => setViewPrefs({ circleOverlay: !settings.circleOverlay })}
       cssOpen={cssOpen}
       cssActive={!!wantedCss.trim()}
       onCssToggle={() => setCssOpen((o) => !o)}
@@ -378,7 +404,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   return (
     <PreviewCssContext.Provider value={appliedCss}>
-      <div className="app">
+      <div className={`app${settings.circleOverlay ? " show-circle" : ""}`} style={{ "--panel-w": `${sidebarWidth}px` } as CSSProperties}>
         <AppBar subtitle={view === "review" ? "Review" : undefined} />
         <div className="workspace">
           <main className="workspace__main">
@@ -415,6 +441,11 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
               />
             )}
           </main>
+          <Divider
+            width={sidebarWidth}
+            onResize={(sidebarWidth) => update((s) => ({ ...s, sidebarWidth }))}
+            onReset={() => update((s) => ({ ...s, sidebarWidth: SIDEBAR.default }))}
+          />
           <ConfigPanel
             settings={settings}
             preset={editing}

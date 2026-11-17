@@ -14,6 +14,7 @@ export function defaultSvgoSettings(): SvgoSettings {
     plugins: Object.fromEntries(PLUGINS.map((p) => [p.name, p.defaultOn])),
     replacements: [],
     attrRules: [],
+    trim: { enabled: false, padding: 0, unit: "%" },
     custom: {}
   }
 }
@@ -45,11 +46,22 @@ export function defaultAppSettings(): AppSettings {
     customPlugins: [],
     defaultPresetId: preset.id,
     editingPresetId: preset.id,
-    thumbSize: "medium",
-    backdrop: "light",
     keepStructure: true,
+    ...defaultLayout()
+  }
+}
+
+export const SIDEBAR = { default: 300, min: 260, max: 640 }
+
+/** The bits "Reset layout" puts back */
+export function defaultLayout() {
+  return {
     previewCss: "",
-    previewCssEnabled: true
+    previewCssEnabled: true,
+    sidebarWidth: SIDEBAR.default,
+    circleOverlay: false,
+    thumbSize: "medium" as const,
+    backdrop: "light" as const
   }
 }
 
@@ -85,7 +97,8 @@ export function activeCustom(settings: SvgoSettings, plugins: CustomPlugin[]): C
 export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const rules = activeReplacements(settings).map(({ id: _id, enabled: _e, ...r }) => r)
   const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
-  return JSON.stringify([toSvgoConfig(settings), rules, attrs, custom.map((c) => [c.hash, c.params.trim()])])
+  const trim = settings.trim.enabled ? [settings.trim.padding, settings.trim.unit] : null
+  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()])])
 }
 
 export function runSpec(settings: SvgoSettings, plugins: CustomPlugin[]): RunSpec {
@@ -105,6 +118,11 @@ export function hashCode(code: string) {
 
 const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v)
+
+const clampNum = (v: unknown, min: number, max: number, d: number) => {
+  const n = Number(v)
+  return Number.isFinite(n) && v !== null && v !== "" ? Math.min(max, Math.max(min, n)) : d
+}
 
 export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
   const base = defaultSvgoSettings()
@@ -128,7 +146,13 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
   const attrRules = Array.isArray(raw.attrRules)
     ? raw.attrRules.map(sanitiseAttrRule).filter((r): r is AttrRule => r !== null)
     : []
+  const trimRaw = isObj(raw.trim) ? raw.trim : {}
   return {
+    trim: {
+      enabled: trimRaw.enabled === true,
+      padding: clampNum(trimRaw.padding, -1e6, 1e6, 0),
+      unit: trimRaw.unit === "px" ? "px" : "%"
+    },
     custom,
     attrRules,
     replacements,
@@ -223,7 +247,9 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     backdrop: raw.backdrop === "dark" ? "dark" : "light",
     keepStructure: typeof raw.keepStructure === "boolean" ? raw.keepStructure : true,
     previewCss: typeof raw.previewCss === "string" ? raw.previewCss : "",
-    previewCssEnabled: typeof raw.previewCssEnabled === "boolean" ? raw.previewCssEnabled : true
+    previewCssEnabled: typeof raw.previewCssEnabled === "boolean" ? raw.previewCssEnabled : true,
+    sidebarWidth: clampNum(raw.sidebarWidth, SIDEBAR.min, SIDEBAR.max, SIDEBAR.default),
+    circleOverlay: raw.circleOverlay === true
   }
 }
 

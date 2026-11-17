@@ -1,4 +1,5 @@
 import { memo, type ReactNode } from "react"
+import { fmtNum, svgSize } from "../lib/svgRoot"
 import { IconBack } from "../icons"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { AppSettings, Backdrop, Preset, SvgItem } from "../lib/types"
@@ -92,7 +93,7 @@ const ReviewRow = memo(function ReviewRow({ item, px, backdrop, presets, default
       <div className="review-row__panes">
         <figure className="pane">
           <Thumb svg={item.source} size={px} backdrop={backdrop} label={`${item.name} before`} />
-          <figcaption><span className="text-2">Before</span> {formatBytes(item.size)}</figcaption>
+          <figcaption><span className="text-2">Before</span> {formatBytes(item.size)} <Dims svg={item.source} /></figcaption>
         </figure>
         <figure className="pane">
           <div className="pane__wrap">
@@ -104,7 +105,7 @@ const ReviewRow = memo(function ReviewRow({ item, px, backdrop, presets, default
             {item.status === "error" ? <span className="pill pill--error" title={item.error}>Error</span>
               : after !== undefined ? (
                 <>
-                  {formatBytes(after)}{" "}
+                  {formatBytes(after)} <Dims svg={item.result?.output} />{" "}
                   <span className={`pill ${pct > 0 ? "pill--success" : "pill--warning"}`}>{formatSaving(item.size, after)}</span>
                   {item.result?.replaced ? <span className="pill" title="Find & replace and attribute rule changes">{plural(item.result.replaced, "change")}</span> : null}
                 </>
@@ -116,3 +117,8 @@ const ReviewRow = memo(function ReviewRow({ item, px, backdrop, presets, default
     </article>
   )
 })
+
+function Dims({ svg }: { svg?: string }) {
+  const size = svgSize(svg)
+  return size ? <span className="text-3">{fmtNum(size.w, 2)} × {fmtNum(size.h, 2)}</span> : null
+}

@@ -10,6 +10,9 @@ A small macOS-first desktop app for optimising SVGs in bulk with [SVGO](https://
 - Review selected files side by side (before / after) with size savings, tweak settings and see them re-run live
 - Find & replace rules per preset (match case, first or all, optional regex, before or after SVGO)
 - Attribute rules (recipes): for chosen elements (`*` or `path, rect, circle`), if they have / lack / match an attribute, then set, add if missing, remove or rename an attribute, or remove the element
+- Trim whitespace: crops the viewBox to the visible artwork, with padding (positive) or inset (negative) in % or viewBox units
+- Width × height on every row and in review, plus a circle guide overlay for avatar-style crops
+- Resizable settings sidebar (remembered), app menu with About and Reset Layout
 - Preview CSS (e.g. `:root { --symbol-colour: red; }`) applied to every preview but never to exported files
 - Third-party SVGO plugins: load a single-file `.js`/`.mjs` plugin (see `examples/plugins/`), toggle it per preset and pass JSON params
 - Import and export presets as JSON

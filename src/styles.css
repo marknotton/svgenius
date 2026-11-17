@@ -263,13 +263,13 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
 .file-row.is-selected { background: var(--accent-soft); }
 .file-list--tiny .file-row { padding-block: 3px; }
 
-.file-row__meta { flex: 1; min-width: 0; }
+.file-row__meta { flex: 1 1 120px; min-width: 110px; }
 .file-row__name, .file-row__dir { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-row__name { font-weight: 500; }
 .file-row__dir { color: var(--text-3); font-size: 11px; }
-.file-row__preset { width: 170px; flex: none; }
+.file-row__preset { flex: 0 1 170px; min-width: 100px; }
 .file-row__stats {
-  flex: none; width: 200px;
+  flex: 0 0 auto; min-width: 150px;
   display: flex; align-items: center; justify-content: flex-end; gap: 8px;
   font-variant-numeric: tabular-nums; font-size: 12px;
 }
@@ -459,3 +459,43 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
 .rule__row--deep { padding-left: 54px; }
 .select--sm { height: 26px; font-size: 11px; flex: none; max-width: 130px; }
 .rule__hint { padding-left: 20px; font-size: 11px; }
+
+/* ── Trim ────────────────────────────────────────────────────── */
+
+.range__value--btn {
+  width: auto; min-width: 34px; padding: 1px 4px;
+  border: 1px solid transparent; border-radius: var(--radius-xs);
+  background: none; font-size: 12px;
+}
+.range__value--btn:hover { border-color: var(--border-input); background: var(--bg); color: var(--text); }
+.range__edit { width: 56px; flex: none; text-align: right; }
+.trim-unit { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; padding-top: 2px; }
+
+/* ── Divider, circle guide, dims ─────────────────────────────── */
+
+.divider {
+  position: relative;
+  flex: none;
+  width: 1px;
+  background: var(--border);
+  cursor: col-resize;
+  z-index: 5;
+}
+.divider::before { content: ""; position: absolute; inset: 0 -4px; }
+.divider:hover, .divider:focus-visible, body.is-resizing .divider { background: var(--accent); outline: none; }
+body.is-resizing { cursor: col-resize; }
+body.is-resizing * { user-select: none !important; }
+.panel { border-left: 0; }
+
+.thumb { position: relative; }
+.show-circle .thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 999px rgba(124, 58, 237, .22), inset 0 0 0 1px var(--accent);
+  pointer-events: none;
+}
+
+.file-row__dims { font-variant-numeric: tabular-nums; }
+.pane figcaption .text-3 { margin-left: 2px; }

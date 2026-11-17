@@ -33,6 +33,13 @@ export interface AttrRule {
   stage: "before" | "after"
 }
 
+export interface TrimSettings {
+  enabled: boolean
+  /** Positive adds space around the artwork, negative crops into it */
+  padding: number
+  unit: "%" | "px"
+}
+
 /** Everything that decides how SVGO treats a file. */
 export interface SvgoSettings {
   multipass: boolean
@@ -42,6 +49,8 @@ export interface SvgoSettings {
   plugins: Record<string, boolean>
   replacements: Replacement[]
   attrRules: AttrRule[]
+  /** Crop the viewBox to the visible artwork, then pad (or inset) it */
+  trim: TrimSettings
   /** Custom plugin id → on/off and its params as JSON text */
   custom: Record<string, { on: boolean, params: string }>
 }
@@ -83,6 +92,8 @@ export interface AppSettings {
   /** CSS injected into previews only */
   previewCss: string
   previewCssEnabled: boolean
+  sidebarWidth: number
+  circleOverlay: boolean
 }
 
 // ── Files ─────────────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
-import { memo, type MouseEvent } from "react"
+import { memo, useMemo, type MouseEvent } from "react"
+import { fmtNum, svgSize } from "../lib/svgRoot"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { Backdrop, Preset, SvgItem } from "../lib/types"
 import { PresetSelect } from "./PresetSelect"
@@ -20,6 +21,8 @@ interface Props {
 export const FileRow = memo(function FileRow(p: Props) {
   const { item, selected, stale, thumbPx, backdrop } = p
   const dir = item.relPath.includes("/") ? item.relPath.slice(0, item.relPath.lastIndexOf("/")) : ""
+  const shown = item.result?.output ?? item.source
+  const size = useMemo(() => svgSize(shown), [shown])
 
   return (
     <li
@@ -38,7 +41,11 @@ export const FileRow = memo(function FileRow(p: Props) {
       <Thumb svg={item.result?.output ?? item.source} size={thumbPx} backdrop={backdrop} label={item.name} />
       <div className="file-row__meta">
         <div className="file-row__name" title={item.path}>{item.name}</div>
-        {dir && <div className="file-row__dir" title={item.path}>{dir}</div>}
+        <div className="file-row__dir" title={item.path}>
+          {size && <span className="file-row__dims" title="Width × height">{fmtNum(size.w, 2)} × {fmtNum(size.h, 2)}</span>}
+          {size && dir && " · "}
+          {dir}
+        </div>
       </div>
       <PresetSelect
         className="file-row__preset"

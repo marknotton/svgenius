@@ -3,9 +3,10 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State};
+use tauri::menu::{AboutMetadataBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
+use tauri::{App, AppHandle, Emitter, Manager, State};
 #[cfg(any(target_os = "macos", target_os = "ios"))]
-use tauri::{Emitter, RunEvent};
+use tauri::RunEvent;
 
 // ── Shared state ──────────────────────────────────────────────────────────────
 
@@ -259,6 +260,67 @@ fn take_pending_open_files(state: State<'_, PendingOpenFiles>) -> Vec<String> {
     std::mem::take(&mut *state.lock().unwrap())
 }
 
+// ── Menu ──────────────────────────────────────────────────────────────────────
+
+fn build_menu(app: &App) -> tauri::Result<()> {
+    let version = app.package_info().version.to_string();
+    let about = AboutMetadataBuilder::new()
+        .name(Some("SVGenius"))
+        .version(Some(version))
+        .authors(Some(vec!["Mark Notton".to_string()]))
+        .copyright(Some("© 2026 Mark Notton"))
+        .comments(Some("Bulk SVG optimiser built on SVGO"))
+        .credits(Some("Made by Mark Notton\nBuilt with Tauri, React and SVGO"))
+        .website(Some("https://github.com/marknotton/svgenius"))
+        .build();
+
+    let reset_layout = MenuItemBuilder::with_id("reset-layout", "Reset Layout").build(app)?;
+
+    let app_menu = SubmenuBuilder::new(app, "SVGenius")
+        .about(Some(about))
+        .separator()
+        .item(&reset_layout)
+        .separator()
+        .services()
+        .separator()
+        .hide()
+        .hide_others()
+        .show_all()
+        .separator()
+        .quit()
+        .build()?;
+
+    // Without an Edit menu, copy/paste shortcuts don't work in inputs on macOS
+    let edit_menu = SubmenuBuilder::new(app, "Edit")
+        .undo()
+        .redo()
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .select_all()
+        .build()?;
+
+    let window_menu = SubmenuBuilder::new(app, "Window")
+        .minimize()
+        .maximize()
+        .separator()
+        .close_window()
+        .build()?;
+
+    let menu = MenuBuilder::new(app)
+        .items(&[&app_menu, &edit_menu, &window_menu])
+        .build()?;
+    app.set_menu(menu)?;
+
+    app.on_menu_event(|app, event| {
+        if event.id() == "reset-layout" {
+            let _ = app.emit("menu:reset-layout", ());
+        }
+    });
+    Ok(())
+}
+
 // ── App entry point ───────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -269,6 +331,10 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(pending)
+        .setup(|app| {
+            build_menu(app)?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             scan_paths,
             read_svg,
