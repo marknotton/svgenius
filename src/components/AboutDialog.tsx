@@ -1,5 +1,5 @@
 import { IconX, Logo } from "../icons"
-import { APP_VERSION, CREDITS, HISTORY, INSPIRATION } from "../lib/about"
+import { APP_VERSION, CREDITS, HISTORY, INSPIRATION, type Release as ReleaseInfo } from "../lib/about"
 import { DOWNLOAD_URL, REPO_URL, isDesktop } from "../lib/platform"
 import { Modal } from "./Dialogs"
 
@@ -33,12 +33,13 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
 
         <section className="settings__section">
           <span className="panel__label">Version history</span>
-          {HISTORY.map((r) => (
-            <div key={r.version} className="about__release">
-              <div className="about__release-head"><strong>{r.version}</strong> <span className="text-3">{r.date}</span></div>
-              <ul>{r.notes.map((n) => <li key={n}>{n}</li>)}</ul>
-            </div>
-          ))}
+          <Release r={HISTORY[0]} />
+          {HISTORY.length > 1 && (
+            <details className="accordion about__older">
+              <summary className="accordion__summary"><span className="text-2">Earlier versions ({HISTORY.length - 1})</span></summary>
+              {HISTORY.slice(1).map((r) => <Release key={r.version} r={r} />)}
+            </details>
+          )}
         </section>
 
         <section className="settings__section">
@@ -68,5 +69,14 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
         </section>
       </div>
     </Modal>
+  )
+}
+
+function Release({ r }: { r: ReleaseInfo }) {
+  return (
+    <div className="about__release">
+      <div className="about__release-head"><strong>{r.version}</strong> <span className="text-3">{r.date}</span></div>
+      <ul>{r.notes.map((n) => <li key={n}>{n}</li>)}</ul>
+    </div>
   )
 }

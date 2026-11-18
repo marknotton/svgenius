@@ -52,3 +52,5 @@ export const IconFlag = ({ filled, ...p }: P & { filled?: boolean }) => (
 export const IconFilter = (p: P) => <Icon {...p}><path d="M2 3h12l-4.5 5.5V13l-3-1.5v-3z" /></Icon>
 export const IconCaret = (p: P) => <Icon width={10} height={10} {...p}><path d="m6 4 4 4-4 4" /></Icon>
 export const IconSwap = (p: P) => <Icon {...p}><path d="M2.5 5.5h10l-2.5-2.5M13.5 10.5h-10l2.5 2.5" /></Icon>
+export const IconUndo = (p: P) => <Icon {...p}><path d="M5.5 3 2.5 6l3 3M2.5 6h7a4 4 0 0 1 0 8H7" /></Icon>
+export const IconRedo = (p: P) => <Icon {...p}><path d="m10.5 3 3 3-3 3M13.5 6h-7a4 4 0 0 0 0 8H9" /></Icon>

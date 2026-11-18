@@ -11,6 +11,18 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.6.1",
+    date: "18 November 2026",
+    notes: [
+      "Undo and redo in the expanded editor cover every change: typing, dragging points, nudges and layer edits",
+      "Preview CSS now styles the expanded editor's previews too, :root custom properties included",
+      "Hovering a layer highlights its shape on the canvas",
+      "The editor preview shows the SVG's own canvas with no padding around it",
+      "The title bar stays usable while a dialog is open",
+      "No more \"No SVGs found there\" message when the desktop app starts"
+    ]
+  },
+  {
     version: "0.6.0",
     date: "18 November 2026",
     notes: [

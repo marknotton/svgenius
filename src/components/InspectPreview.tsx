@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { Backdrop } from "../lib/types"
+import { svgSize } from "../lib/svgRoot"
 import { allAnchors, geometry, pointAt, pointKey, serialisePath, shiftPoints, type PointKind, type PointRef, type Seg } from "../lib/pathData"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 
@@ -15,6 +16,8 @@ interface Props {
   selected: number
   onPick: (index: number) => void
   onHover: (index: number) => void
+  /** Hovered element, from here or from the layers list */
+  hover?: number
   /** The selected path's points, drawn as draggable handles */
   path?: PathEdit | null
 }
@@ -53,16 +56,21 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selected, onPick, onHover, path }: Props) {
+export function InspectPreview({ markup, backdrop, selected, onPick, onHover, hover = -1, path }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
   const swallowClick = useRef(false)
-  const [hover, setHover] = useState(-1)
   const [boxes, setBoxes] = useState<{ sel: DOMRect | null, hov: DOMRect | null }>({ sel: null, hov: null })
   const css = usePreviewCss()
-  // Preview CSS goes in last, so element numbers still match the markup
-  const root = useMemo(() => prepare(withPreviewCss(markup, css)), [markup, css])
+  // Preview CSS goes in last, so element numbers still match the markup. In
+  // a shadow root :root means the page, so it becomes :host, which the SVG
+  // inherits from like it would from its own root
+  const root = useMemo(() => prepare(withPreviewCss(markup, css.replace(/:root\b/g, ":host"))), [markup, css])
+  const ratio = useMemo(() => {
+    const d = svgSize(markup)
+    return d && d.w > 0 && d.h > 0 ? d.w / d.h : 1
+  }, [markup])
 
   useLayoutEffect(() => {
     const el = stage.current
@@ -105,9 +113,11 @@ export function InspectPreview({ markup, backdrop, selected, onPick, onHover, pa
 
   return (
     <div ref={box} className={`inspect thumb--${backdrop}`}>
+      {/* The SVG's own canvas, at its real shape, with nothing around it */}
+      <div className="inspect__canvas" style={{ "--r": ratio } as React.CSSProperties}>
       <div ref={stage} className="inspect__stage"
-        onMouseMove={(e) => { const i = Math.max(indexOf(e), 0) || -1; if (i !== hover) { setHover(i); onHover(i) } }}
-        onMouseLeave={() => { setHover(-1); onHover(-1) }}
+        onMouseMove={(e) => { const i = Math.max(indexOf(e), 0) || -1; if (i !== hover) onHover(i) }}
+        onMouseLeave={() => onHover(-1)}
         onClick={(e) => {
           if (swallowClick.current) { swallowClick.current = false; return }
           // The svg itself isn't pickable here, so empty canvas clears the selection
@@ -117,6 +127,7 @@ export function InspectPreview({ markup, backdrop, selected, onPick, onHover, pa
       {boxes.hov && <div className="inspect__box inspect__box--hover" style={rect(boxes.hov)} />}
       {boxes.sel && !path && <div className="inspect__box" style={rect(boxes.sel)} />}
       {path && root && <PathOverlay stage={stage} box={box} root={root} edit={path} swallowClick={swallowClick} />}
+      </div>
       {!root && <p className="inspect__error text-3">This markup doesn't parse, so it can't be previewed.</p>}
     </div>
   )

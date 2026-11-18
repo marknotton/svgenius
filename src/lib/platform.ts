@@ -184,8 +184,9 @@ export function listenForDrops({ onHover, onDrop }: DropHandlers): () => void {
 /** Files handed over by the OS ("Open With", including cold launches). Desktop only */
 export function listenForOpenedFiles(onFiles: (paths: string[]) => void): () => void {
   if (!isDesktop) return () => {}
-  desktop.takePendingOpenFiles().then(onFiles).catch(() => {})
-  return listenFor<string[]>("files:opened", onFiles)
+  // Nothing waiting is the usual launch, not "no SVGs found"
+  desktop.takePendingOpenFiles().then((paths) => { if (paths.length) onFiles(paths) }).catch(() => {})
+  return listenFor<string[]>("files:opened", (paths) => { if (paths.length) onFiles(paths) })
 }
 
 // ── Exporting ─────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { IconCopy, IconReset, IconX } from "../icons"
+import { IconCopy, IconRedo, IconReset, IconUndo, IconX } from "../icons"
 import { elementRanges, rangeAt } from "../lib/markupMap"
 import { convertToPath, duplicateElement, moveElement, removeElement, setAttr, type DropPlace } from "../lib/markupEdit"
 import { SHAPES, parsePath, serialisePath, type Seg } from "../lib/pathData"
@@ -70,6 +70,55 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     own.current = true
     onEdit(next)
   }
+
+  // ── Undo and redo ─────────────────────────────────────────────────────────
+  // One history for every kind of edit here: typing, dragging points,
+  // nudging, layers. Quick runs of changes (typing, arrow nudges) are grouped
+  const source = item.source ?? ""
+  const hist = useRef({ past: [] as string[], future: [] as string[], prev: source, at: 0, restoring: false })
+  const [, setHistTick] = useState(0)
+  useEffect(() => {
+    const h = hist.current
+    if (source === h.prev) return
+    if (h.restoring) h.restoring = false
+    else {
+      const now = Date.now()
+      if (now - h.at > 600) { h.past.push(h.prev); h.at = now }
+      if (h.past.length > 300) h.past.shift()
+      h.future = []
+    }
+    h.prev = source
+    setHistTick((n) => n + 1)
+  }, [source])
+  const travel = (back: boolean) => {
+    const h = hist.current
+    const to = back ? h.past.pop() : h.future.pop()
+    if (to === undefined) return
+    ;(back ? h.future : h.past).push(source)
+    h.restoring = true
+    h.at = 0
+    // Same elements, same numbering: keep what's selected
+    if (tab === "source" && elementRanges(to).length === ranges.length) own.current = true
+    onEdit(to)
+  }
+  const travelRef = useRef(travel)
+  travelRef.current = travel
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey) return
+      const k = e.key.toLowerCase()
+      const undo = k === "z" && !e.shiftKey
+      const redo = (k === "z" && e.shiftKey) || k === "y"
+      if (!undo && !redo) return
+      // Before Monaco or a field gets it, so there's only one history
+      e.preventDefault()
+      e.stopPropagation()
+      travelRef.current(undo)
+    }
+    window.addEventListener("keydown", key, true)
+    return () => window.removeEventListener("keydown", key, true)
+  }, [])
+  const canUndo = hist.current.past.length > 0, canRedo = hist.current.future.length > 0
 
   const elements = useMemo(() => parseElements(markup), [markup])
   const editable = tab === "source"
@@ -146,6 +195,10 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
           <CodeTabs value={tab} onChange={onTab} />
           <span className="text-3 markup-dialog__tip">Click a shape or a layer to select it{editable ? ". Drag a path's points to reshape it" : ""}</span>
           <div className="markup-dialog__spacer" />
+          <div className="btn-join" role="group" aria-label="History">
+            <button className="btn btn--secondary btn--sm" onClick={() => travel(true)} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo"><IconUndo width={12} height={12} /></button>
+            <button className="btn btn--secondary btn--sm" onClick={() => travel(false)} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo"><IconRedo width={12} height={12} /></button>
+          </div>
           {tab === "source" && edited && <button className="link" onClick={onRevert} title="Throw away edits and reload the file's markup"><IconReset width={11} height={11} /> Revert</button>}
           {tab === "output" && <button className="link" onClick={copy} disabled={!markup}><IconCopy width={11} height={11} /> {copied ? "Copied" : "Copy"}</button>}
           {tab === "output" && item.result && (
@@ -166,7 +219,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               : <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
           </div>
           <InspectPreview markup={markup} backdrop={backdrop} selected={selected}
-            onPick={pick} onHover={setHover}
+            onPick={pick} onHover={setHover} hover={hover}
             path={segs ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath } : null} />
           <div className="markup-dialog__side">
             {segs && <PathPanel segs={segs} readOnly={!editable} active={active} onActive={setActive} onChange={writePath} />}
