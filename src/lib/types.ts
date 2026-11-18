@@ -87,6 +87,13 @@ export interface SvgoSettings {
   mergePaths: boolean
   /** Bake transform attributes into the path data (Beta) */
   flattenTransforms: boolean
+  /** Shift the artwork so its visual weight sits in the middle (Beta) */
+  opticalCentre: boolean
+  /** 0–100: how far from the box centre towards the centre of mass */
+  opticalStrength: number
+  /** Find the lowest precision per file that still renders the same; floatPrecision becomes the most it uses */
+  autoPrecision: boolean
+  autoTolerance: PrecisionTolerance
   /** Strokes become real holes in the shapes beneath them (Beta) */
   cutOutStrokes: boolean
   /** Shapes matching any of these become real holes in the shapes beneath them (Beta) */
@@ -178,7 +185,8 @@ export type Flag = "red" | "orange" | "yellow" | "green" | "blue" | "purple"
 
 export type ItemStatus = "loading" | "idle" | "running" | "done" | "error"
 
-export type GeometryEffect = "flatten" | "cutouts" | "merge"
+export type GeometryEffect = "flatten" | "cutouts" | "merge" | "centre"
+export type PrecisionTolerance = "strict" | "balanced" | "loose"
 
 export interface OptimiseResult {
   output: string
@@ -187,6 +195,8 @@ export interface OptimiseResult {
   replaced: number
   /** Beta geometry steps that actually changed something */
   effects?: GeometryEffect[]
+  /** The precision auto precision settled on */
+  precision?: number
   /** Fingerprint of the settings used, so we can tell when a result is stale */
   key: string
 }

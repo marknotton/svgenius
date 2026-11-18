@@ -1,10 +1,11 @@
-import type { CustomPlugin, SvgoSettings } from "../lib/types"
+import type { CustomPlugin, PrecisionTolerance, SvgoSettings } from "../lib/types"
 import { AttrRuleList } from "./AttrRuleList"
 import { CustomPluginList } from "./CustomPluginList"
 import { CutMatcherList } from "./CutMatcherList"
 import { EditContents, EditViewBox } from "./EditSections"
 import { PluginList } from "./PluginList"
 import { ReplaceList } from "./ReplaceList"
+import { Segmented } from "./Segmented"
 import { Toggle } from "./Toggle"
 
 // ── Every setting a preset holds ──────────────────────────────────────────────
@@ -28,12 +29,27 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
           checked={s.multipass} onChange={(v) => edit((x) => ({ ...x, multipass: v }))} />
         <Toggle label="Pretty print" hint="Indent the markup. Bigger files, easier to read"
           checked={s.pretty} onChange={(v) => edit((x) => ({ ...x, pretty: v }))} />
-        <label className="range" title="Decimal places kept in numbers, paths and transforms">
-          <span className="range__label">Precision</span>
+        <Toggle label="Auto precision"
+          hint="Finds the fewest decimal places each file can have without looking any different. Every attempt is rendered and compared with the full-precision result, so files that need more keep more"
+          checked={s.autoPrecision} onChange={(v) => edit((x) => ({ ...x, autoPrecision: v }))} />
+        <label className="range" title={s.autoPrecision ? "The most decimal places a file may keep. Auto precision goes lower wherever it can" : "Decimal places kept in numbers, paths and transforms"}>
+          <span className="range__label">{s.autoPrecision ? "Max precision" : "Precision"}</span>
           <input type="range" min={0} max={8} step={1} value={s.floatPrecision}
             onChange={(e) => edit((x) => ({ ...x, floatPrecision: Number(e.target.value) }))} />
           <span className="range__value">{s.floatPrecision}</span>
         </label>
+        {s.autoPrecision && (
+          <div className="field-row">
+            <span className="text-3">Allowed change</span>
+            <Segmented<PrecisionTolerance> label="How much the render may change" value={s.autoTolerance}
+              onChange={(autoTolerance) => edit((x) => ({ ...x, autoTolerance }))}
+              options={[
+                { value: "strict", label: "None", title: "No edge moves more than a quarter of a pixel at 512px" },
+                { value: "balanced", label: "Tiny", title: "Edges may shift up to about half a pixel at 256px. Invisible at icon sizes" },
+                { value: "loose", label: "Small", title: "Smallest files. Edges may shift about half a pixel at 128px, so check big uses" }
+              ]} />
+          </div>
+        )}
       </section>
 
       <section className="panel__section">
@@ -74,6 +90,17 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
           hint="Removes strokes and cuts the area they covered out of the shapes painted beneath, so fake clipping becomes real holes. Strokes that don't cover anything stay. Dashed strokes are left alone"
           checked={s.cutOutStrokes} onChange={(v) => edit((x) => ({ ...x, cutOutStrokes: v }))} />
         <CutMatcherList matchers={s.cutOutShapes} onChange={(cutOutShapes) => edit((x) => ({ ...x, cutOutShapes }))} />
+        <Toggle label="Optical centring"
+          hint="Centres the artwork by where its weight is, not by its outline, so lopsided icons stop looking too high or too low. Uses the space around the artwork (add trim padding for room) and never pushes it past an edge"
+          checked={s.opticalCentre} onChange={(v) => edit((x) => ({ ...x, opticalCentre: v }))} />
+        {s.opticalCentre && (
+          <label className="range" title="0% is the plain box centre, 100% puts the centre of mass dead centre">
+            <span className="range__label">Strength</span>
+            <input type="range" min={0} max={100} step={5} value={s.opticalStrength}
+              onChange={(e) => edit((x) => ({ ...x, opticalStrength: Number(e.target.value) }))} />
+            <span className="range__value">{s.opticalStrength}%</span>
+          </label>
+        )}
         <Toggle label="Merge overlapping paths"
           hint="Joins shapes that share a fill and opacity into one path (a boolean union), so see-through overlaps don't show and files get smaller. Shapes with strokes, IDs, masks or filters are left alone"
           checked={s.mergePaths} onChange={(v) => edit((x) => ({ ...x, mergePaths: v }))} />

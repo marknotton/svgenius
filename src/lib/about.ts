@@ -11,6 +11,14 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.3.0",
+    date: "18 November 2026",
+    notes: [
+      "Beta: Optical centring moves artwork so its visual weight sits in the middle, with a strength slider",
+      "Auto precision finds the fewest decimal places each file can keep without looking different"
+    ]
+  },
+  {
     version: "0.2.0",
     date: "18 November 2026",
     notes: [

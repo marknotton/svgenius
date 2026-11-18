@@ -23,9 +23,9 @@ function loadImage(src: string) {
   })
 }
 
-/** Visible bounds in viewBox units, or null if nothing is drawn */
-async function contentBounds(svg: string, vb: ViewBox): Promise<ViewBox | null> {
-  const scale = SCAN / Math.max(vb.w, vb.h)
+/** Renders the viewBox area to pixels (RGBA), longest side `size` px */
+export async function renderPixels(svg: string, vb: ViewBox, size: number) {
+  const scale = size / Math.max(vb.w, vb.h)
   const cw = Math.max(1, Math.round(vb.w * scale))
   const ch = Math.max(1, Math.round(vb.h * scale))
 
@@ -43,7 +43,12 @@ async function contentBounds(svg: string, vb: ViewBox): Promise<ViewBox | null> 
   const ctx = canvas.getContext("2d", { willReadFrequently: true })
   if (!ctx) throw new Error("Canvas isn't available")
   ctx.drawImage(img, 0, 0, cw, ch)
-  const data = ctx.getImageData(0, 0, cw, ch).data
+  return { data: ctx.getImageData(0, 0, cw, ch).data, cw, ch, scale }
+}
+
+/** Visible bounds in viewBox units, or null if nothing is drawn */
+async function contentBounds(svg: string, vb: ViewBox): Promise<ViewBox | null> {
+  const { data, cw, ch, scale } = await renderPixels(svg, vb, SCAN)
 
   let minX = cw, minY = ch, maxX = -1, maxY = -1
   for (let y = 0; y < ch; y++) {
@@ -145,6 +150,60 @@ export async function trimSvg(svg: string, trim: TrimSettings, precision: number
   return replaceRoot(svg, out)
 }
 
+// ── Optical centring (Beta) ───────────────────────────────────────────────────
+// A box-centred icon often looks off, usually too low or too high, because the
+// eye centres on where the ink is, not on the outline. This finds the
+// artwork's centre of mass (from a render, so strokes and overlaps count),
+// moves part of the way from the box centre towards it, and shifts the viewBox
+// so that point sits in the middle. Never moves the artwork past an edge.
+
+const OPTICAL_SCAN = 512
+
+export async function opticalCentreSvg(svg: string, strength: number, precision: number) {
+  const tag = rootTag(svg)
+  if (!tag || strength <= 0) return svg
+  const width = parseLength(getAttr(tag, "width"))
+  const height = parseLength(getAttr(tag, "height"))
+  const vb = parseViewBox(getAttr(tag, "viewBox"))
+    ?? (width && height ? { x: 0, y: 0, w: width, h: height } : null)
+  if (!vb) return svg
+
+  const box = (await exactBounds(svg, vb)) ?? await contentBounds(svg, vb)
+  if (!box) return svg
+  const mass = await centreOfMass(svg, vb)
+  if (!mass) return svg
+
+  const k = Math.min(1, strength)
+  const bx = box.x + box.w / 2, by = box.y + box.h / 2
+  const tx = bx + (mass.x - bx) * k, ty = by + (mass.y - by) * k
+  // How far the artwork has to travel, kept inside the viewBox
+  const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
+  const dx = clamp(vb.x + vb.w / 2 - tx, vb.x - box.x, vb.x + vb.w - (box.x + box.w))
+  const dy = clamp(vb.y + vb.h / 2 - ty, vb.y - box.y, vb.y + vb.h - (box.y + box.h))
+  const digits = Math.max(precision, 2)
+  const q = 10 ** digits
+  const rdx = Math.round(dx * q) / q, rdy = Math.round(dy * q) / q
+  if (!rdx && !rdy) return svg
+  // Moving the viewBox the other way moves the artwork without touching it
+  const f = (n: number) => fmtNum(n, digits)
+  const out = setAttr(tag, "viewBox", `${f(vb.x - rdx)} ${f(vb.y - rdy)} ${f(vb.w)} ${f(vb.h)}`)
+  return replaceRoot(svg, out)
+}
+
+/** Ink-weighted centre of the artwork in viewBox units */
+async function centreOfMass(svg: string, vb: ViewBox) {
+  const { data, cw, ch, scale } = await renderPixels(svg, vb, OPTICAL_SCAN)
+  let sum = 0, sx = 0, sy = 0
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      const a = data[(y * cw + x) * 4 + 3]
+      if (a === 0) continue
+      sum += a; sx += a * (x + 0.5); sy += a * (y + 0.5)
+    }
+  }
+  return sum > 0 ? { x: vb.x + sx / sum / scale, y: vb.y + sy / sum / scale } : null
+}
+
 // ── Output scale ──────────────────────────────────────────────────────────────
 
 /** Multiplies width/height. Adds them from the viewBox if the file has none */
@@ -239,6 +298,8 @@ export async function postProcess(svg: string, settings: SvgoSettings, effects?:
   // Trim measures last, after every move and scale, so padding 0 always means
   // the artwork touches the edges
   if (t.enabled) out = await trimSvg(out, t, settings.floatPrecision)
+  // After trim, so it works within the final canvas and its padding
+  out = await step("centre", settings.opticalCentre, out, () => opticalCentreSvg(out, settings.opticalStrength / 100, settings.floatPrecision))
   out = t.sizeUnit === "px"
     ? resizeSvg(out, t.sizeSide, t.sizePx, settings.floatPrecision)
     : scaleSvg(out, t.scale, settings.floatPrecision)

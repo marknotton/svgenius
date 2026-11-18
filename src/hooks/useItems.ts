@@ -5,6 +5,7 @@ import { newId } from "../lib/settings"
 import { errorMessage, forgetFiles, isDesktop, readSvg, scanPaths } from "../lib/platform"
 import { loadSession, saveSession } from "../lib/session"
 import { postProcess } from "../lib/trim"
+import { optimiseAutoPrecision } from "../lib/precision"
 import type { GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "../lib/types"
 
 // ── File list + optimisation queue ────────────────────────────────────────────
@@ -128,11 +129,14 @@ export function useItems() {
       runs.current.set(item.id, run)
       patch(item.id, { status: "running", error: undefined })
       try {
-        const { data, replaced } = await optimiseSvg(item.source as string, spec)
+        const auto = spec.svgo.autoPrecision
+        const { data, replaced, precision } = auto
+          ? await optimiseAutoPrecision(item.source as string, spec)
+          : { ...await optimiseSvg(item.source as string, spec), precision: undefined }
         const effects: GeometryEffect[] = []
-        const output = await postProcess(data, spec.svgo, effects)
+        const output = await postProcess(data, precision === undefined ? spec.svgo : { ...spec.svgo, floatPrecision: precision }, effects)
         if (runs.current.get(item.id) !== run) return
-        const result = { output, size: byteLength(output), replaced, effects, key: spec.key }
+        const result = { output, size: byteLength(output), replaced, effects, precision, key: spec.key }
         results.set(item.id, result)
         patch(item.id, { status: "done", result, errorKey: undefined })
       } catch (e) {

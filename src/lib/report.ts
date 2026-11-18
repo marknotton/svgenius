@@ -134,13 +134,21 @@ export function summaryReport(entries: ReportEntry[], rename: RenameSettings) {
 
   const did = (fx: GeometryEffect) => (s: SvgoSettings, e: ReportEntry) => e.item.result?.effects
     ? e.item.result.effects.includes(fx)
-    : fx === "flatten" ? s.flattenTransforms : fx === "merge" ? s.mergePaths : s.cutOutStrokes || activeCutMatchers(s).length > 0
+    : fx === "flatten" ? s.flattenTransforms : fx === "merge" ? s.mergePaths : fx === "centre" ? s.opticalCentre : s.cutOutStrokes || activeCutMatchers(s).length > 0
   const flat = count(did("flatten"))
   if (flat) out.push(`Flattened transforms into the path data in ${howMany(flat, total)}.`)
   const cuts = count(did("cutouts"))
   if (cuts) out.push(`Replaced fake masking with real cut-outs in ${howMany(cuts, total)}.`)
   const merged = count(did("merge"))
   if (merged) out.push(`Merged overlapping shapes into single paths in ${howMany(merged, total)}.`)
+  const centred = count(did("centre"))
+  if (centred) out.push(`Optically centred ${howMany(centred, total)}, so the artwork's visual weight sits in the middle.`)
+  const auto = ok.filter((e) => e.item.result?.precision !== undefined)
+  if (auto.length) {
+    const ps = auto.map((e) => e.item.result?.precision as number)
+    const lo = Math.min(...ps), hi = Math.max(...ps)
+    out.push(`Picked the lowest safe number precision per file (${lo === hi ? `${lo} decimal place${lo === 1 ? "" : "s"}` : `${lo} to ${hi} decimal places`}) for ${howMany(auto.length, total)}.`)
+  }
 
   const ruled = ok.filter((e) => (e.item.result?.replaced ?? 0) > 0)
   if (ruled.length) {

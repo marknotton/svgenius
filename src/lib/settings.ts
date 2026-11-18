@@ -19,6 +19,10 @@ export function defaultSvgoSettings(): SvgoSettings {
     appendMarkup: "",
     mergePaths: false,
     flattenTransforms: false,
+    opticalCentre: false,
+    opticalStrength: 50,
+    autoPrecision: false,
+    autoTolerance: "balanced",
     cutOutStrokes: false,
     cutOutShapes: [],
     custom: {}
@@ -136,7 +140,7 @@ export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
   const t = settings.trim
   const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.sizeUnit === "px" ? [t.sizeSide, t.sizePx] : t.scale, t.artScale, t.offsetX, t.offsetY]
-  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths, settings.flattenTransforms, settings.cutOutStrokes, settings.cutOutShapes.filter((m) => m.enabled && m.value.trim()).map((m) => [m.kind, m.value.trim()])])
+  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths, settings.flattenTransforms, settings.opticalCentre && settings.opticalStrength, settings.autoPrecision && settings.autoTolerance, settings.cutOutStrokes, settings.cutOutShapes.filter((m) => m.enabled && m.value.trim()).map((m) => [m.kind, m.value.trim()])])
 }
 
 export function runSpec(settings: SvgoSettings, plugins: CustomPlugin[]): RunSpec {
@@ -202,6 +206,10 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
     appendMarkup: typeof raw.appendMarkup === "string" ? raw.appendMarkup : "",
     mergePaths: raw.mergePaths === true,
     flattenTransforms: raw.flattenTransforms === true,
+    opticalCentre: raw.opticalCentre === true,
+    opticalStrength: clampNum(raw.opticalStrength, 0, 100, 50),
+    autoPrecision: raw.autoPrecision === true,
+    autoTolerance: raw.autoTolerance === "strict" || raw.autoTolerance === "loose" ? raw.autoTolerance : "balanced",
     cutOutStrokes: raw.cutOutStrokes === true,
     cutOutShapes: Array.isArray(raw.cutOutShapes)
       ? raw.cutOutShapes.map(sanitiseCutMatcher).filter((m): m is CutMatcher => m !== null)

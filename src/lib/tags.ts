@@ -36,6 +36,10 @@ export function fileTags(item: SvgItem, settings: SvgoSettings, customOn: number
     const what = [settings.cutOutStrokes && "strokes", shapes > 0 && "matching shapes"].filter(Boolean).join(" and ")
     tags.push({ label: "Cut-outs", title: `Covering ${what} turned into real holes` })
   }
+  if (did("centre", settings.opticalCentre)) tags.push({ label: "Optically centred", title: `Artwork moved so its visual weight sits in the middle (strength ${settings.opticalStrength}%)` })
+  if (settings.autoPrecision && item.result?.precision !== undefined) {
+    tags.push({ label: `Precision ${item.result.precision}`, title: `Auto precision picked ${item.result.precision} decimal place${item.result.precision === 1 ? "" : "s"} (max ${settings.floatPrecision})` })
+  }
   if (did("merge", settings.mergePaths)) tags.push({ label: "Merged paths", title: "Shapes sharing a fill and opacity were joined into one path" })
   if (settings.appendMarkup.trim()) tags.push({ label: "Extra markup", title: "Markup added before </svg>" })
   if (customOn) tags.push({ label: plural(customOn, "custom plugin"), title: "Third-party SVGO plugins switched on" })
