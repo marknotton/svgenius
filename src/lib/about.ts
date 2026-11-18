@@ -11,6 +11,18 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.4.0",
+    date: "18 November 2026",
+    notes: [
+      "A simpler first view: an Advanced switch reveals the viewBox and contents tools, rules, every plugin, filters, import and export, and Beta tools",
+      "The expanded editor always shows a preview you can click; picking a shape selects its markup so Delete removes it",
+      "Preview CSS now overrides inline styles too, so it works on the After preview",
+      "Before and after previews always show side by side",
+      "Open a file in your default SVG app (desktop)",
+      "Fixes: the clipped Strokes become cut-outs row, a joined circle guide and clip control, and an explanation for Flatten transforms"
+    ]
+  },
+  {
     version: "0.3.1",
     date: "18 November 2026",
     notes: ["A bigger app icon"]

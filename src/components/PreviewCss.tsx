@@ -7,11 +7,24 @@ import { createContext, useContext } from "react"
 export const PreviewCssContext = createContext("")
 export const usePreviewCss = () => useContext(PreviewCssContext)
 
+/**
+ * Every declaration becomes !important. Optimised files often carry their
+ * styles inline (style="fill:…"), which would otherwise beat preview CSS, so
+ * the After preview would ignore it while the Before one didn't.
+ */
+export function importantCss(css: string) {
+  return css.replace(/\{([^{}]*)\}/g, (_, body: string) => `{${body.split(";").map((d) => {
+    const t = d.trim()
+    if (!t || !t.includes(":") || /!important\s*$/i.test(t)) return d
+    return `${d.replace(/\s+$/, "")} !important`
+  }).join(";")}}`)
+}
+
 export function withPreviewCss(svg: string, css: string) {
   if (!css.trim()) return svg
   const end = svg.lastIndexOf("</svg>")
   if (end < 0) return svg
-  const safe = css.replace(/]]>/g, "]] >")
+  const safe = importantCss(css).replace(/]]>/g, "]] >")
   return `${svg.slice(0, end)}<style><![CDATA[\n${safe}\n]]></style>${svg.slice(end)}`
 }
 

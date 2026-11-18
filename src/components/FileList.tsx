@@ -26,6 +26,8 @@ interface Props {
   /** Number of active filter rules, and the filter panel itself */
   filterCount: number
   filtersOpen: boolean
+  /** Advanced view only */
+  showFilters: boolean
   onFilters: () => void
   filterBar: ReactNode
   onClearFilters: () => void
@@ -104,10 +106,10 @@ export function FileList(p: Props) {
         <input className="input input--sm list-search" type="search" placeholder="Search names" aria-label="Search files by name"
           value={p.query} onChange={(e) => p.onQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Escape") p.onQuery("") }} />
-        <button className={`btn btn--ghost btn--sm filters-btn${p.filtersOpen || p.filterCount ? " is-on" : ""}`} onClick={p.onFilters}
+        {p.showFilters && <button className={`btn btn--ghost btn--sm filters-btn${p.filtersOpen || p.filterCount ? " is-on" : ""}`} onClick={p.onFilters}
           aria-pressed={p.filtersOpen} title="Advanced filters: markup, colours, elements, attributes, flags and status">
           <IconFilter /> Filters{p.filterCount > 0 && <span className="filters-btn__count">{p.filterCount}</span>}
-        </button>
+        </button>}
         <div className="toolbar__spacer" />
         {p.viewControls}
       </div>
@@ -129,7 +131,7 @@ export function FileList(p: Props) {
             onRowClick={p.onRowClick}
             stale={p.isStale(item)}
             thumbPx={settings.showDetails ? settings.thumbPx : settings.galleryPx}
-            compare={settings.listCompare}
+            compare
             details={settings.showDetails}
             tags={settings.showDetails ? p.tagsFor(item) : NO_TAGS}
             exportName={p.exportNames?.get(item.id)}

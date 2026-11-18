@@ -153,12 +153,15 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
 .appbar * { -webkit-app-region: no-drag; }
 /* No traffic lights to clear in the browser */
 .is-web .appbar { padding-left: 16px; }
-.appbar__get {
-  position: absolute; right: 72px; top: 50%; transform: translateY(-50%);
-  display: inline-flex; align-items: center; gap: 5px;
+.appbar__right { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 4px; }
+.appbar__right .btn--icon { width: 24px; height: 22px; }
+.appbar__link {
+  display: inline-flex; align-items: center; gap: 5px; margin: 0 6px;
   font-size: 11px; color: var(--text-2); text-decoration: none;
 }
-.appbar__get:hover { color: var(--accent-ink); }
+.appbar__link:hover { color: var(--accent-ink); }
+.appbar__advanced { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); cursor: pointer; margin-right: 4px; }
+.panel__simple { padding: 12px 14px; }
 .empty__body a { color: var(--accent-ink); }
 .appbar__title { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; pointer-events: none; }
 
@@ -660,8 +663,6 @@ body.is-resizing * { user-select: none !important; }
 /* ── Round 3: settings, tags, drag sort, context menu ────────── */
 
 .appbar { position: relative; }
-.appbar__settings { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); }
-.appbar__about { position: absolute; right: 38px; top: 50%; transform: translateY(-50%); }
 
 .rule__grip { display: inline-flex; cursor: grab; color: var(--text-3); padding: 2px 0; flex: none; }
 .rule__grip:active { cursor: grabbing; }
@@ -889,7 +890,7 @@ body.is-resizing * { user-select: none !important; }
 /* Each heading sticks to the top while its own section is in view */
 .panel__scroll .panel__section > .panel__label,
 .panel__scroll .panel__section > .plugins__head,
-.panel__scroll .panel__section > * > .plugins__head:first-child {
+.panel__scroll .panel__section > :not(.rules--inline) > .plugins__head:first-child {
   position: sticky; top: 0; z-index: 3;
   margin: -12px -14px 2px; padding: 12px 14px 6px;
   background: var(--surface);
@@ -900,13 +901,22 @@ body.is-resizing * { user-select: none !important; }
 .panel__actions { display: flex; align-items: center; gap: 2px; margin: 0 -8px -4px; }
 
 /* ── File sidebar ───────────────────────────────────────────────────────────── */
-.inspector__codehead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.inspector__codehead { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.inspector__codehead .panel__label { margin: 0; }
+.code-tabs { display: inline-flex; gap: 2px; }
+.code-tabs button { border: 0; background: none; padding: 2px 6px; border-radius: var(--radius-xs); font-size: 12px; color: var(--text-3); cursor: pointer; }
+.code-tabs button:hover { color: var(--text); }
+.code-tabs button.is-active { color: var(--accent-ink); background: var(--accent-soft); }
+.markup-dialog__tip { font-size: 11px; }
 .inspector__links { display: flex; gap: 14px; flex-wrap: wrap; }
 .accordion { border-bottom: 1px solid var(--border); }
-.accordion__summary { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px; cursor: pointer; list-style: none; }
+.accordion__summary { display: flex; align-items: center; gap: 8px; padding: 12px 14px; cursor: pointer; list-style: none; }
 .accordion__summary::-webkit-details-marker { display: none; }
-.accordion__summary::before { content: "▸"; font-size: 10px; color: var(--text-3); transition: transform .15s; }
-.accordion[open] > .accordion__summary::before { transform: rotate(90deg); }
+.accordion__summary::marker { content: ""; }
+/* A chevron on the right says it opens */
+.accordion__summary::after { content: ""; margin-left: auto; width: 6px; height: 6px; border-right: 1.5px solid var(--text-3); border-bottom: 1.5px solid var(--text-3); transform: rotate(-45deg); transition: transform .15s; }
+.accordion[open] > .accordion__summary::after { transform: rotate(45deg); }
+.accordion__summary .panel__label { margin: 0; }
 .accordion__hint { font-size: 11px; margin-left: auto; }
 .accordion > .panel__section:last-child { border-bottom: 0; }
 .infotip__btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--text-3); cursor: pointer; }
@@ -943,3 +953,10 @@ input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hove
 .about__release li + li { margin-top: 2px; }
 .about__credits { list-style: none; margin: 4px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px 16px; }
 .about__credits li { font-size: 12px; }
+
+/* Buttons joined into one control: square inner corners, no gap */
+.btn-join { display: inline-flex; }
+.btn-join > * { margin: 0; }
+.btn-join > :not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; }
+.btn-join > :not(:last-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.btn-join > .is-on { position: relative; z-index: 1; }

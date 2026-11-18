@@ -161,6 +161,8 @@ export interface AppSettings {
   /** Thumbnail size in the gallery (showDetails off) */
   galleryPx: number
   backdrop: Backdrop
+  /** Show every option. Off keeps the app simple: presets and output only */
+  advanced: boolean
   /** App colours: follow the system, or always light or dark */
   theme: ThemeChoice
   keepStructure: boolean

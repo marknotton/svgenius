@@ -27,7 +27,7 @@ import { exportNames } from "./lib/rename"
 import { fileTags } from "./lib/tags"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
-import { canReveal, errorMessage, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, pickSvgs, reveal, saveJson } from "./lib/platform"
+import { canReveal, openInDefaultApp, errorMessage, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, pickSvgs, reveal, saveJson } from "./lib/platform"
 import { preloadMonaco, setEditorTheme } from "./components/CodeEditor"
 import { useTheme } from "./lib/theme"
 import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "./lib/types"
@@ -187,7 +187,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   // ── Filters ─────────────────────────────────────────────────────────────────
   const [filters, setFilters] = useState<FilterSet>(emptyFilters)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const filterCount = activeRules(filters).length
+  // Filters are an advanced tool: in the simple view they're hidden and off
+  const filterCount = settings.advanced ? activeRules(filters).length : 0
   const filtered = useMemo(() => (filterCount ? items.filter((i) => matchesFilters(i, filters)) : items), [items, filters, filterCount])
 
   const selectAll = (all: boolean) => setSelection(all ? new Set(shownItems.map((i) => i.id)) : new Set())
@@ -475,7 +476,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       y: e.clientY,
       items: [
         { label: "Inspect", run: () => { setFocusId(id); setSidebarTab("file") } },
-        ...(canReveal ? [{ label: "Reveal in Finder", run: () => reveal(item.path) }] : []),
+        ...(canReveal ? [
+          { label: "Open in default app", run: () => openInDefaultApp(item.path) },
+          { label: "Reveal in Finder", run: () => reveal(item.path) }
+        ] : []),
         "-",
         { label: "Remove from list", run: () => removeIds(new Set([id])) },
         ...(inSelection ? [{ label: `Remove ${plural(selection.size, "selected file")}`, danger: true, run: () => removeIds(new Set(selection)) }] : [])
@@ -532,8 +536,6 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       onSize={(px) => setViewPrefs(settings.showDetails
         ? { thumbPx: px < 0 ? PREVIEW_PX.list.default : px }
         : { galleryPx: px < 0 ? PREVIEW_PX.gallery.default : px })}
-      compare={settings.listCompare}
-      onCompare={() => setViewPrefs({ listCompare: !settings.listCompare })}
       details={settings.showDetails}
       onDetails={() => setViewPrefs({ showDetails: !settings.showDetails })}
       backdrop={settings.backdrop}
@@ -561,7 +563,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   return (
     <PreviewCssContext.Provider value={appliedCss}>
       <div className={`app${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px` } as CSSProperties}>
-        <AppBar onSettings={() => setSettingsOpen(true)} onAbout={() => setAboutOpen(true)} />
+        <AppBar onSettings={() => setSettingsOpen(true)} onAbout={() => setAboutOpen(true)}
+          advanced={settings.advanced} onAdvanced={(advanced) => update((s) => ({ ...s, advanced }))} />
         <div className="workspace">
           <main className="workspace__main">
             {items.length === 0 ? (
@@ -584,7 +587,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onContextMenu={rowMenu}
                 onFlag={flagClick}
                 filterCount={filterCount}
-                filtersOpen={filtersOpen}
+                filtersOpen={settings.advanced && filtersOpen}
+                showFilters={settings.advanced}
                 onClearFilters={() => setFilters(emptyFilters())}
                 onFilters={() => setFiltersOpen((o) => !o)}
                 filterBar={<FilterBar filters={filters} onChange={setFilters} shown={shownItems.length} total={items.length} />}
@@ -641,6 +645,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 customPlugins={settings.customPlugins}
                 onLoadPlugin={loadPlugin}
                 onRemovePlugin={removePlugin}
+                advanced={settings.advanced}
               />
             ) : (
               <ConfigPanel

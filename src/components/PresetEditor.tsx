@@ -17,9 +17,11 @@ interface Props {
   customPlugins: CustomPlugin[]
   onLoadPlugin: () => void
   onRemovePlugin: (p: CustomPlugin) => void
+  /** Off: just the output options. Everything else still applies, just hidden */
+  advanced: boolean
 }
 
-export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, onRemovePlugin }: Props) {
+export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, onRemovePlugin, advanced }: Props) {
   const trim = (patch: Partial<SvgoSettings["trim"]>) => edit((x) => ({ ...x, trim: { ...x.trim, ...patch } }))
   return (
     <>
@@ -52,6 +54,10 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
         )}
       </section>
 
+      {!advanced && (
+        <p className="panel__simple text-3">Switch on <strong>Advanced</strong> above for the viewBox, contents, rules, every SVGO plugin and Beta tools.</p>
+      )}
+      {advanced && <>
       <section className="panel__section">
         <EditViewBox trim={s.trim} onChange={trim} />
       </section>
@@ -84,7 +90,12 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
         <div className="panel__label">Beta <span className="pill pill--beta">Experimental</span></div>
         <p className="panel__hint text-3">Geometry changes made after SVGO. Check the results before exporting.</p>
         <Toggle label="Flatten transforms"
-          hint="Bakes transform, rotate and matrix attributes into the path data, so no transforms are left. Text, images, masks, filters, gradients and stretched strokes keep theirs"
+          hint="Removes transform attributes (translate, rotate, scale, matrix) and rewrites the shapes so they sit exactly where the transform put them"
+          info={<>
+            <p>Finds <code>transform="…"</code> attributes, like <code>translate(10 5)</code> or <code>matrix(…)</code>, and removes them. The shapes they moved are rewritten as paths at their final position.</p>
+            <p><strong>Nothing should look different.</strong> The markup is just cleaner and easier to edit, with no hidden offsets.</p>
+            <p>Text, images, masks, filters, gradients and strokes that would stretch keep their transforms.</p>
+          </>}
           checked={s.flattenTransforms} onChange={(v) => edit((x) => ({ ...x, flattenTransforms: v }))} />
         <Toggle label="Strokes become cut-outs"
           hint="Removes strokes and cuts the area they covered out of the shapes painted beneath, so fake clipping becomes real holes. Strokes that don't cover anything stay. Dashed strokes are left alone"
@@ -118,6 +129,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
           }))}
         />
       </section>
+      </>}
     </>
   )
 }

@@ -1,14 +1,13 @@
 import { useMemo, useState } from "react"
 import { CodeEditor } from "./CodeEditor"
-import { MarkupDialog, type MarkupTab } from "./MarkupDialog"
-import { IconCopy, IconReset } from "../icons"
+import { CodeTabs, MarkupDialog, type MarkupTab } from "./MarkupDialog"
+import { IconCopy, IconExpand, IconReset } from "../icons"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import { PREVIEW_PX } from "../lib/settings"
 import type { FileTag } from "../lib/tags"
 import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "../lib/svgRoot"
 import type { Backdrop, CustomPlugin, Preset, SvgItem, SvgoSettings } from "../lib/types"
 import { PresetSelect } from "./PresetSelect"
-import { Segmented } from "./Segmented"
 import { PresetEditor } from "./PresetEditor"
 import { SliderField } from "./SliderField"
 import { Thumb } from "./Thumb"
@@ -38,6 +37,7 @@ interface Props {
   customPlugins: CustomPlugin[]
   onLoadPlugin: () => void
   onRemovePlugin: (p: CustomPlugin) => void
+  advanced: boolean
 }
 
 function viewBoxOf(svg?: string) {
@@ -49,7 +49,7 @@ const dims = (s: { w: number, h: number } | null) => (s ? `${fmtNum(s.w, 2)} × 
 
 export function FileInspector({ item, presets, defaultPreset, backdrop, previewPx, ...p }: Props) {
   const [tab, setTab] = useState<MarkupTab>("source")
-  const [big, setBig] = useState<null | { inspect: boolean }>(null)
+  const [big, setBig] = useState(false)
   const [copied, setCopied] = useState(false)
   const out = item.result?.output
   const before = useMemo(() => ({ size: svgSize(item.source), vb: viewBoxOf(item.source) }), [item.source])
@@ -105,18 +105,13 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
         </section>
 
         <section className="panel__section inspector__code">
-          <div className="panel__label">Markup</div>
           <div className="inspector__codehead">
-            <Segmented label="Markup" value={tab} onChange={setTab}
-              options={[{ value: "source", label: "Before (editable)" }, { value: "output", label: "After" }]} />
+            <span className="panel__label">Markup</span>
+            <CodeTabs value={tab} onChange={setTab} />
+            <div className="toolbar__spacer" />
             {tab === "source" && edited && <button className="link" onClick={p.onRevert} title="Throw away edits and reload the file's markup"><IconReset width={11} height={11} /> Revert</button>}
             {tab === "output" && <button className="link" onClick={copy} disabled={!out}><IconCopy width={11} height={11} /> {copied ? "Copied" : "Copy"}</button>}
-          </div>
-          <div className="inspector__codebar">
-            <button className="btn btn--secondary btn--sm" onClick={() => setBig({ inspect: true })}
-              title="A big preview where clicking a shape finds it in the markup">Inspect</button>
-            <button className="btn btn--ghost btn--sm" onClick={() => setBig({ inspect: false })}
-              title="Edit the markup in a large window">Expand editor</button>
+            <button className="link" onClick={() => setBig(true)} title="A big editor with a preview you can click to find shapes in the markup"><IconExpand width={11} height={11} /> Expand</button>
           </div>
           {tab === "source" ? (
             <>
@@ -145,24 +140,25 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             <>
               <PresetSelect label={`Preset for ${item.name}`} presets={presets} defaultPreset={defaultPreset}
                 value={item.presetId} onChange={p.onPreset} onCreateNew={p.onNewPreset} newLabel="New preset for this file…" />
-              <p className="text-3 inspector__hint">Edit the preset in the Config tab (it changes every file that uses it), or open Advanced customisation to give just this file its own settings.</p>
+              <p className="text-3 inspector__hint">Edit the preset in the Config tab (it changes every file that uses it){p.advanced ? ", or open Advanced customisation to give just this file its own settings" : ""}.</p>
             </>
           )}
         </section>
-        <details className="accordion" open={!!item.config}
-          onToggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open && !item.config) p.onCustomise() }}>
-          <summary className="accordion__summary">
-            <span className="panel__label">Advanced customisation</span>
-            <span className="text-3 accordion__hint">{item.config ? "Bespoke settings" : `Starts from “${p.presetName}”, only this file`}</span>
-          </summary>
-          {item.config && (
-            <PresetEditor settings={item.config} edit={p.onConfig} customPlugins={p.customPlugins}
-              onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} />
-          )}
-        </details>
+        {(p.advanced || item.config) && (
+          <details className="accordion" open={!!item.config}
+            onToggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open && !item.config) p.onCustomise() }}>
+            <summary className="accordion__summary">
+              <span className="panel__label">Advanced customisation</span>
+            </summary>
+            {item.config && (
+              <PresetEditor settings={item.config} edit={p.onConfig} customPlugins={p.customPlugins}
+                onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} advanced={p.advanced} />
+            )}
+          </details>
+        )}
         {big && (
-          <MarkupDialog item={item} tab={tab} onTab={setTab} inspect={big.inspect} onInspect={(inspect) => setBig({ inspect })}
-            backdrop={backdrop} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => setBig(null)} />
+          <MarkupDialog item={item} tab={tab} onTab={setTab}
+            backdrop={backdrop} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => setBig(false)} />
         )}
       </div>
     </div>

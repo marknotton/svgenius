@@ -59,14 +59,16 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
             <IconReset /> Reset
           </button>
           <div className="toolbar__spacer" />
-          <button className="btn btn--ghost btn--sm" onClick={p.onImport} title="Import presets from a JSON file"><IconUpload /> Import</button>
-          <button className="btn btn--ghost btn--sm" onClick={p.onExport} title="Export all presets to a JSON file"><IconDownload /> Export</button>
+          {settings.advanced && <>
+            <button className="btn btn--ghost btn--sm" onClick={p.onImport} title="Import presets from a JSON file"><IconUpload /> Import</button>
+            <button className="btn btn--ghost btn--sm" onClick={p.onExport} title="Export all presets to a JSON file"><IconDownload /> Export</button>
+          </>}
         </div>
       </div>
 
       <div className="panel__scroll">
         <PresetEditor settings={s} edit={edit} customPlugins={settings.customPlugins}
-          onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} />
+          onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} advanced={settings.advanced} />
       </div>
     </aside>
   )

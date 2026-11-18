@@ -2,7 +2,7 @@ import { listen } from "@tauri-apps/api/event"
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { open, save } from "@tauri-apps/plugin-dialog"
-import { revealItemInDir } from "@tauri-apps/plugin-opener"
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener"
 import * as desktop from "./tauri"
 import type { ScannedFile } from "./types"
 
@@ -231,6 +231,11 @@ export async function exportSvgs(
 }
 
 export const canReveal = isDesktop
+
+/** Opens the original file in whatever app the system uses for SVGs. Desktop only */
+export const openInDefaultApp = (path: string) => {
+  if (isDesktop) openPath(path).catch(() => {})
+}
 
 export const reveal = (path: string) => {
   if (isDesktop) revealItemInDir(path).catch(() => {})

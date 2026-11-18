@@ -25,7 +25,7 @@ export function CutMatcherList({ matchers, onChange }: Props) {
   const active = matchers.filter((m) => m.enabled && m.value.trim()).length
 
   return (
-    <div className="rules">
+    <div className="rules rules--inline">
       <div className="plugins__head">
         <span className="toggle__label">Shapes become cut-outs {matchers.length > 0 && <span className="text-3">{active}/{matchers.length}</span>}</span>
         <button className="link" onClick={() => onChange([...matchers, createCutMatcher()])}><IconPlus width={11} height={11} /> Add match</button>

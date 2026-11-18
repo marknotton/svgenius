@@ -114,6 +114,8 @@ export function CodeEditor({ value, onChange, readOnly, className, label, reveal
     const range = new monaco.Range(a.lineNumber, a.column, b.lineNumber, b.column)
     editor.setSelection(range)
     editor.revealRangeInCenterIfOutsideViewport(range)
+    // Ready for Delete, Backspace or typing over it
+    editor.focus()
   }, [reveal, ready])
 
   useEffect(() => {

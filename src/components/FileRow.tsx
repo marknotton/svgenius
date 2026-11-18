@@ -3,7 +3,8 @@ import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "../lib/svgRoot"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { FileTag } from "../lib/tags"
 import { FLAGS } from "../lib/filters"
-import { IconFlag } from "../icons"
+import { IconFlag, IconOpen } from "../icons"
+import { isDesktop, openInDefaultApp } from "../lib/platform"
 import type { Backdrop, Preset, SvgItem } from "../lib/types"
 import { Thumb } from "./Thumb"
 
@@ -66,6 +67,7 @@ export const FileRow = memo(function FileRow(p: Props) {
           <FlagButton item={item} onFlag={p.onFlag} />
           <span className="file-card__name" title={item.path}><Name item={item} to={p.exportName} /></span>
           <Stats item={item} stale={stale} />
+          <OpenButton item={item} />
         </div>
         <div className="file-card__panes">
           <figure className="file-card__pane">
@@ -106,6 +108,7 @@ export const FileRow = memo(function FileRow(p: Props) {
         <div className="file-row__top">
           <div className="file-row__name" title={item.path}><Name item={item} to={p.exportName} /></div>
           <Stats item={item} stale={stale} compact />
+          <OpenButton item={item} />
         </div>
         <dl className="facts">
           <Fact label="Size">
@@ -181,6 +184,18 @@ function Check({ item, selected, onToggle }: { item: SvgItem, selected: boolean,
       onClick={(e) => { e.stopPropagation(); onToggle(item.id, e) }}>
       <input type="checkbox" className="checkbox" checked={selected} aria-label={`Select ${item.name}`} onChange={() => {}} />
     </span>
+  )
+}
+
+/** Opens the original in the user's SVG app (desktop only: the browser has no path) */
+function OpenButton({ item }: { item: SvgItem }) {
+  if (!isDesktop) return null
+  return (
+    <button type="button" className="btn btn--icon file-open" title="Open the original file in your default SVG app"
+      aria-label={`Open ${item.name} in your default app`}
+      onClick={(e) => { e.stopPropagation(); openInDefaultApp(item.path) }}>
+      <IconOpen />
+    </button>
   )
 }
 

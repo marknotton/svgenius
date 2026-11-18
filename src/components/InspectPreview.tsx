@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { Backdrop } from "../lib/types"
+import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 
 // ── Inspectable preview ───────────────────────────────────────────────────────
 // Renders the SVG inline (scripts and event handlers stripped) so elements can
@@ -39,7 +40,9 @@ export function InspectPreview({ markup, backdrop, selected, onPick, onHover }: 
   const stage = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState(-1)
   const [boxes, setBoxes] = useState<{ sel: DOMRect | null, hov: DOMRect | null }>({ sel: null, hov: null })
-  const root = useMemo(() => prepare(markup), [markup])
+  const css = usePreviewCss()
+  // Preview CSS goes in last, so element numbers still match the markup
+  const root = useMemo(() => prepare(withPreviewCss(markup, css)), [markup, css])
 
   useLayoutEffect(() => {
     const el = stage.current

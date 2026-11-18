@@ -72,10 +72,12 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
               )
             })}
           </ul>
-          <div className="settings__actions">
-            <button className="btn btn--ghost btn--sm" onClick={p.onImport}><IconUpload /> Import presets…</button>
-            <button className="btn btn--ghost btn--sm" onClick={p.onExport}><IconDownload /> Export presets…</button>
-          </div>
+          {settings.advanced && (
+            <div className="settings__actions">
+              <button className="btn btn--ghost btn--sm" onClick={p.onImport}><IconUpload /> Import presets…</button>
+              <button className="btn btn--ghost btn--sm" onClick={p.onExport}><IconDownload /> Export presets…</button>
+            </div>
+          )}
         </section>
 
         <section className="settings__section">
@@ -88,6 +90,8 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
 
         <section className="settings__section">
           <div className="panel__label">Appearance</div>
+          <Toggle label="Advanced options" hint="Show every option: viewBox and contents editing, rules, all SVGO plugins, filters, import and export, and Beta tools"
+            checked={settings.advanced} onChange={(v) => set("advanced", v)} />
           <div className="field-row">
             <span>Theme</span>
             <Segmented<ThemeChoice> label="App theme" value={settings.theme} onChange={(v) => set("theme", v)}
@@ -102,7 +106,6 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
             <Segmented<Backdrop> label="Preview background" value={settings.backdrop} onChange={(v) => set("backdrop", v)}
               options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
           </div>
-          <Toggle label="Before and after thumbnails" checked={settings.listCompare} onChange={(v) => set("listCompare", v)} />
           <Toggle label="Inspect mode" hint="Compact rows with dimensions, tags and presets. Off shows big before/after previews"
             checked={settings.showDetails} onChange={(v) => set("showDetails", v)} />
           <Toggle label="Circle guide" checked={settings.circleOverlay} onChange={(v) => set("circleOverlay", v)} />
