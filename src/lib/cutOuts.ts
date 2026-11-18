@@ -9,10 +9,12 @@ import {
   NOT_RENDERED, SHAPES, hasEffects, isUrl, outlineOf, ownMatrix, pathData, replaceWithPath, solid, withLiveSvg,
   type Paper
 } from "./paperKit"
+import type { CutMatcher } from "./types"
 
 export interface CutOutOptions {
   strokes: boolean
-  whites: boolean
+  /** Shapes that become holes, matched by fill colour or markup */
+  shapes: CutMatcher[]
 }
 
 interface Target {
@@ -24,7 +26,35 @@ interface Target {
   dirty: boolean
 }
 
-const WHITE = /^(rgba?\(\s*255,\s*255,\s*255(,\s*1)?\s*\)|#fff(fff)?|white)$/i
+/** Any CSS colour in one canonical spelling, or null if it isn't one */
+let colourCtx: CanvasRenderingContext2D | null = null
+export function canonicalColour(v: string) {
+  colourCtx ??= document.createElement("canvas").getContext("2d")
+  if (!colourCtx || !v.trim()) return null
+  colourCtx.fillStyle = "#010203"
+  colourCtx.fillStyle = v.trim()
+  const a = colourCtx.fillStyle
+  colourCtx.fillStyle = "#030201"
+  colourCtx.fillStyle = v.trim()
+  // Unchanged across both sentinels means the browser rejected it
+  return a === colourCtx.fillStyle ? a : null
+}
+
+function matcherTest(list: CutMatcher[]) {
+  const colours = new Set(list.filter((m) => m.kind === "colour").map((m) => canonicalColour(m.value)).filter((c): c is string => !!c))
+  const texts = list.filter((m) => m.kind === "markup").map((m) => m.value.trim().toLowerCase()).filter(Boolean)
+  return (el: Element, fill: string) => {
+    if (colours.size) {
+      const c = canonicalColour(fill)
+      if (c && colours.has(c)) return true
+    }
+    if (texts.length) {
+      const tag = (el.outerHTML.match(/^<[^>]*>/)?.[0] ?? "").toLowerCase()
+      if (texts.some((t) => tag.includes(t))) return true
+    }
+    return false
+  }
+}
 const STROKE_ATTRS = ["stroke", "stroke-width", "stroke-opacity", "stroke-linecap", "stroke-linejoin", "stroke-miterlimit", "stroke-dasharray", "stroke-dashoffset"]
 
 // ── Stroke outlines ───────────────────────────────────────────────────────────
@@ -186,6 +216,7 @@ const areaOf = (p: paper.PathItem) => Math.abs((p as paper.Path).area)
 // ── Walk the artwork in paint order ───────────────────────────────────────────
 
 function cutIn(paper: Paper, root: Element, opts: CutOutOptions, precision: number) {
+  const matches = matcherTest(opts.shapes)
   const targets: Target[] = []
   const removed = new Set<Element>()
   let cuts = 0
@@ -217,7 +248,7 @@ function cutIn(paper: Paper, root: Element, opts: CutOutOptions, precision: numb
       if (cs.display === "none" || hasEffects(el, cs)) continue
       const fillOn = cs.fill !== "none" && Number(cs.fillOpacity) > 0 && el.localName !== "line"
       const strokeOn = cs.stroke !== "none" && parseFloat(cs.strokeWidth) > 0 && Number(cs.strokeOpacity) > 0
-      const white = opts.whites && fillOn && WHITE.test(cs.fill.trim()) && Number(cs.fillOpacity) >= 1 && Number(cs.opacity) >= 1
+      const white = fillOn && !isUrl(cs.fill) && matches(el, cs.fill)
       const strokeCut = opts.strokes && strokeOn && !isUrl(cs.stroke) && (!cs.strokeDasharray || cs.strokeDasharray === "none")
 
       const local = (fillOn || strokeCut) ? outlineOf(paper, el, true) : null
@@ -273,6 +304,6 @@ function cutIn(paper: Paper, root: Element, opts: CutOutOptions, precision: numb
 }
 
 export async function cutOutFakeClipping(svg: string, opts: CutOutOptions, precision: number) {
-  if (!opts.strokes && !opts.whites) return svg
+  if (!opts.strokes && !opts.shapes.length) return svg
   return withLiveSvg(svg, (paper, root) => cutIn(paper, root, opts, Math.max(precision, 3)))
 }

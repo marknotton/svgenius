@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react"
+import { CodeEditor } from "./CodeEditor"
+import { MarkupDialog, type MarkupTab } from "./MarkupDialog"
 import { IconCopy, IconReset } from "../icons"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import { PREVIEW_PX } from "../lib/settings"
@@ -46,7 +48,8 @@ function viewBoxOf(svg?: string) {
 const dims = (s: { w: number, h: number } | null) => (s ? `${fmtNum(s.w, 2)} × ${fmtNum(s.h, 2)}` : "–")
 
 export function FileInspector({ item, presets, defaultPreset, backdrop, previewPx, ...p }: Props) {
-  const [tab, setTab] = useState<"source" | "output">("source")
+  const [tab, setTab] = useState<MarkupTab>("source")
+  const [big, setBig] = useState<null | { inspect: boolean }>(null)
   const [copied, setCopied] = useState(false)
   const out = item.result?.output
   const before = useMemo(() => ({ size: svgSize(item.source), vb: viewBoxOf(item.source) }), [item.source])
@@ -108,16 +111,21 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             {tab === "source" && edited && <button className="link" onClick={p.onRevert} title="Throw away edits and reload the file's markup"><IconReset width={11} height={11} /> Revert</button>}
             {tab === "output" && <button className="link" onClick={copy} disabled={!out}><IconCopy width={11} height={11} /> {copied ? "Copied" : "Copy"}</button>}
           </div>
+          <div className="inspector__codebar">
+            <button className="btn btn--secondary btn--sm" onClick={() => setBig({ inspect: true })}
+              title="A big preview where clicking a shape finds it in the markup">Inspect</button>
+            <button className="btn btn--ghost btn--sm" onClick={() => setBig({ inspect: false })}
+              title="Edit the markup in a large window">Expand editor</button>
+          </div>
           {tab === "source" ? (
             <>
-              <textarea className="input input--mono code" spellCheck={false} value={item.source ?? ""}
-                aria-label="Source markup" onChange={(e) => p.onEdit(e.target.value)} />
+              <CodeEditor key="source" className="code" label="Source markup" value={item.source ?? ""} onChange={p.onEdit} />
               <p className="text-3 inspector__hint">
                 {edited ? "Edited here only. Your original file isn't touched, exports use this version." : "The file as it is on disk, before any settings. Edit it to see changes live, the original isn't touched."}
               </p>
             </>
           ) : (
-            <textarea className="input input--mono code" readOnly value={out ?? ""} aria-label="Optimised markup" />
+            <CodeEditor key="output" className="code" label="Optimised markup" value={out ?? ""} readOnly />
           )}
           {item.status === "error" && <p className="rule__error">{item.error}</p>}
         </section>
@@ -145,6 +153,10 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             </>
           )}
         </section>
+        {big && (
+          <MarkupDialog item={item} tab={tab} onTab={setTab} inspect={big.inspect} onInspect={(inspect) => setBig({ inspect })}
+            backdrop={backdrop} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => setBig(null)} />
+        )}
         {item.config && (
           <PresetEditor settings={item.config} edit={p.onConfig} customPlugins={p.customPlugins}
             onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} />

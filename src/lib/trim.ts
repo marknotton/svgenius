@@ -2,6 +2,8 @@ import { svgDataUrl } from "./format"
 import { mergeOverlappingPaths } from "./mergePaths"
 import { flattenTransforms } from "./flattenTransforms"
 import { cutOutFakeClipping } from "./cutOuts"
+import { geometryBounds } from "./geomBounds"
+import { activeCutMatchers } from "./settings"
 import { fmtNum, getAttr, parseLength, parseViewBox, replaceRoot, rootTag, setAttr, type ViewBox } from "./svgRoot"
 import type { ArtTransform, GeometryEffect, SvgoSettings, TrimSettings } from "./types"
 
@@ -82,6 +84,15 @@ async function contentBounds(svg: string, vb: ViewBox): Promise<ViewBox | null> 
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
 }
 
+/** Curve-exact bounds, clipped to the viewBox like a render would be */
+async function exactBounds(svg: string, vb: ViewBox): Promise<ViewBox | null> {
+  const g = await geometryBounds(svg).catch(() => null)
+  if (!g) return null
+  const x0 = Math.max(g.x, vb.x), y0 = Math.max(g.y, vb.y)
+  const x1 = Math.min(g.x + g.w, vb.x + vb.w), y1 = Math.min(g.y + g.h, vb.y + vb.h)
+  return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null
+}
+
 export async function trimSvg(svg: string, trim: TrimSettings, precision: number) {
   const tag = rootTag(svg)
   if (!tag) return svg
@@ -91,7 +102,7 @@ export async function trimSvg(svg: string, trim: TrimSettings, precision: number
     ?? (width && height ? { x: 0, y: 0, w: width, h: height } : null)
   if (!vb) return svg
 
-  const box = await contentBounds(svg, vb)
+  const box = (await exactBounds(svg, vb)) ?? await contentBounds(svg, vb)
   if (!box) return svg
 
   const pad = trim.unit === "%" ? (Math.max(box.w, box.h) * trim.padding) / 100 : trim.padding
@@ -114,6 +125,11 @@ export async function trimSvg(svg: string, trim: TrimSettings, precision: number
 
   const digits = Math.max(precision, 2)
   const f = (n: number) => fmtNum(n, digits)
+  // Round outwards, so rounding never shaves the artwork
+  const q = 10 ** digits
+  const x0 = Math.floor(next.x * q + 1e-6) / q, y0 = Math.floor(next.y * q + 1e-6) / q
+  const x1 = Math.ceil((next.x + next.w) * q - 1e-6) / q, y1 = Math.ceil((next.y + next.h) * q - 1e-6) / q
+  next = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
   let out = setAttr(tag, "viewBox", `${f(next.x)} ${f(next.y)} ${f(next.w)} ${f(next.h)}`)
   // One uniform scale for both sides, so width/height always match the new
   // viewBox's aspect ratio and nothing gets letterboxed back in
@@ -212,8 +228,9 @@ export async function postProcess(svg: string, settings: SvgoSettings, effects?:
   // Beta geometry: holes first, so the shapes they leave can still merge
   let out = await step("flatten", settings.flattenTransforms, svg, () => flattenTransforms(svg, p))
   const cut = out
-  out = await step("cutouts", settings.cutOutStrokes || settings.cutOutWhites, cut, () =>
-    cutOutFakeClipping(cut, { strokes: settings.cutOutStrokes, whites: settings.cutOutWhites }, p))
+  const shapes = activeCutMatchers(settings)
+  out = await step("cutouts", settings.cutOutStrokes || shapes.length > 0, cut, () =>
+    cutOutFakeClipping(cut, { strokes: settings.cutOutStrokes, shapes }, p))
   const merge = out
   out = await step("merge", settings.mergePaths, merge, () => mergeOverlappingPaths(merge, p))
   out = transformSvg(out, { scale: t.artScale, offsetX: t.offsetX, offsetY: t.offsetY })

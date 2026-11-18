@@ -715,3 +715,35 @@ body.is-resizing * { user-select: none !important; }
   tab-size: 18;
 }
 .report .select { max-width: none; }
+.swatch { flex: none; width: 26px; height: 26px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); cursor: pointer; }
+.swatch::-webkit-color-swatch-wrapper { padding: 0; }
+.swatch::-webkit-color-swatch { border: none; border-radius: 3px; }
+.rules__empty code { font-size: 10.5px; }
+
+/* ── Code editor ────────────────────────────────────────────────────────────── */
+.code-editor { position: relative; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg); }
+.code-editor.code { height: 260px; padding: 0; resize: vertical; }
+.code-editor__host { position: absolute; inset: 0; }
+.code-editor__fallback { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: 0; resize: none; padding: 8px; font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+.code-mark { background: rgba(124, 58, 237, .14); }
+.inspector__codebar { display: flex; gap: 6px; }
+
+/* ── Big markup editor + inspector ──────────────────────────────────────────── */
+.modal.markup-dialog { width: calc(100vw - 48px); height: calc(100vh - 48px); max-width: none; padding: 12px 14px 14px; gap: 10px; }
+.markup-dialog__head { display: flex; align-items: center; gap: 12px; }
+.markup-dialog__title { max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.markup-dialog__spacer { flex: 1; }
+.toggle-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.markup-dialog__body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; gap: 10px; }
+.markup-dialog__body.is-inspecting { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.markup-dialog__code { height: 100%; }
+.inspect { position: relative; min-height: 0; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border); }
+.inspect__stage { position: absolute; inset: 16px; cursor: crosshair; }
+.inspect__box { position: absolute; pointer-events: none; outline: 2px solid var(--accent); background: rgba(124, 58, 237, .12); margin: 16px 0 0 16px; }
+.inspect__box--hover { outline: 1px dashed var(--accent); background: rgba(124, 58, 237, .07); }
+.inspect__error { position: absolute; inset: auto 12px 12px; }
+.inspect { --a: var(--check-light-a); --b: var(--check-light-b); background-color: var(--a); background-image: conic-gradient(var(--b) 25%, transparent 0 50%, var(--b) 0 75%, transparent 0); background-size: 16px 16px; }
+.inspect.thumb--dark { --a: var(--check-dark-a); --b: var(--check-dark-b); }
+.thumb__loading { position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.35) 50%, transparent 70%) 0 0 / 300% 100%; animation: thumb-shimmer 1.2s linear infinite; }
+@keyframes thumb-shimmer { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+.select--sm.cut-kind { flex: 1; max-width: none; }

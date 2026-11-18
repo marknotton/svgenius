@@ -1,6 +1,7 @@
 import type { CustomPlugin, SvgoSettings } from "../lib/types"
 import { AttrRuleList } from "./AttrRuleList"
 import { CustomPluginList } from "./CustomPluginList"
+import { CutMatcherList } from "./CutMatcherList"
 import { EditContents, EditViewBox } from "./EditSections"
 import { PluginList } from "./PluginList"
 import { ReplaceList } from "./ReplaceList"
@@ -72,9 +73,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
         <Toggle label="Strokes become cut-outs"
           hint="Removes strokes and cuts the area they covered out of the shapes painted beneath, so fake clipping becomes real holes. Strokes that don't cover anything stay. Dashed strokes are left alone"
           checked={s.cutOutStrokes} onChange={(v) => edit((x) => ({ ...x, cutOutStrokes: v }))} />
-        <Toggle label="White shapes become cut-outs"
-          hint="Same again for solid white shapes painted on top of others. White shapes that don't cover anything stay"
-          checked={s.cutOutWhites} onChange={(v) => edit((x) => ({ ...x, cutOutWhites: v }))} />
+        <CutMatcherList matchers={s.cutOutShapes} onChange={(cutOutShapes) => edit((x) => ({ ...x, cutOutShapes }))} />
         <Toggle label="Merge overlapping paths"
           hint="Joins shapes that share a fill and opacity into one path (a boolean union), so see-through overlaps don't show and files get smaller. Shapes with strokes, IDs, masks or filters are left alone"
           checked={s.mergePaths} onChange={(v) => edit((x) => ({ ...x, mergePaths: v }))} />

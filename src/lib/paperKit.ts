@@ -47,7 +47,7 @@ export function fmtMatrix(m: paper.Matrix, precision: number) {
 
 /** A shape's outline in its own coordinates (its transform attribute ignored) */
 export function outlineOf(paper: Paper, el: Element, closeAll = false) {
-  const clone = el.cloneNode(true) as Element
+  const clone = cloneForPaper(el)
   for (const a of PAINT) clone.removeAttribute(a)
   // A lone rx or ry rounds both ways, which paper.js doesn't know
   if (el.localName === "rect") {
@@ -113,4 +113,55 @@ export async function withLiveSvg(svg: string, fn: (paper: Paper, root: SVGSVGEl
     host.remove()
     paper.project.clear()
   }
+}
+
+// ── Path data clean-up ────────────────────────────────────────────────────────
+// paper.js trips over compact path data SVGO writes, like repeated arcs with
+// no command letter or packed arc flags ("a9 9 0 1018 0"). Spell every
+// segment out before handing it over.
+
+const ARGS: Record<string, number> = { m: 2, l: 2, h: 1, v: 1, c: 6, s: 4, q: 4, t: 2, a: 7, z: 0 }
+const NUM = /^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/
+
+export function normalisePathData(d: string) {
+  const out: string[] = []
+  let i = 0
+  let cmd = ""
+  const skip = () => { while (i < d.length && /[\s,]/.test(d[i])) i++ }
+  const num = (flag: boolean) => {
+    skip()
+    if (flag && (d[i] === "0" || d[i] === "1")) return d[i++]
+    const m = NUM.exec(d.slice(i))
+    if (!m) return null
+    i += m[0].length
+    return m[0]
+  }
+  while (i < d.length) {
+    skip()
+    if (i >= d.length) break
+    if (/[a-z]/i.test(d[i])) cmd = d[i++]
+    else if (!cmd) return d
+    const n = ARGS[cmd.toLowerCase()]
+    if (n === undefined) return d
+    if (n === 0) { out.push(cmd); cmd = ""; continue }
+    const args: string[] = []
+    for (let k = 0; k < n; k++) {
+      const v = num(cmd.toLowerCase() === "a" && (k === 3 || k === 4))
+      if (v === null) return d
+      args.push(v)
+    }
+    out.push(`${cmd}${args.join(" ")}`)
+    // Extra pairs after a move are line-tos
+    if (cmd === "m") cmd = "l"
+    else if (cmd === "M") cmd = "L"
+  }
+  return out.join(" ")
+}
+
+/** A clone safe to give paper.js */
+export function cloneForPaper(el: Element) {
+  const clone = el.cloneNode(true) as Element
+  const d = clone.getAttribute("d")
+  if (d) clone.setAttribute("d", normalisePathData(d))
+  return clone
 }

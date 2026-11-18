@@ -1,7 +1,7 @@
 import type { Config } from "svgo/browser"
 import { PLUGINS, PLUGIN_NAMES } from "./plugins"
 import { CASES, defaultRename } from "./rename"
-import type { RenameSettings, AppSettings, AttrRule, CustomPlugin, CustomRun, Preset, Replacement, RunSpec, SvgoSettings } from "./types"
+import type { RenameSettings, AppSettings, AttrRule, CustomPlugin, CutMatcher, CustomRun, Preset, Replacement, RunSpec, SvgoSettings } from "./types"
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ export function defaultSvgoSettings(): SvgoSettings {
     mergePaths: false,
     flattenTransforms: false,
     cutOutStrokes: false,
-    cutOutWhites: false,
+    cutOutShapes: [],
     custom: {}
   }
 }
@@ -136,7 +136,7 @@ export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
   const t = settings.trim
   const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.sizeUnit === "px" ? [t.sizeSide, t.sizePx] : t.scale, t.artScale, t.offsetX, t.offsetY]
-  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths, settings.flattenTransforms, settings.cutOutStrokes, settings.cutOutWhites])
+  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths, settings.flattenTransforms, settings.cutOutStrokes, settings.cutOutShapes.filter((m) => m.enabled && m.value.trim()).map((m) => [m.kind, m.value.trim()])])
 }
 
 export function runSpec(settings: SvgoSettings, plugins: CustomPlugin[]): RunSpec {
@@ -203,7 +203,10 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
     mergePaths: raw.mergePaths === true,
     flattenTransforms: raw.flattenTransforms === true,
     cutOutStrokes: raw.cutOutStrokes === true,
-    cutOutWhites: raw.cutOutWhites === true,
+    cutOutShapes: Array.isArray(raw.cutOutShapes)
+      ? raw.cutOutShapes.map(sanitiseCutMatcher).filter((m): m is CutMatcher => m !== null)
+      // The old white-shapes toggle becomes a white colour matcher
+      : raw.cutOutWhites === true ? [createCutMatcher()] : [],
     custom,
     attrRules,
     replacements,
@@ -234,6 +237,23 @@ function sanitiseAttrRule(raw: unknown): AttrRule | null {
     caseSensitive: typeof raw.caseSensitive === "boolean" ? raw.caseSensitive : true,
     // Rules always run on the original markup now (the Before/After SVGO switch is gone)
     stage: "before"
+  }
+}
+
+/** Matchers that are on and filled in */
+export const activeCutMatchers = (s: SvgoSettings) => s.cutOutShapes.filter((m) => m.enabled && m.value.trim())
+
+export function createCutMatcher(): CutMatcher {
+  return { id: newId(), enabled: true, kind: "colour", value: "#ffffff" }
+}
+
+function sanitiseCutMatcher(raw: unknown): CutMatcher | null {
+  if (!isObj(raw)) return null
+  return {
+    id: typeof raw.id === "string" ? raw.id : newId(),
+    enabled: raw.enabled !== false,
+    kind: raw.kind === "markup" ? "markup" : "colour",
+    value: typeof raw.value === "string" ? raw.value : ""
   }
 }
 

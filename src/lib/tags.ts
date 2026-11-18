@@ -1,6 +1,7 @@
 import { fmtNum } from "./svgRoot"
 import type { GeometryEffect, SvgItem, SvgoSettings } from "./types"
 import { plural } from "./format"
+import { activeCutMatchers } from "./settings"
 
 // ── What's been done to a file, as short tags ─────────────────────────────────
 
@@ -30,8 +31,9 @@ export function fileTags(item: SvgItem, settings: SvgoSettings, customOn: number
   // Once optimised, only claim what actually changed the file
   const did = (e: GeometryEffect, on: boolean) => on && (!item.result?.effects || item.result.effects.includes(e))
   if (did("flatten", settings.flattenTransforms)) tags.push({ label: "Flattened transforms", title: "Transforms baked into the path data" })
-  if (did("cutouts", settings.cutOutStrokes || settings.cutOutWhites)) {
-    const what = [settings.cutOutStrokes && "strokes", settings.cutOutWhites && "white shapes"].filter(Boolean).join(" and ")
+  const shapes = activeCutMatchers(settings).length
+  if (did("cutouts", settings.cutOutStrokes || shapes > 0)) {
+    const what = [settings.cutOutStrokes && "strokes", shapes > 0 && "matching shapes"].filter(Boolean).join(" and ")
     tags.push({ label: "Cut-outs", title: `Covering ${what} turned into real holes` })
   }
   if (did("merge", settings.mergePaths)) tags.push({ label: "Merged paths", title: "Shapes sharing a fill and opacity were joined into one path" })

@@ -7,7 +7,7 @@
 // Paint order is kept: a shape only joins an earlier one when nothing painted
 // between them overlaps it.
 
-import { SVG_NS, withLiveSvg, type Paper } from "./paperKit"
+import { SVG_NS, cloneForPaper, withLiveSvg, type Paper } from "./paperKit"
 
 const SHAPES = new Set(["path", "rect", "circle", "ellipse", "polygon", "polyline"])
 const GEOMETRY = ["d", "x", "y", "width", "height", "cx", "cy", "r", "rx", "ry", "points", "transform", "pathLength"]
@@ -34,7 +34,7 @@ function mergeKey(el: Element, cs: CSSStyleDeclaration) {
 }
 
 function toItem(paper: Paper, el: Element) {
-  const clone = el.cloneNode(true) as Element
+  const clone = cloneForPaper(el)
   for (const a of PAINT) clone.removeAttribute(a)
   const wrapper = `<svg xmlns="${SVG_NS}">${new XMLSerializer().serializeToString(clone)}</svg>`
   const imported = paper.project.importSVG(wrapper, { insert: false, expandShapes: true }) as paper.Item
@@ -42,9 +42,12 @@ function toItem(paper: Paper, el: Element) {
   const path = found.find((p) => !p.parent || !(p.parent instanceof paper.CompoundPath))
   if (!path) return null
   const clean = path.clone({ insert: false }) as paper.PathItem
+  // Fills close every sub-path, even ones written without a Z
+  const parts = clean instanceof paper.CompoundPath ? (clean.children as paper.Path[]) : [clean as paper.Path]
+  for (const p of parts) p.closed = true
   if (el.getAttribute("fill-rule") === "evenodd" || getComputedStyle(el).fillRule === "evenodd") clean.fillRule = "evenodd"
-  // Resolve even-odd holes so the union treats them correctly
-  return clean.fillRule === "evenodd" ? (clean.unite(clean, { insert: false }) as paper.PathItem) : clean
+  // Resolve holes and self-overlaps so the union treats them correctly
+  return clean.unite(clean, { insert: false }) as paper.PathItem
 }
 
 function mergeIn(paper: Paper, parent: Element, precision: number): number {

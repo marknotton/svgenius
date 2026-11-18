@@ -1,4 +1,5 @@
 import { CASES } from "./rename"
+import { activeCutMatchers } from "./settings"
 import { fmtNum, svgSize } from "./svgRoot"
 import { formatBytes, formatSaving, plural } from "./format"
 import type { GeometryEffect, RenameSettings, SvgItem, SvgoSettings } from "./types"
@@ -133,7 +134,7 @@ export function summaryReport(entries: ReportEntry[], rename: RenameSettings) {
 
   const did = (fx: GeometryEffect) => (s: SvgoSettings, e: ReportEntry) => e.item.result?.effects
     ? e.item.result.effects.includes(fx)
-    : fx === "flatten" ? s.flattenTransforms : fx === "merge" ? s.mergePaths : s.cutOutStrokes || s.cutOutWhites
+    : fx === "flatten" ? s.flattenTransforms : fx === "merge" ? s.mergePaths : s.cutOutStrokes || activeCutMatchers(s).length > 0
   const flat = count(did("flatten"))
   if (flat) out.push(`Flattened transforms into the path data in ${howMany(flat, total)}.`)
   const cuts = count(did("cutouts"))

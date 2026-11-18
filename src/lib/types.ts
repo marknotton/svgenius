@@ -3,6 +3,15 @@
 export type Backdrop = "light" | "dark"
 
 /** A find & replace rule, stored on a preset */
+/** Picks shapes to turn into cut-outs, by fill colour or by text in their markup */
+export interface CutMatcher {
+  id: string
+  enabled: boolean
+  kind: "colour" | "markup"
+  /** A colour (any CSS colour) or text to find in the shape's tag */
+  value: string
+}
+
 export interface Replacement {
   id: string
   enabled: boolean
@@ -80,8 +89,8 @@ export interface SvgoSettings {
   flattenTransforms: boolean
   /** Strokes become real holes in the shapes beneath them (Beta) */
   cutOutStrokes: boolean
-  /** White shapes become real holes in the shapes beneath them (Beta) */
-  cutOutWhites: boolean
+  /** Shapes matching any of these become real holes in the shapes beneath them (Beta) */
+  cutOutShapes: CutMatcher[]
   /** Custom plugin id → on/off and its params as JSON text */
   custom: Record<string, { on: boolean, params: string }>
 }
