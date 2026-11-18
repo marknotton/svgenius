@@ -11,6 +11,8 @@ interface Props {
   label?: string
   /** Being optimised: shows a spinner over the preview */
   pending?: boolean
+  /** Shown in place of a missing preview */
+  placeholder?: string
 }
 
 /**
@@ -18,7 +20,7 @@ interface Props {
  * ratio, so whitespace (or the lack of it) is visible. Rendered via <img>, so
  * scripts never run.
  */
-export const Thumb = memo(function Thumb({ svg, size, backdrop, label, pending }: Props) {
+export const Thumb = memo(function Thumb({ svg, size, backdrop, label, pending, placeholder }: Props) {
   const css = usePreviewCss()
   const src = useMemo(() => (svg === undefined ? undefined : svgDataUrl(withPreviewCss(svg, css))), [svg, css])
   const dims = useMemo(() => svgSize(svg), [svg])
@@ -33,6 +35,7 @@ export const Thumb = memo(function Thumb({ svg, size, backdrop, label, pending }
             onError={(e) => { e.currentTarget.style.visibility = "hidden" }} />
         )}
         {pending && <span className="thumb__loading" />}
+        {svg === undefined && !pending && placeholder && <span className="thumb__note" title={placeholder}>{size >= 90 ? placeholder : "Not optimised"}</span>}
       </div>
     </div>
   )

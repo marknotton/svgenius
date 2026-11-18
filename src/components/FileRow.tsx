@@ -31,6 +31,7 @@ interface Props {
 }
 
 const OWN = "__own__"
+const NOT_YET = "Not optimised yet. Click Optimise, or turn on Live preview"
 
 export const FileRow = memo(function FileRow(p: Props) {
   const { item, selected, stale, thumbPx, backdrop } = p
@@ -76,7 +77,7 @@ export const FileRow = memo(function FileRow(p: Props) {
             <figcaption className="text-3">Before{original && ` · ${fmtNum(original.w, 2)} × ${fmtNum(original.h, 2)}`}</figcaption>
           </figure>
           <figure className="file-card__pane">
-            <Thumb svg={item.result?.output} pending={item.status === "running"} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
+            <Thumb svg={item.result?.output} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : NOT_YET} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
             <figcaption className="text-3">
               After{size && item.result && <> · <span key={flash} className={`file-row__dims${flash ? " is-flash" : ""}`}>{dims}</span></>}
             </figcaption>
@@ -100,7 +101,7 @@ export const FileRow = memo(function FileRow(p: Props) {
       {p.compare ? (
         <div className="file-row__compare">
           <Thumb svg={item.source} size={thumbPx} backdrop={backdrop} label={`${item.name} before`} />
-          <Thumb svg={item.result?.output} pending={item.status === "running"} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
+          <Thumb svg={item.result?.output} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : NOT_YET} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
         </div>
       ) : (
         <Thumb svg={item.result?.output ?? item.source} pending={item.status === "running"} size={thumbPx} backdrop={backdrop} label={item.name} />

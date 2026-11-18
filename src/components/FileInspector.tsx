@@ -74,7 +74,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             <figcaption className="text-2">Before</figcaption>
           </figure>
           <figure className="pane">
-            <Thumb svg={out} size={previewPx} backdrop={backdrop} label={`${item.name} after`} />
+            <Thumb svg={out} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : "Not optimised yet. Click Optimise, or turn on Live preview"} size={previewPx} backdrop={backdrop} label={`${item.name} after`} />
             <figcaption className="text-2">After{item.status === "running" && <span className="spinner spinner--xs" />}</figcaption>
           </figure>
         </div>
