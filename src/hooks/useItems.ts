@@ -6,6 +6,7 @@ import { errorMessage, forgetFiles, isDesktop, readSvg, scanPaths } from "../lib
 import { loadSession, saveSession } from "../lib/session"
 import { postProcess } from "../lib/trim"
 import { optimiseAutoPrecision } from "../lib/precision"
+import { assessComplexity, isBlocked } from "../lib/complexity"
 import type { GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "../lib/types"
 
 // ── File list + optimisation queue ────────────────────────────────────────────
@@ -62,7 +63,7 @@ export function useItems() {
     await runLimited(fresh, 8, async (item) => {
       try {
         const source = await readSvg(item.path)
-        patch(item.id, { source, fileSource: source, size: byteLength(source), status: "idle" })
+        patch(item.id, { source, fileSource: source, size: byteLength(source), status: "idle", heavy: assessComplexity(source) })
       } catch (e) {
         patch(item.id, { status: "error", error: errorMessage(e) })
       }
@@ -93,13 +94,13 @@ export function useItems() {
   /** In-app edit of the markup. Never written back to the original file */
   const editSource = useCallback((id: string, source: string) => {
     setItems((list) => list.map((i) => (i.id === id
-      ? { ...i, source, size: byteLength(source), rev: i.rev + 1, status: i.status === "error" ? "idle" : i.status, errorKey: undefined }
+      ? { ...i, source, size: byteLength(source), heavy: assessComplexity(source), rev: i.rev + 1, status: i.status === "error" ? "idle" : i.status, errorKey: undefined }
       : i)))
   }, [])
 
   const revertSource = useCallback((id: string) => {
     setItems((list) => list.map((i) => (i.id === id && i.fileSource !== undefined
-      ? { ...i, source: i.fileSource, size: byteLength(i.fileSource), rev: i.rev + 1, errorKey: undefined }
+      ? { ...i, source: i.fileSource, size: byteLength(i.fileSource), heavy: assessComplexity(i.fileSource), rev: i.rev + 1, errorKey: undefined }
       : i)))
   }, [])
 
@@ -114,9 +115,12 @@ export function useItems() {
     const edited = item.fileSource !== undefined && item.source !== item.fileSource
     setItems((list) => list.map((i) => (i.path !== path ? i
       : edited ? { ...i, fileSource: text }
-      : { ...i, source: text, fileSource: text, size: byteLength(text), rev: i.rev + 1, status: i.status === "error" ? "idle" : i.status, errorKey: undefined })))
+      : { ...i, source: text, fileSource: text, size: byteLength(text), heavy: assessComplexity(text), rev: i.rev + 1, status: i.status === "error" ? "idle" : i.status, errorKey: undefined })))
     return edited ? "kept" : "updated"
   }, [])
+
+  /** Render and optimise a heavy file at the user's own risk */
+  const forceRender = useCallback((id: string) => patch(id, { forceRender: true }), [patch])
 
   /** Give a file its own settings (or undefined to go back to its preset) */
   const setConfig = useCallback((id: string, config: SvgoSettings | undefined) => patch(id, { config }), [patch])
@@ -129,7 +133,7 @@ export function useItems() {
     const set = new Set(ids)
     const results = new Map<string, OptimiseResult>()
     const jobs = itemsRef.current
-      .filter((i) => set.has(i.id) && i.source !== undefined)
+      .filter((i) => set.has(i.id) && i.source !== undefined && !isBlocked(i))
       .map((item) => ({ item, spec: resolve(item) }))
       .filter(({ item, spec }) => {
         if (!force && item.result && item.result.key === spec.key) {
@@ -162,5 +166,5 @@ export function useItems() {
     return results
   }, [patch])
 
-  return { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk }
+  return { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk, forceRender }
 }

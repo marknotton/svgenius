@@ -11,6 +11,8 @@ import { PresetSelect } from "./PresetSelect"
 import { PresetEditor } from "./PresetEditor"
 import { SliderField } from "./SliderField"
 import { Thumb } from "./Thumb"
+import { TooComplex } from "./TooComplex"
+import { isBlocked } from "../lib/complexity"
 
 // ── Per-file inspector ────────────────────────────────────────────────────────
 // Info, tags, a live markup editor and the file's preset or own settings.
@@ -70,7 +72,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
   return (
     <div className="inspector">
       <div className="panel__head inspector__head">
-        <div className="inspector__previews">
+        {isBlocked(item) ? <TooComplex item={item} /> : <div className="inspector__previews">
           <figure className="pane">
             <Thumb svg={item.source} size={previewPx} backdrop={backdrop} label={`${item.name} before`} />
             <figcaption className="text-2">Before</figcaption>
@@ -79,7 +81,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             <Thumb svg={out} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : "Not optimised yet. Click Optimise, or turn on Live preview"} size={previewPx} backdrop={backdrop} label={`${item.name} after`} />
             <figcaption className="text-2">After{item.status === "running" && <span className="spinner spinner--xs" />}</figcaption>
           </figure>
-        </div>
+        </div>}
         <SliderField label="Preview" value={previewPx} min={PREVIEW_PX.inspector.min} max={PREVIEW_PX.inspector.max} step={4} suffix="px"
           hint="Size of the before and after previews. Click the number to type any size." accept={(n) => n >= PREVIEW_PX.inspector.min && n <= 2000}
           onChange={(px) => p.onPreviewPx(Math.round(px))} />
@@ -115,7 +117,9 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             {tab === "output" && <button className="link" onClick={copy} disabled={!out}><IconCopy width={11} height={11} /> {copied ? "Copied" : "Copy"}</button>}
             <button className="link" onClick={() => p.onMarkupOpen(true)} title="A big editor with a preview you can click to find shapes in the markup"><IconExpand width={11} height={11} /> Expand</button>
           </div>
-          {tab === "source" ? (
+          {isBlocked(item) ? (
+            <p className="text-3 inspector__hint">The markup editor opens once you choose Render anyway.</p>
+          ) : tab === "source" ? (
             <>
               <CodeEditor key="source" className="code" label="Source markup" value={item.source ?? ""} onChange={p.onEdit} />
               <p className="text-3 inspector__hint">
@@ -158,7 +162,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             )}
           </details>
         )}
-        {p.markupOpen && (
+        {p.markupOpen && !isBlocked(item) && (
           <MarkupDialog item={item} tab={tab} onTab={setTab}
             backdrop={backdrop} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => p.onMarkupOpen(false)} />
         )}

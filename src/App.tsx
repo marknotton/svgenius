@@ -29,6 +29,8 @@ import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
 import { canReveal, openInDefaultApp, errorMessage, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, pickSvgs, reveal, saveJson } from "./lib/platform"
 import { preloadMonaco, setEditorTheme } from "./components/CodeEditor"
+import { RenderAnywayContext } from "./components/TooComplex"
+import { isBlocked } from "./lib/complexity"
 import { useTheme } from "./lib/theme"
 import { useFileWatch } from "./hooks/useFileWatch"
 import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "./lib/types"
@@ -48,7 +50,7 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk } = useItems()
+  const { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk, forceRender } = useItems()
   // Once there are files, get the code editor ready before anyone opens it
   const hasItems = items.length > 0
   useEffect(() => { if (hasItems) preloadMonaco() }, [hasItems])
@@ -261,7 +263,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   // Off-screen rows catch up when they're scrolled near.
 
   const needsRun = useCallback((i: SvgItem) => {
-    if (i.source === undefined || i.status === "loading" || i.status === "running") return false
+    if (i.source === undefined || i.status === "loading" || i.status === "running" || isBlocked(i)) return false
     const key = resolve(i).key
     return i.result?.key !== key && i.errorKey !== key
   }, [resolve])
@@ -582,6 +584,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   return (
     <PreviewCssContext.Provider value={appliedCss}>
+    <RenderAnywayContext.Provider value={forceRender}>
       <div className={`app${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px` } as CSSProperties}>
         <AppBar onSettings={() => setSettingsOpen(true)} onAbout={() => setAboutOpen(true)}
           advanced={settings.advanced} onAdvanced={(advanced) => update((s) => ({ ...s, advanced }))} />
@@ -737,6 +740,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         {dialogs.node}
         <Toasts toasts={toasts} dismiss={dismiss} />
       </div>
+    </RenderAnywayContext.Provider>
     </PreviewCssContext.Provider>
   )
 }

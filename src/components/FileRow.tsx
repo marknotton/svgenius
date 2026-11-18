@@ -7,6 +7,8 @@ import { IconFlag, IconOpen } from "../icons"
 import { isDesktop, openInDefaultApp } from "../lib/platform"
 import type { Backdrop, Preset, SvgItem } from "../lib/types"
 import { Thumb } from "./Thumb"
+import { TooComplex } from "./TooComplex"
+import { isBlocked } from "../lib/complexity"
 
 interface Props {
   item: SvgItem
@@ -34,6 +36,7 @@ const NOT_YET = "Not optimised yet. Click Optimise, or turn on Live preview"
 
 export const FileRow = memo(function FileRow(p: Props) {
   const { item, selected, stale, thumbPx, backdrop } = p
+  const blocked = isBlocked(item)
   const dir = item.relPath.includes("/") ? item.relPath.slice(0, item.relPath.lastIndexOf("/")) : ""
   const shown = item.result?.output ?? item.source
   const size = useMemo(() => svgSize(shown), [shown])
@@ -73,6 +76,7 @@ export const FileRow = memo(function FileRow(p: Props) {
           <OpenButton item={item} />
         </div>
         <div className="file-card__panes">
+          {blocked ? <TooComplex item={item} size={thumbPx} /> : <>
           <figure className="file-card__pane">
             <Thumb svg={item.source} size={thumbPx} backdrop={backdrop} label={`${item.name} before`} />
             <figcaption className="text-3">Before{original && ` · ${fmtNum(original.w, 2)} × ${fmtNum(original.h, 2)}`}</figcaption>
@@ -83,6 +87,7 @@ export const FileRow = memo(function FileRow(p: Props) {
               After{size && item.result && <> · <span key={flash} className={`file-row__dims${flash ? " is-flash" : ""}`}>{dims}</span></>}
             </figcaption>
           </figure>
+          </>}
         </div>
       </li>
     )
@@ -100,7 +105,9 @@ export const FileRow = memo(function FileRow(p: Props) {
     >
       <Check item={item} selected={selected} onToggle={p.onToggle} />
       <FlagButton item={item} onFlag={p.onFlag} />
-      {p.compare ? (
+      {blocked ? (
+        <TooComplex item={item} size={p.compare ? thumbPx * 2 + 4 : thumbPx} />
+      ) : p.compare ? (
         <div className="file-row__compare">
           <Thumb svg={item.source} size={thumbPx} backdrop={backdrop} label={`${item.name} before`} />
           <Thumb svg={item.result?.output} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : NOT_YET} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />

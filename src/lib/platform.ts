@@ -116,6 +116,7 @@ export const readSvg = async (path: string): Promise<string> => {
   if (isDesktop) return desktop.readSvg(path)
   const f = webFiles.get(path)
   if (!f) throw new Error("That file is no longer available. Add it again.")
+  if (f.size > 25 * 1024 * 1024) throw new Error("File is larger than 25 MB")
   return f.text()
 }
 

@@ -13,7 +13,7 @@
 - **Trim whitespace.** The viewBox hugs the artwork exactly, curves and round caps included, with optional padding.
 - **Presets.** Save your favourite SVGO settings as named presets, give odd files their own, and import or export them as JSON to share with the team.
 - **Find, filter and flag.** Filter by colour, element, attribute, markup text, file name or status. Flag files in colours and do things like "optimise everything except the red ones".
-- **Edit the markup.** A proper code editor with an Inspect picker: click part of the artwork and jump to its markup.
+- **Edit the markup.** A proper code editor with an Inspect picker and a layers tree: click part of the artwork and jump to its markup, drag a path's points, reverse it or flip it between absolute and relative.
 - **Rules and recipes.** Find and replace, attribute rules, added markup, scale and nudge, plus custom SVGO plugins.
 - **A plain-English report.** Copy a summary of what changed for a pull request or a client.
 

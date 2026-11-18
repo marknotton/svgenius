@@ -224,4 +224,8 @@ export interface SvgItem extends ScannedFile {
   config?: SvgoSettings
   /** A colour flag for sorting through files */
   flag?: Flag
+  /** Why the markup is too heavy to render safely (size or element count) */
+  heavy?: string
+  /** Render and optimise it anyway */
+  forceRender?: boolean
 }

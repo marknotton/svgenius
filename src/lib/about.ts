@@ -11,6 +11,16 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.5.0",
+    date: "18 November 2026",
+    notes: [
+      "Layers in the expanded editor: every element as a tree you can fold, select and delete",
+      "Path tools: drag a path's points and handles, edit its commands, Reverse it, or switch it between absolute and relative",
+      "Convert to path for rectangles, circles, ellipses, lines and polygons",
+      "Very heavy files (over 3 MB or 15,000 elements) aren't previewed or optimised until you choose Render anyway"
+    ]
+  },
+  {
     version: "0.4.1",
     date: "18 November 2026",
     notes: [
@@ -107,5 +117,6 @@ export const CREDITS: Credit[] = [
   { name: "Rust and Serde", url: "https://serde.rs", licence: "MIT / Apache-2.0", what: "The desktop side: scanning folders, reading and writing files." },
   { name: "CSSTree and CSSO", url: "https://github.com/csstree/csstree", licence: "MIT", what: "Parse and minify the CSS inside SVGs, via SVGO." },
   { name: "GitHub Pages and Actions", url: "https://pages.github.com", licence: "Service", what: "Free hosting for the browser version and builds for the desktop app." },
+  { name: "SVG Path Editor", url: "https://github.com/Yqnn/svg-path-editor", licence: "AGPL-3.0", what: "Yqnn's path editor inspired the path tools: the command list, draggable points and Reverse. Ours is written from scratch, no code is shared." },
   { name: "Playwright", url: "https://playwright.dev", licence: "Apache-2.0", what: "Used to test the app and take the README screenshots." }
 ]

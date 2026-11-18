@@ -30,7 +30,7 @@ interface Props {
   className?: string
   label: string
   /** Character range to select and scroll to */
-  reveal?: { start: number, end: number, n: number } | null
+  reveal?: { start: number, end: number, n: number, focus?: boolean } | null
   /** Character range to mark (e.g. the hovered element) */
   mark?: { start: number, end: number } | null
   /** Fires when the cursor moves by the user's hand */
@@ -115,7 +115,7 @@ export function CodeEditor({ value, onChange, readOnly, className, label, reveal
     editor.setSelection(range)
     editor.revealRangeInCenterIfOutsideViewport(range)
     // Ready for Delete, Backspace or typing over it
-    editor.focus()
+    if (reveal.focus !== false) editor.focus()
   }, [reveal, ready])
 
   useEffect(() => {
