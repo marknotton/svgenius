@@ -26,8 +26,12 @@ export const Thumb = memo(function Thumb({ svg, size, backdrop, label }: Props) 
     if (src === undefined) { setShown(undefined); return }
     let live = true
     const img = new Image()
+    const done = (ok: boolean) => { if (live) setShown({ src, ok }) }
+    // Wait for load, not decode(): WebKit can reject (or never settle) decode()
+    // for SVGs that load and draw perfectly well
+    img.onload = () => done(true)
+    img.onerror = () => done(false)
     img.src = src
-    img.decode().then(() => { if (live) setShown({ src, ok: true }) }, () => { if (live) setShown({ src, ok: false }) })
     return () => { live = false }
   }, [src])
   const dims = useMemo(() => svgSize(svg), [svg])
