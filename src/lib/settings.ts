@@ -36,6 +36,14 @@ export function createReplacement(): Replacement {
 
 export const newId = () => crypto.randomUUID()
 
+/** A deep copy of one item with a new id, placed straight after the original */
+export function duplicateAfter<T extends { id: string }>(list: T[], id: string, tweak: (copy: T) => T = (c) => c): T[] {
+  const i = list.findIndex((x) => x.id === id)
+  if (i < 0) return list
+  const copy = tweak({ ...structuredClone(list[i]), id: newId() })
+  return [...list.slice(0, i + 1), copy, ...list.slice(i + 1)]
+}
+
 export function createPreset(name: string, settings = defaultSvgoSettings()): Preset {
   return { id: newId(), name, settings: structuredClone(settings) }
 }

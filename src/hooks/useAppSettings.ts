@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { createPreset, defaultSvgoSettings, sanitiseAppSettings } from "../lib/settings"
+import { createPreset, defaultSvgoSettings, duplicateAfter, sanitiseAppSettings } from "../lib/settings"
 import { loadSettingsFile, saveSettingsFile } from "../lib/tauri"
 import type { AppSettings, Preset, SvgoSettings } from "../lib/types"
 
@@ -69,6 +69,14 @@ export function presetActions(update: Update) {
       const preset = createPreset(name, from ?? defaultSvgoSettings())
       update((s) => ({ ...s, presets: [...s.presets, preset], editingPresetId: preset.id }))
       return preset
+    },
+
+    /** Copies a preset (every setting) and places it straight after the original */
+    duplicate(id: string) {
+      update((s) => ({
+        ...s,
+        presets: duplicateAfter(s.presets, id, (c) => ({ ...c, name: uniqueName(s, `${c.name} copy`) }))
+      }))
     },
 
     rename(id: string, name: string) {

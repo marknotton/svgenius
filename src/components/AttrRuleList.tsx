@@ -1,8 +1,8 @@
 import { useDragSort } from "../hooks/useDragSort"
-import { IconGrip, IconPlus, IconTrash } from "../icons"
+import { IconDuplicate, IconGrip, IconPlus, IconTrash } from "../icons"
 import { ElementPicker } from "./ElementPicker"
 import { ACTIONS, CONDITIONS, isRuleReady } from "../lib/attrRules"
-import { createAttrRule } from "../lib/settings"
+import { createAttrRule, duplicateAfter } from "../lib/settings"
 import type { AttrRule } from "../lib/types"
 
 // ── Attribute rules (recipes) ─────────────────────────────────────────────────
@@ -42,6 +42,8 @@ export function AttrRuleList({ rules, onChange }: Props) {
                 aria-label={`Attribute rule ${n} enabled`} onChange={(e) => patch(r.id, { enabled: e.target.checked })} />
               <span className="rule__word">For</span>
               <ElementPicker value={r.targets} label={`Attribute rule ${n} elements`} onChange={(targets) => patch(r.id, { targets })} />
+              <button className="btn btn--icon" title="Duplicate rule" aria-label={`Duplicate attribute rule ${n}`}
+                onClick={() => onChange(duplicateAfter(rules, r.id))}><IconDuplicate /></button>
               <button className="btn btn--icon" title="Delete rule" aria-label={`Delete attribute rule ${n}`}
                 onClick={() => onChange(rules.filter((x) => x.id !== r.id))}><IconTrash /></button>
             </div>

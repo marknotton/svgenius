@@ -1,8 +1,8 @@
 import type { ReactNode } from "react"
 import { useDragSort } from "../hooks/useDragSort"
-import { IconGrip, IconPlus, IconTrash } from "../icons"
+import { IconDuplicate, IconGrip, IconPlus, IconTrash } from "../icons"
 import { ruleError } from "../lib/replace"
-import { createReplacement } from "../lib/settings"
+import { createReplacement, duplicateAfter } from "../lib/settings"
 import type { Replacement } from "../lib/types"
 
 // ── Find & replace rules ──────────────────────────────────────────────────────
@@ -41,6 +41,7 @@ export function ReplaceList({ rules, onChange }: Props) {
                 aria-label={`Rule ${i + 1} enabled`} onChange={(e) => patch(r.id, { enabled: e.target.checked })} />
               <input className="input input--sm input--mono" placeholder={r.regex ? "Find (regex)" : "Find"} value={r.find}
                 spellCheck={false} aria-label={`Rule ${i + 1} find`} onChange={(e) => patch(r.id, { find: e.target.value })} />
+              <button className="btn btn--icon" title="Duplicate rule" aria-label={`Duplicate rule ${i + 1}`} onClick={() => onChange(duplicateAfter(rules, r.id))}><IconDuplicate /></button>
               <button className="btn btn--icon" title="Delete rule" aria-label={`Delete rule ${i + 1}`} onClick={() => remove(r.id)}><IconTrash /></button>
             </div>
             <div className="rule__row rule__row--indent">

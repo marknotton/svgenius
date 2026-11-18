@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { useDragSort } from "../hooks/useDragSort"
 import type { PresetActions } from "../hooks/useAppSettings"
-import { IconDownload, IconGrip, IconStar, IconTrash, IconUpload, IconX } from "../icons"
+import { IconDownload, IconDuplicate, IconGrip, IconStar, IconTrash, IconUpload, IconX } from "../icons"
 import { plural } from "../lib/format"
 import type { AppSettings, Backdrop } from "../lib/types"
 import { Modal } from "./Dialogs"
@@ -59,6 +59,8 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
                     onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur() }} />
                   <span className="text-3 preset-list__usage">{n ? plural(n, "file") : ""}</span>
                   <button className="btn btn--ghost btn--sm" onClick={() => { actions.openInPanel(preset.id); p.onClose() }}>Edit</button>
+                  <button className="btn btn--icon" aria-label={`Duplicate ${preset.name}`} title="Duplicate preset"
+                    onClick={() => actions.duplicate(preset.id)}><IconDuplicate /></button>
                   {confirmDelete === preset.id ? (
                     <button className="btn btn--danger btn--sm" onClick={() => { p.onDeletePreset(preset.id); setConfirmDelete(null) }}
                       onBlur={() => setConfirmDelete(null)} autoFocus>Delete?</button>
