@@ -39,7 +39,9 @@ function mergeKey(el: Element, cs: CSSStyleDeclaration) {
   if (stroke && stroke !== "none" && strokeW > 0 && Number(cs.strokeOpacity) > 0) return null
   if (cs.fill === "none" || cs.fill.startsWith("url(")) return null
   if (el.getAttribute("filter") || el.getAttribute("mask") || el.getAttribute("clip-path") || el.id) return null
-  if (cs.filter !== "none" || cs.mask !== "none" || cs.clipPath !== "none") return null
+  // WebKit reports shorthands like mask as "" rather than "none", so check longhands loosely
+  const set = (v: string | undefined) => !!v && v !== "none" && v !== "normal"
+  if (set(cs.filter) || set(cs.maskImage) || set(cs.getPropertyValue("-webkit-mask-image")) || set(cs.clipPath)) return null
   return `${cs.fill}|${cs.fillOpacity}|${cs.opacity}`
 }
 

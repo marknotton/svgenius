@@ -68,7 +68,7 @@ export function EditContents({ trim, onChange, markup, onMarkup }: Props & { mar
         <button className="link" disabled={pristine} title="Artwork back to normal, extra markup cleared"
           onClick={() => { onChange({ artScale: 1, offsetX: 0, offsetY: 0 }); onMarkup("") }}>Reset</button>
       </div>
-      <p className="rules__empty text-3">The drawing inside the viewBox. The SVG's size stays the same.</p>
+      <p className="rules__empty text-3">The drawing inside the viewBox. The SVG's size stays the same, unless Trim is on: trimming happens after these, so the viewBox still hugs the artwork.</p>
       <ArtworkFields scale={trim.artScale} x={trim.offsetX} y={trim.offsetY}
         onChange={(p) => onChange({
           ...(p.scale !== undefined && { artScale: p.scale }),

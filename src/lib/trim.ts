@@ -185,10 +185,12 @@ export function appendMarkup(svg: string, markup: string) {
 export async function postProcess(svg: string, settings: SvgoSettings) {
   const t = settings.trim
   let out = settings.mergePaths ? await mergeOverlappingPaths(svg, settings.floatPrecision) : svg
-  if (t.enabled) out = await trimSvg(out, t, settings.floatPrecision)
   out = transformSvg(out, { scale: t.artScale, offsetX: t.offsetX, offsetY: t.offsetY })
   // Outside the artwork group, so it isn't moved or scaled with it
   out = appendMarkup(out, settings.appendMarkup)
+  // Trim measures last, after every move and scale, so padding 0 always means
+  // the artwork touches the edges
+  if (t.enabled) out = await trimSvg(out, t, settings.floatPrecision)
   out = scaleSvg(out, t.scale, settings.floatPrecision)
   return out
 }
