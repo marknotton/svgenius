@@ -14,6 +14,8 @@ import { FileList } from "./components/FileList"
 import { Footer } from "./components/Footer"
 import { PreviewCssBar, PreviewCssContext } from "./components/PreviewCss"
 import { RenamePanel } from "./components/RenamePanel"
+import { FilterBar } from "./components/FilterBar"
+import { activeRules, emptyFilters, matchesFilters, nextFlag, type FilterSet } from "./lib/filters"
 import { ReportDialog } from "./components/ReportDialog"
 import { SettingsDialog } from "./components/SettingsDialog"
 import { Toasts, useToasts } from "./components/Toast"
@@ -44,7 +46,7 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, itemsRef, addPaths, remove, clear, setPreset, editSource, revertSource, setConfig, optimise } = useItems()
+  const { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise } = useItems()
   const dialogs = useDialogs()
   const { toasts, push, dismiss } = useToasts()
   const actions = useMemo(() => presetActions(update), [update])
@@ -179,18 +181,31 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     })
   }, [rangeTo])
 
-  /** Plain click selects just this row and opens it in the inspector */
+  /** A click opens the row in the inspector. Only the checkbox (or ⌘/Shift-click) changes the selection */
   const rowClick = useCallback((id: string, e: MouseEvent) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey) return toggle(id, e)
-    setSelection(new Set([id]))
-    anchor.current = id
     setFocusId(id)
     setSidebarTab("file")
   }, [toggle])
 
+  /** Cycles the flag colour. On a selected row it flags every selected file; Alt-click clears */
+  const flagClick = useCallback((id: string, e: MouseEvent) => {
+    const item = itemsRef.current.find((i) => i.id === id)
+    if (!item) return
+    const flag = e.altKey ? undefined : nextFlag(item.flag)
+    setFlag(selection.has(id) && selection.size > 1 ? [...selection] : [id], flag)
+  }, [itemsRef, selection, setFlag])
+
+  // ── Filters ─────────────────────────────────────────────────────────────────
+  const [filters, setFilters] = useState<FilterSet>(emptyFilters)
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const filterCount = activeRules(filters).length
+  const filtered = useMemo(() => (filterCount ? items.filter((i) => matchesFilters(i, filters)) : items), [items, filters, filterCount])
+
   const selectAll = (all: boolean) => setSelection(all ? new Set(shownItems.map((i) => i.id)) : new Set())
 
-  const targets = useMemo(() => (selection.size ? items.filter((i) => selection.has(i.id)) : items), [items, selection])
+  // Selected files, or else every file the filters let through
+  const targets = useMemo(() => (selection.size ? items.filter((i) => selection.has(i.id)) : filtered), [items, selection, filtered])
   // Export names, previewed on the rows of the files that would be exported
   const previewNames = useMemo(
     () => (settings.rename.enabled ? exportNames(targets.filter((i) => i.status !== "error"), settings.rename) : null),
@@ -215,10 +230,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const [query, setQuery] = useState("")
   const shownItems = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return items
-    return items.filter((i) => i.name.toLowerCase().includes(q) || i.relPath.toLowerCase().includes(q)
+    if (!q) return filtered
+    return filtered.filter((i) => i.name.toLowerCase().includes(q) || i.relPath.toLowerCase().includes(q)
       || (previewNames?.get(i.id) ?? "").toLowerCase().includes(q))
-  }, [items, query, previewNames])
+  }, [filtered, query, previewNames])
 
 
   // ── Running ─────────────────────────────────────────────────────────────────
@@ -478,7 +493,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "Inspect", run: () => { setSelection(new Set([id])); setFocusId(id); setSidebarTab("file") } },
+        { label: "Inspect", run: () => { setFocusId(id); setSidebarTab("file") } },
         { label: "Reveal in Finder", run: () => { revealItemInDir(item.path).catch(() => {}) } },
         "-",
         { label: "Remove from list", run: () => removeIds(new Set([id])) },
@@ -601,6 +616,12 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onPreset={(id, presetId) => setPreset([id], presetId)}
                 onNewPreset={newPresetForItem}
                 onContextMenu={rowMenu}
+                onFlag={flagClick}
+                filterCount={filterCount}
+                filtersOpen={filtersOpen}
+                onClearFilters={() => setFilters(emptyFilters())}
+                onFilters={() => setFiltersOpen((o) => !o)}
+                filterBar={<FilterBar filters={filters} onChange={setFilters} shown={shownItems.length} total={items.length} />}
                 tagsFor={tagsFor}
                 exportNames={previewNames}
                 onAddFiles={addFiles}
@@ -687,6 +708,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
           ready={readyCount}
           failed={failedCount}
           selectionCount={selection.size}
+          filtered={filterCount > 0}
           busy={busy}
           keepStructure={settings.keepStructure}
           onKeepStructure={(keepStructure) => update((s) => ({ ...s, keepStructure }))}

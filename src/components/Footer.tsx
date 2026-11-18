@@ -16,6 +16,8 @@ interface Props {
   /** Targets that failed */
   failed: number
   selectionCount: number
+  /** Filters are narrowing the list */
+  filtered: boolean
   busy: boolean
   keepStructure: boolean
   onKeepStructure: (v: boolean) => void
@@ -31,7 +33,7 @@ export function Footer(p: Props) {
   const before = done.reduce((n, i) => n + i.size, 0)
   const after = done.reduce((n, i) => n + (i.result?.size ?? 0), 0)
   const n = p.targets.length
-  const scope = p.selectionCount === 0 ? "all " : ""
+  const scope = p.selectionCount > 0 ? "" : p.filtered ? "filtered " : "all "
   const outstanding = n - p.ready - p.failed
   const canExport = n > 0 && p.ready > 0 && outstanding === 0 && !p.busy
   const [menu, setMenu] = useState<MenuState | null>(null)

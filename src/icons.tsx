@@ -44,3 +44,7 @@ export const IconGrip = (p: P) => <Icon width={12} height={12} {...p}><circle cx
 export const IconGear = (p: P) => <Icon {...p}><circle cx="8" cy="8" r="2.25" /><path d="M8 1.75v1.5M8 12.75v1.5M14.25 8h-1.5M3.25 8h-1.5M12.42 3.58l-1.06 1.06M4.64 11.36l-1.06 1.06M12.42 12.42l-1.06-1.06M4.64 4.64 3.58 3.58" /><circle cx="8" cy="8" r="4.5" /></Icon>
 export const IconInfo = (p: P) => <Icon width={13} height={13} {...p}><circle cx="8" cy="8" r="6" /><path d="M8 7.25v4M8 4.9v.1" /></Icon>
 export const IconDuplicate = (p: P) => <Icon {...p}><rect x="5.5" y="5.5" width="8" height="8" rx="1.5" /><path d="M10.5 3.5v-.25A1.25 1.25 0 0 0 9.25 2h-6A1.25 1.25 0 0 0 2 3.25v6a1.25 1.25 0 0 0 1.25 1.25h.25M9.5 7.5v4M7.5 9.5h4" /></Icon>
+export const IconFlag = ({ filled, ...p }: P & { filled?: boolean }) => (
+  <Icon {...p}><path d="M3.5 14.5v-12M3.5 2.5h8l-1.8 3 1.8 3h-8" fill={filled ? "currentColor" : "none"} /></Icon>
+)
+export const IconFilter = (p: P) => <Icon {...p}><path d="M2 3h12l-4.5 5.5V13l-3-1.5v-3z" /></Icon>

@@ -174,6 +174,8 @@ export interface ScannedFile {
   size: number
 }
 
+export type Flag = "red" | "orange" | "yellow" | "green" | "blue" | "purple"
+
 export type ItemStatus = "loading" | "idle" | "running" | "done" | "error"
 
 export type GeometryEffect = "flatten" | "cutouts" | "merge"
@@ -205,4 +207,6 @@ export interface SvgItem extends ScannedFile {
   rev: number
   /** This file's own settings, used instead of its preset */
   config?: SvgoSettings
+  /** A colour flag for sorting through files */
+  flag?: Flag
 }

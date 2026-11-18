@@ -1,6 +1,6 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react"
 import { LIVE_BUFFER_PX } from "../lib/config"
-import { IconFile, IconFolder, IconTrash } from "../icons"
+import { IconFile, IconFilter, IconFolder, IconTrash } from "../icons"
 import { plural } from "../lib/format"
 import type { FileTag } from "../lib/tags"
 import type { AppSettings, Preset, SvgItem } from "../lib/types"
@@ -25,6 +25,13 @@ interface Props {
   onPreset: (id: string, presetId: string | null) => void
   onNewPreset: (item: SvgItem) => void
   onContextMenu: (id: string, e: MouseEvent) => void
+  onFlag: (id: string, e: MouseEvent) => void
+  /** Number of active filter rules, and the filter panel itself */
+  filterCount: number
+  filtersOpen: boolean
+  onFilters: () => void
+  filterBar: ReactNode
+  onClearFilters: () => void
   tagsFor: (item: SvgItem) => FileTag[]
   exportNames: Map<string, string> | null
   onAddFiles: () => void
@@ -87,7 +94,7 @@ export function FileList(p: Props) {
         <span className="toolbar__count">
           {selection.size > 0
             ? `${selection.size} of ${plural(p.total, "file")} selected`
-            : p.query.trim() ? `${items.length} of ${plural(p.total, "file")}` : plural(p.total, "file")}
+            : p.query.trim() || p.filterCount ? `${items.length} of ${plural(p.total, "file")}` : plural(p.total, "file")}
         </span>
         <div className="toolbar__group">
           <button className="btn btn--ghost btn--sm" onClick={p.onAddFiles}><IconFile /> Files</button>
@@ -100,14 +107,21 @@ export function FileList(p: Props) {
         <input className="input input--sm list-search" type="search" placeholder="Search names" aria-label="Search files by name"
           value={p.query} onChange={(e) => p.onQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Escape") p.onQuery("") }} />
+        <button className={`btn btn--ghost btn--sm filters-btn${p.filtersOpen || p.filterCount ? " is-on" : ""}`} onClick={p.onFilters}
+          aria-pressed={p.filtersOpen} title="Advanced filters: markup, colours, elements, attributes, flags and status">
+          <IconFilter /> Filters{p.filterCount > 0 && <span className="filters-btn__count">{p.filterCount}</span>}
+        </button>
         <div className="toolbar__spacer" />
         {p.liveToggle}
         {p.viewControls}
       </div>
+      {p.filtersOpen && p.filterBar}
       {p.cssBar}
 
-      {items.length === 0 && p.query.trim() && (
-        <p className="list-empty text-3">No files match “{p.query.trim()}”. <button className="link" onClick={() => p.onQuery("")}>Clear search</button></p>
+      {items.length === 0 && p.total > 0 && (p.query.trim() || p.filterCount > 0) && (
+        <p className="list-empty text-3">No files match{p.query.trim() ? ` “${p.query.trim()}”` : " the filters"}.{" "}
+          {p.query.trim() && <button className="link" onClick={() => p.onQuery("")}>Clear search</button>}{" "}
+          {p.filterCount > 0 && <button className="link" onClick={p.onClearFilters}>Clear filters</button>}</p>
       )}
       <ul ref={listRef} className={`file-list${!settings.showDetails ? " file-list--gallery" : settings.thumbPx <= 40 ? " file-list--tiny" : ""}`}>
         {items.map((item) => (
@@ -130,6 +144,7 @@ export function FileList(p: Props) {
             onToggle={p.onToggle}
             onPreset={p.onPreset}
             onNewPreset={p.onNewPreset}
+            onFlag={p.onFlag}
           />
         ))}
       </ul>

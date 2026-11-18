@@ -53,6 +53,11 @@ export function useItems() {
     setItems((list) => list.map((i) => (set.has(i.id) ? { ...i, presetId, config: undefined } : i)))
   }, [])
 
+  const setFlag = useCallback((ids: string[], flag: SvgItem["flag"]) => {
+    const set = new Set(ids)
+    setItems((list) => list.map((i) => (set.has(i.id) ? { ...i, flag } : i)))
+  }, [])
+
   /** In-app edit of the markup. Never written back to the original file */
   const editSource = useCallback((id: string, source: string) => {
     setItems((list) => list.map((i) => (i.id === id
@@ -107,5 +112,5 @@ export function useItems() {
     return results
   }, [patch])
 
-  return { items, itemsRef, addPaths, remove, clear, setPreset, editSource, revertSource, setConfig, optimise }
+  return { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise }
 }

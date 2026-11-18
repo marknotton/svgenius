@@ -1,7 +1,9 @@
-import { memo, useEffect, useMemo, useRef, useState, type MouseEvent } from "react"
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react"
 import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "../lib/svgRoot"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { FileTag } from "../lib/tags"
+import { FLAGS } from "../lib/filters"
+import { IconFlag } from "../icons"
 import type { Backdrop, Preset, SvgItem } from "../lib/types"
 import { PresetSelect } from "./PresetSelect"
 import { Thumb } from "./Thumb"
@@ -25,6 +27,7 @@ interface Props {
   onContextMenu: (id: string, e: MouseEvent) => void
   onPreset: (id: string, presetId: string | null) => void
   onNewPreset: (item: SvgItem) => void
+  onFlag: (id: string, e: MouseEvent) => void
 }
 
 const OWN = "__own__"
@@ -62,14 +65,8 @@ export const FileRow = memo(function FileRow(p: Props) {
         aria-selected={selected}
       >
         <div className="file-card__head">
-          <input
-            type="checkbox"
-            className="checkbox"
-            checked={selected}
-            aria-label={`Select ${item.name}`}
-            onClick={(e) => { e.stopPropagation(); p.onToggle(item.id, e) }}
-            onChange={() => {}}
-          />
+          <Check item={item} selected={selected} onToggle={p.onToggle} />
+          <FlagButton item={item} onFlag={p.onFlag} />
           <span className="file-card__name" title={item.path}><Name item={item} to={p.exportName} /></span>
           <Stats item={item} stale={stale} />
         </div>
@@ -92,19 +89,14 @@ export const FileRow = memo(function FileRow(p: Props) {
   return (
     <li
       className={`file-row${selected ? " is-selected" : ""}${p.focused ? " is-focused" : ""}`}
+      style={{ "--thumb": `${p.compare ? thumbPx * 2 + 4 : thumbPx}px` } as CSSProperties}
       data-id={item.id}
       onClick={(e) => p.onRowClick(item.id, e)}
       onContextMenu={(e) => p.onContextMenu(item.id, e)}
       aria-selected={selected}
     >
-      <input
-        type="checkbox"
-        className="checkbox"
-        checked={selected}
-        aria-label={`Select ${item.name}`}
-        onClick={(e) => { e.stopPropagation(); p.onToggle(item.id, e) }}
-        onChange={() => {}}
-      />
+      <Check item={item} selected={selected} onToggle={p.onToggle} />
+      <FlagButton item={item} onFlag={p.onFlag} />
       {p.compare ? (
         <div className="file-row__compare">
           <Thumb svg={item.source} size={thumbPx} backdrop={backdrop} label={`${item.name} before`} />
@@ -127,11 +119,6 @@ export const FileRow = memo(function FileRow(p: Props) {
           {size && dir && " · "}
           {dir}
         </div>
-        {p.details && p.tags.length > 0 && (
-          <div className="tags">
-            {p.tags.map((t) => <span key={t.label} className={`tag${t.tone ? ` tag--${t.tone}` : ""}`} title={t.title}>{t.label}</span>)}
-          </div>
-        )}
       </div>
       {item.config ? (
         <select className="select file-row__preset" aria-label={`Preset for ${item.name}`} value={OWN}
@@ -155,6 +142,11 @@ export const FileRow = memo(function FileRow(p: Props) {
         />
       )}
       <Stats item={item} stale={stale} />
+      {p.tags.length > 0 && (
+        <div className="tags file-row__tags">
+          {p.tags.map((t) => <span key={t.label} className={`tag${t.tone ? ` tag--${t.tone}` : ""}`} title={t.title}>{t.label}</span>)}
+        </div>
+      )}
     </li>
   )
 })
@@ -188,5 +180,27 @@ function Name({ item, to }: { item: SvgItem, to?: string }) {
         <span className="file-name__label">Exports as</span> {to}
       </span>
     </span>
+  )
+}
+
+/** The checkbox, with a bigger hit area. The only thing that changes the selection */
+function Check({ item, selected, onToggle }: { item: SvgItem, selected: boolean, onToggle: (id: string, e: MouseEvent) => void }) {
+  return (
+    <span className="check-hit" title={selected ? "Deselect" : "Select"}
+      onClick={(e) => { e.stopPropagation(); onToggle(item.id, e) }}>
+      <input type="checkbox" className="checkbox" checked={selected} aria-label={`Select ${item.name}`} onChange={() => {}} />
+    </span>
+  )
+}
+
+function FlagButton({ item, onFlag }: { item: SvgItem, onFlag: (id: string, e: MouseEvent) => void }) {
+  const f = FLAGS.find((x) => x.value === item.flag)
+  return (
+    <button type="button" className={`flag-btn${f ? " is-set" : ""}`} style={f ? { color: f.colour } : undefined}
+      title={f ? `${f.label} flag. Click for the next colour, the last one clears it` : "Flag this file. Click again to change the colour"}
+      aria-label={f ? `${f.label} flag on ${item.name}` : `Flag ${item.name}`}
+      onClick={(e) => { e.stopPropagation(); onFlag(item.id, e) }}>
+      <IconFlag filled={!!f} />
+    </button>
   )
 }
