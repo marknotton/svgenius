@@ -25,6 +25,9 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
         <div className="panel__label">Output</div>
         <Toggle label="Multipass" hint="Run the plugins repeatedly until nothing more is saved"
           checked={s.multipass} onChange={(v) => edit((x) => ({ ...x, multipass: v }))} />
+        <Toggle label="Merge overlapping paths"
+          hint="Joins shapes that share a fill and opacity into one path (a boolean union), so see-through overlaps don't show and files get smaller. Shapes with strokes, IDs, masks or filters are left alone"
+          checked={s.mergePaths} onChange={(v) => edit((x) => ({ ...x, mergePaths: v }))} />
         <Toggle label="Pretty print" hint="Indent the markup. Bigger files, easier to read"
           checked={s.pretty} onChange={(v) => edit((x) => ({ ...x, pretty: v }))} />
         <label className="range" title="Decimal places kept in numbers, paths and transforms">
@@ -41,8 +44,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
 
       <section className="panel__section">
         <EditContents trim={s.trim} onChange={trim}
-          markup={s.appendMarkup} onMarkup={(appendMarkup) => edit((x) => ({ ...x, appendMarkup }))}
-          merge={s.mergeOpacity} onMerge={(mergeOpacity) => edit((x) => ({ ...x, mergeOpacity }))} />
+          markup={s.appendMarkup} onMarkup={(appendMarkup) => edit((x) => ({ ...x, appendMarkup }))} />
       </section>
 
       <section className="panel__section">

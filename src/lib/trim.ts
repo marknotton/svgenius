@@ -1,5 +1,5 @@
 import { svgDataUrl } from "./format"
-import { mergeOpacity } from "./opacity"
+import { mergeOverlappingPaths } from "./mergePaths"
 import { fmtNum, getAttr, parseLength, parseViewBox, replaceRoot, rootTag, setAttr, type ViewBox } from "./svgRoot"
 import type { ArtTransform, SvgoSettings, TrimSettings } from "./types"
 
@@ -113,9 +113,17 @@ export async function trimSvg(svg: string, trim: TrimSettings, precision: number
   const digits = Math.max(precision, 2)
   const f = (n: number) => fmtNum(n, digits)
   let out = setAttr(tag, "viewBox", `${f(next.x)} ${f(next.y)} ${f(next.w)} ${f(next.h)}`)
-  // Keep explicit sizes in proportion with the new viewBox
-  if (width !== null) out = setAttr(out, "width", f(width * (next.w / vb.w)))
-  if (height !== null) out = setAttr(out, "height", f(height * (next.h / vb.h)))
+  // One uniform scale for both sides, so width/height always match the new
+  // viewBox's aspect ratio and nothing gets letterboxed back in
+  if (width !== null || height !== null) {
+    const k = width !== null && height !== null
+      ? Math.min(width / vb.w, height / vb.h)
+      : width !== null ? width / vb.w : (height as number) / vb.h
+    out = setAttr(out, "width", f(next.w * k))
+    out = setAttr(out, "height", f(next.h * k))
+  }
+  // A leftover preserveAspectRatio could still pad or crop
+  out = out.replace(/\spreserveAspectRatio="[^"]*"/, "")
   return replaceRoot(svg, out)
 }
 
@@ -176,7 +184,7 @@ export function appendMarkup(svg: string, markup: string) {
 /** Everything that happens after SVGO, in order */
 export async function postProcess(svg: string, settings: SvgoSettings) {
   const t = settings.trim
-  let out = settings.mergeOpacity ? mergeOpacity(svg) : svg
+  let out = settings.mergePaths ? await mergeOverlappingPaths(svg, settings.floatPrecision) : svg
   if (t.enabled) out = await trimSvg(out, t, settings.floatPrecision)
   out = transformSvg(out, { scale: t.artScale, offsetX: t.offsetX, offsetY: t.offsetY })
   // Outside the artwork group, so it isn't moved or scaled with it

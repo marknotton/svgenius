@@ -912,6 +912,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"paper@npm:0.12.18":
+  version: 0.12.18
+  resolution: "paper@npm:0.12.18"
+  checksum: 10c0/7731501e1bc74e84b74d2eadf05044644aef437a013d797d7dbda9af248c0896f45a334d55c9f049e1692cfac1c3a06c8b68b95c69ee2bf8f7d06bf1bdaf8805
+  languageName: node
+  linkType: hard
+
 "picocolors@npm:^1.1.1":
   version: 1.1.1
   resolution: "picocolors@npm:1.1.1"
@@ -1064,6 +1071,7 @@ __metadata:
     "@types/react": "npm:^19.3.0"
     "@types/react-dom": "npm:^19.3.0"
     "@vitejs/plugin-react": "npm:^6.3.0"
+    paper: "npm:0.12.18"
     react: "npm:^19.3.1"
     react-dom: "npm:^19.3.1"
     svgo: "npm:^4.1.0"

@@ -70,8 +70,8 @@ export interface SvgoSettings {
   trim: TrimSettings
   /** Raw markup added to every file, just before </svg> */
   appendMarkup: string
-  /** Group neighbouring translucent shapes so their overlaps don't darken */
-  mergeOpacity: boolean
+  /** Boolean-union shapes that share a fill and opacity into one path */
+  mergePaths: boolean
   /** Custom plugin id → on/off and its params as JSON text */
   custom: Record<string, { on: boolean, params: string }>
 }

@@ -16,7 +16,7 @@ export function defaultSvgoSettings(): SvgoSettings {
     attrRules: [],
     trim: { enabled: false, padding: 0, unit: "%", aspect: "fit", scale: 1, artScale: 1, offsetX: 0, offsetY: 0 },
     appendMarkup: "",
-    mergeOpacity: false,
+    mergePaths: false,
     custom: {}
   }
 }
@@ -123,7 +123,7 @@ export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
   const t = settings.trim
   const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.scale, t.artScale, t.offsetX, t.offsetY]
-  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergeOpacity])
+  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths])
 }
 
 export function runSpec(settings: SvgoSettings, plugins: CustomPlugin[]): RunSpec {
@@ -184,7 +184,7 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
       offsetY: clampNum(trimRaw.offsetY, -1e4, 1e4, 0)
     },
     appendMarkup: typeof raw.appendMarkup === "string" ? raw.appendMarkup : "",
-    mergeOpacity: raw.mergeOpacity === true,
+    mergePaths: raw.mergePaths === true,
     custom,
     attrRules,
     replacements,

@@ -59,7 +59,7 @@ export function EditViewBox({ trim, onChange }: Props) {
   )
 }
 
-export function EditContents({ trim, onChange, markup, onMarkup, merge, onMerge }: Props & { markup: string, onMarkup: (v: string) => void, merge: boolean, onMerge: (v: boolean) => void }) {
+export function EditContents({ trim, onChange, markup, onMarkup }: Props & { markup: string, onMarkup: (v: string) => void }) {
   const pristine = trim.artScale === 1 && trim.offsetX === 0 && trim.offsetY === 0 && !markup.trim()
   return (
     <>
@@ -75,9 +75,6 @@ export function EditContents({ trim, onChange, markup, onMarkup, merge, onMerge 
           ...(p.x !== undefined && { offsetX: p.x }),
           ...(p.y !== undefined && { offsetY: p.y })
         })} />
-      <Toggle label="Merge overlapping transparency"
-        hint="Shapes with their own opacity darken where they overlap. This moves the opacity onto a shared group so they paint as one layer"
-        checked={merge} onChange={onMerge} />
       <label className="append-markup">
         <span className="range__label">Add markup</span>
         <textarea className="input input--mono" spellCheck={false} rows={3} value={markup}
