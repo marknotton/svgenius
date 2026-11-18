@@ -146,6 +146,22 @@ export function scaleSvg(svg: string, scale: number, precision: number) {
   return replaceRoot(svg, out)
 }
 
+/** Sets one side to an exact size; the other follows the viewBox's aspect ratio */
+export function resizeSvg(svg: string, side: "width" | "height", px: number, precision: number) {
+  const tag = rootTag(svg)
+  if (!tag || !(px > 0)) return svg
+  const vb = parseViewBox(getAttr(tag, "viewBox"))
+  const width = parseLength(getAttr(tag, "width")) ?? vb?.w ?? null
+  const height = parseLength(getAttr(tag, "height")) ?? vb?.h ?? null
+  if (!width || !height) return svg
+  const ratio = vb ? vb.w / vb.h : width / height
+  let out = vb ? tag : setAttr(tag, "viewBox", `0 0 ${width} ${height}`)
+  const f = (n: number) => fmtNum(n, Math.max(precision, 3))
+  out = setAttr(out, "width", f(side === "width" ? px : px * ratio))
+  out = setAttr(out, "height", f(side === "height" ? px : px / ratio))
+  return replaceRoot(svg, out)
+}
+
 // ── Artwork transform ────────────────────────────────────────────────────────
 
 /** Wraps the artwork in a <g> that scales around the viewBox centre and offsets it */
@@ -191,6 +207,8 @@ export async function postProcess(svg: string, settings: SvgoSettings) {
   // Trim measures last, after every move and scale, so padding 0 always means
   // the artwork touches the edges
   if (t.enabled) out = await trimSvg(out, t, settings.floatPrecision)
-  out = scaleSvg(out, t.scale, settings.floatPrecision)
+  out = t.sizeUnit === "px"
+    ? resizeSvg(out, t.sizeSide, t.sizePx, settings.floatPrecision)
+    : scaleSvg(out, t.scale, settings.floatPrecision)
   return out
 }

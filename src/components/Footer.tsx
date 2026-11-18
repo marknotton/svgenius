@@ -21,9 +21,8 @@ interface Props {
   onKeepStructure: (v: boolean) => void
   onOptimise: () => void
   onExport: (clear: boolean) => void
-  /** Opens the export file name options */
+  /** Shows the export file name options */
   onNames: () => void
-  renaming: boolean
 }
 
 export function Footer(p: Props) {
@@ -64,10 +63,6 @@ export function Footer(p: Props) {
       <button className={`btn ${outstanding > 0 ? "btn--primary" : "btn--secondary"}`} onClick={p.onOptimise} disabled={n === 0 || p.busy || outstanding === 0}
         title="Run every file with its current settings. Live mode only updates the rows on screen">
         {p.busy ? <span className="spinner spinner--sm" /> : <IconPlay />} Optimise {scope}{plural(n, "file")}
-      </button>
-      <button className={`btn btn--ghost btn--sm footer__names${p.renaming ? " is-on" : ""}`} onClick={p.onNames}
-        title="Rename exported files: prefix, suffix, case and numbering">
-        {p.renaming ? "Renaming on" : "File names…"}
       </button>
       <div className="split">
         <button className={`btn ${outstanding > 0 ? "btn--secondary" : "btn--primary"}`} onClick={() => p.onExport(false)} disabled={!canExport}

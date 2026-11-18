@@ -181,5 +181,12 @@ function Stats({ item, stale }: { item: SvgItem, stale: boolean }) {
 
 function Name({ item, to }: { item: SvgItem, to?: string }) {
   if (!to || to === item.name) return <>{item.name}</>
-  return <>{item.name} <span className="file-row__rename" title="Name it will be exported with">→ {to}</span></>
+  return (
+    <span className="file-name">
+      <span className="file-name__from">{item.name}</span>
+      <span className="file-name__to" title="The name this file will be exported with">
+        <span className="file-name__label">Exports as</span> {to}
+      </span>
+    </span>
+  )
 }

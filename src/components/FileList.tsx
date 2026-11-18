@@ -7,7 +7,11 @@ import type { AppSettings, Preset, SvgItem } from "../lib/types"
 import { FileRow } from "./FileRow"
 
 interface Props {
+  /** The files to show (already filtered by the search) */
   items: SvgItem[]
+  total: number
+  query: string
+  onQuery: (q: string) => void
   selection: Set<string>
   focusId: string | null
   onRowClick: (id: string, e: MouseEvent) => void
@@ -81,7 +85,9 @@ export function FileList(p: Props) {
           onChange={() => p.onSelectAll(!allSelected)}
         />
         <span className="toolbar__count">
-          {selection.size > 0 ? `${selection.size} of ${plural(items.length, "file")} selected` : plural(items.length, "file")}
+          {selection.size > 0
+            ? `${selection.size} of ${plural(p.total, "file")} selected`
+            : p.query.trim() ? `${items.length} of ${plural(p.total, "file")}` : plural(p.total, "file")}
         </span>
         <div className="toolbar__group">
           <button className="btn btn--ghost btn--sm" onClick={p.onAddFiles}><IconFile /> Files</button>
@@ -91,12 +97,18 @@ export function FileList(p: Props) {
             <IconTrash /> {selection.size ? "Remove" : "Clear"}
           </button>
         </div>
+        <input className="input input--sm list-search" type="search" placeholder="Search names" aria-label="Search files by name"
+          value={p.query} onChange={(e) => p.onQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Escape") p.onQuery("") }} />
         <div className="toolbar__spacer" />
         {p.liveToggle}
         {p.viewControls}
       </div>
       {p.cssBar}
 
+      {items.length === 0 && p.query.trim() && (
+        <p className="list-empty text-3">No files match “{p.query.trim()}”. <button className="link" onClick={() => p.onQuery("")}>Clear search</button></p>
+      )}
       <ul ref={listRef} className={`file-list${!settings.showDetails ? " file-list--gallery" : settings.thumbPx <= 40 ? " file-list--tiny" : ""}`}>
         {items.map((item) => (
           <FileRow

@@ -1,8 +1,6 @@
 import { useMemo } from "react"
-import { IconX } from "../icons"
 import { CASES, defaultRename, exportNames } from "../lib/rename"
 import type { RenameSettings, SvgItem } from "../lib/types"
-import { Modal } from "./Dialogs"
 import { Segmented } from "./Segmented"
 import { Toggle } from "./Toggle"
 
@@ -13,23 +11,21 @@ interface Props {
   onChange: (r: RenameSettings) => void
   /** The files that would be exported, in order, for the preview */
   items: SvgItem[]
-  onClose: () => void
 }
 
-export function RenameDialog({ rename: r, onChange, items, onClose }: Props) {
+export function RenamePanel({ rename: r, onChange, items }: Props) {
   const set = (patch: Partial<RenameSettings>) => onChange({ ...r, ...patch })
   const preview = useMemo(() => {
     const names = exportNames(items, { ...r, enabled: true })
-    return items.slice(0, 8).map((i) => ({ id: i.id, from: i.name, to: names.get(i.id) ?? i.name, dir: i.relPath.includes("/") ? i.relPath.slice(0, i.relPath.lastIndexOf("/")) : "" }))
+    return items.slice(0, 50).map((i) => ({ id: i.id, from: i.name, to: names.get(i.id) ?? i.name, dir: i.relPath.includes("/") ? i.relPath.slice(0, i.relPath.lastIndexOf("/")) : "" }))
   }, [items, r])
 
   return (
-    <Modal onCancel={onClose}>
-      <div className="settings rename">
-        <div className="settings__head">
-          <h2 className="modal__title">Export file names</h2>
-          <button className="btn btn--icon" aria-label="Close" onClick={onClose}><IconX /></button>
-        </div>
+    <div className="panel" aria-label="Export file names">
+      <div className="panel__scroll rename">
+        <section className="panel__section">
+        <div className="panel__label">Export file names</div>
+        <p className="rules__empty text-3">Only the exported copies are renamed, never your original files.</p>
 
         <Toggle label="Rename files on export" hint="Your original files are never renamed, only the exported copies"
           checked={r.enabled} onChange={(enabled) => set({ enabled })} />
@@ -80,10 +76,15 @@ export function RenameDialog({ rename: r, onChange, items, onClose }: Props) {
                 <span>Count</span>
                 <Segmented label="Numbering scope" value={r.scope} onChange={(scope) => set({ scope })}
                   options={[
-                    { value: "all", label: "Across all files" },
-                    { value: "folder", label: "Per folder", title: "Restart at the first number in each folder" }
+                    { value: "all", label: "One sequence" },
+                    { value: "folder", label: "Restart per folder" }
                   ]} />
               </div>
+              <p className="rename__explain text-3">
+                {r.scope === "all"
+                  ? "Every file gets the next number in list order, whatever folder it's in: icons/01, icons/02, logos/03."
+                  : "Each folder counts from the start number again: icons/01, icons/02, logos/01. Handy with Keep folder structure."}
+              </p>
               <div className="rename__pair">
                 <label className="field-row">
                   <span>Start at</span>
@@ -100,27 +101,27 @@ export function RenameDialog({ rename: r, onChange, items, onClose }: Props) {
           )}
         </div>
 
-        <div className="settings__section">
+        </section>
+
+        <section className="panel__section">
           <div className="plugins__head">
             <span className="panel__label">Preview</span>
-            <span className="text-3">{items.length > 8 ? `First 8 of ${items.length}` : `${items.length} files`}, in list order</span>
+            <span className="text-3">{items.length > 50 ? `First 50 of ${items.length}` : `${items.length} files`}, in list order</span>
           </div>
-          <ul className="rename__preview">
-            {preview.map((p) => (
-              <li key={p.id}>
-                {p.dir && <span className="text-3">{p.dir}/</span>}
-                <span className="text-3">{p.from}</span> → <strong>{r.enabled ? p.to : p.from}</strong>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="settings__actions">
-          <button className="btn btn--ghost btn--sm" onClick={() => onChange({ ...defaultRename(), enabled: r.enabled })}>Reset</button>
-          <div className="toolbar__spacer" />
-          <button className="btn btn--primary btn--sm" onClick={onClose}>Done</button>
-        </div>
+          <table className="rename__table">
+            <thead><tr><th>Original</th><th>Exported as</th></tr></thead>
+            <tbody>
+              {preview.map((p) => (
+                <tr key={p.id}>
+                  <td title={p.dir ? `${p.dir}/${p.from}` : p.from}>{p.dir && <span className="text-3">{p.dir}/</span>}{p.from}</td>
+                  <td className={r.enabled && p.to !== p.from ? "is-changed" : ""}>{r.enabled ? p.to : p.from}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button className="btn btn--ghost btn--sm rename__reset" onClick={() => onChange({ ...defaultRename(), enabled: r.enabled })}>Reset names</button>
+        </section>
       </div>
-    </Modal>
+    </div>
   )
 }

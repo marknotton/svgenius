@@ -15,7 +15,7 @@ export function defaultSvgoSettings(): SvgoSettings {
     plugins: Object.fromEntries(PLUGINS.map((p) => [p.name, p.defaultOn])),
     replacements: [],
     attrRules: [],
-    trim: { enabled: false, padding: 0, unit: "%", aspect: "fit", scale: 1, artScale: 1, offsetX: 0, offsetY: 0 },
+    trim: { enabled: false, padding: 0, unit: "%", aspect: "fit", scale: 1, sizeUnit: "%", sizeSide: "height", sizePx: 100, artScale: 1, offsetX: 0, offsetY: 0 },
     appendMarkup: "",
     mergePaths: false,
     custom: {}
@@ -132,7 +132,7 @@ export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const rules = activeReplacements(settings).map(({ id: _id, enabled: _e, ...r }) => r)
   const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
   const t = settings.trim
-  const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.scale, t.artScale, t.offsetX, t.offsetY]
+  const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.sizeUnit === "px" ? [t.sizeSide, t.sizePx] : t.scale, t.artScale, t.offsetX, t.offsetY]
   return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths])
 }
 
@@ -189,6 +189,9 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
       unit: trimRaw.unit === "px" ? "px" : "%",
       aspect: trimRaw.aspect === "preserve" ? "preserve" : "fit",
       scale: validScale(trimRaw.scale) ?? 1,
+      sizeUnit: trimRaw.sizeUnit === "px" ? "px" : "%",
+      sizeSide: trimRaw.sizeSide === "width" ? "width" : "height",
+      sizePx: clampNum(trimRaw.sizePx, 0.01, 1e5, 100),
       artScale: validScale(trimRaw.artScale) ?? 1,
       offsetX: clampNum(trimRaw.offsetX, -1e4, 1e4, 0),
       offsetY: clampNum(trimRaw.offsetY, -1e4, 1e4, 0)

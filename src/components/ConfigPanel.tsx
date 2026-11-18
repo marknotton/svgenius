@@ -13,6 +13,7 @@ interface Props {
   onNew: () => void
   onRename: () => void
   onDelete: () => void
+  onReset: () => void
   onImport: () => void
   onExport: () => void
   onLoadPlugin: () => void
@@ -61,7 +62,7 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
       </div>
 
       <div className="panel__foot">
-        <button className="btn btn--ghost btn--sm" onClick={() => actions.reset(preset.id)} title="Reset this preset to SVGO's defaults">
+        <button className="btn btn--ghost btn--sm" onClick={p.onReset} title="Reset this preset to SVGO's defaults">
           <IconReset /> Reset
         </button>
         <div className="toolbar__spacer" />

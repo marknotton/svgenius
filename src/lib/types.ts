@@ -41,6 +41,10 @@ export interface TrimSettings {
   aspect: "fit" | "preserve"
   /** Multiplies the output width/height (the viewBox is untouched). 1 = unchanged */
   scale: number
+  /** "%" uses scale; "px" sets one side to sizePx and the other follows the aspect ratio */
+  sizeUnit: "%" | "px"
+  sizeSide: "width" | "height"
+  sizePx: number
   /** Scales the artwork inside the viewBox, around its centre. 1 = unchanged */
   artScale: number
   /** Moves the artwork, as % of the viewBox width/height */

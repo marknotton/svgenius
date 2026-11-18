@@ -13,13 +13,13 @@ import { FileInspector } from "./components/FileInspector"
 import { FileList } from "./components/FileList"
 import { Footer } from "./components/Footer"
 import { PreviewCssBar, PreviewCssContext } from "./components/PreviewCss"
-import { RenameDialog } from "./components/RenameDialog"
+import { RenamePanel } from "./components/RenamePanel"
 import { SettingsDialog } from "./components/SettingsDialog"
 import { Toasts, useToasts } from "./components/Toast"
 import { ViewControls } from "./components/ViewControls"
 import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/useAppSettings"
 import { useItems } from "./hooks/useItems"
-import { IconX } from "./icons"
+import { IconInfo, IconX } from "./icons"
 import { planExport } from "./lib/exportPlan"
 import { plural } from "./lib/format"
 import { activeCustom, buildExport, defaultLayout, hashCode, mergeImport, newId, PREVIEW_PX, runSpec, SIDEBAR } from "./lib/settings"
@@ -49,14 +49,13 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const actions = useMemo(() => presetActions(update), [update])
 
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [namesOpen, setNamesOpen] = useState(false)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(false)
   const anchor = useRef<string | null>(null)
   const [focusId, setFocusId] = useState<string | null>(null)
-  const [sidebarTab, setSidebarTab] = useState<"preset" | "file">("preset")
+  const [sidebarTab, setSidebarTab] = useState<"preset" | "names" | "file">("preset")
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set())
 
   // ── Presets ─────────────────────────────────────────────────────────────────
@@ -187,7 +186,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     setSidebarTab("file")
   }, [toggle])
 
-  const selectAll = (all: boolean) => setSelection(all ? new Set(items.map((i) => i.id)) : new Set())
+  const selectAll = (all: boolean) => setSelection(all ? new Set(shownItems.map((i) => i.id)) : new Set())
 
   const targets = useMemo(() => (selection.size ? items.filter((i) => selection.has(i.id)) : items), [items, selection])
   // Export names, previewed on the rows of the files that would be exported
@@ -195,6 +194,16 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     () => (settings.rename.enabled ? exportNames(targets.filter((i) => i.status !== "error"), settings.rename) : null),
     [targets, settings.rename]
   )
+
+  // Search by original or export name; the rest of the list is hidden
+  const [query, setQuery] = useState("")
+  const shownItems = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return items
+    return items.filter((i) => i.name.toLowerCase().includes(q) || i.relPath.toLowerCase().includes(q)
+      || (previewNames?.get(i.id) ?? "").toLowerCase().includes(q))
+  }, [items, query, previewNames])
+
 
   // ── Running ─────────────────────────────────────────────────────────────────
 
@@ -552,7 +561,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
               <EmptyState onAddFiles={addFiles} onAddFolder={addFolder} />
             ) : (
               <FileList
-                items={items}
+                items={shownItems}
+                total={items.length}
+                query={query}
+                onQuery={setQuery}
                 selection={selection}
                 settings={settings}
                 defaultPreset={defaultPreset}
@@ -562,10 +574,11 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 focusId={focusId}
                 onVisible={setVisibleIds}
                 liveToggle={
-                  <label className="footer__check" title="Re-run files on screen as you change settings">
+                  <label className="footer__check live-toggle"
+                    title={"Live preview: as you change settings, the files on screen (and the one you're inspecting) re-optimise straight away so the previews and sizes stay current.\n\nFiles further down catch up as you scroll. Turn it off for very large batches, then use Optimise when you're ready."}>
                     <input type="checkbox" className="checkbox" checked={settings.liveUpdates}
                       onChange={(e) => update((s) => ({ ...s, liveUpdates: e.target.checked }))} />
-                    Live
+                    Live preview <IconInfo />
                   </label>
                 }
                 onSelectAll={selectAll}
@@ -591,17 +604,20 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             <div className="sidebar__tabs" role="tablist">
               <button role="tab" aria-selected={sidebarTab === "preset"} className={`sidebar__tab${sidebarTab === "preset" ? " is-active" : ""}`}
                 onClick={() => setSidebarTab("preset")}>Preset</button>
+              <button role="tab" aria-selected={sidebarTab === "names"} className={`sidebar__tab${sidebarTab === "names" ? " is-active" : ""}`}
+                onClick={() => setSidebarTab("names")}>File names{settings.rename.enabled && <span className="flag__dot" />}</button>
               {focused ? (
                 <div role="tab" aria-selected={sidebarTab === "file"} className={`sidebar__tab sidebar__tab--file${sidebarTab === "file" ? " is-active" : ""}`}>
                   <button className="sidebar__tab-label" title={focused.path} onClick={() => setSidebarTab("file")}>{focused.name}</button>
                   <button className="sidebar__tab-close" aria-label="Close file" title="Close file"
                     onClick={() => { setFocusId(null); setSidebarTab("preset") }}><IconX width={10} height={10} /></button>
                 </div>
-              ) : (
-                <button role="tab" aria-selected={false} className="sidebar__tab" disabled title="Click a file to inspect it">File</button>
-              )}
+              ) : null}
             </div>
-            {sidebarTab === "file" && focused ? (
+            {sidebarTab === "names" ? (
+              <RenamePanel rename={settings.rename} items={targets.filter((i) => i.status !== "error")}
+                onChange={(rename) => update((s) => ({ ...s, rename }))} />
+            ) : sidebarTab === "file" && focused ? (
               <FileInspector
                 item={focused}
                 presets={settings.presets}
@@ -632,6 +648,15 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onNew={newPreset}
                 onRename={renamePreset}
                 onDelete={deletePreset}
+                onReset={async () => {
+                  const ok = await dialogs.confirm({
+                    title: `Reset “${editing.name}”?`,
+                    body: "Every setting in this preset goes back to SVGO's defaults, including its rules. This can't be undone.",
+                    confirmLabel: "Reset",
+                    danger: true
+                  })
+                  if (ok) actions.reset(editing.id)
+                }}
                 onImport={importPresets}
                 onExport={exportPresets}
                 onLoadPlugin={loadPlugin}
@@ -654,14 +679,9 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             if (res.size > 0) push({ tone: "success", text: `Optimised ${plural(res.size, "file")}. Ready to export` })
           }}
           onExport={doExport}
-          onNames={() => setNamesOpen(true)}
-          renaming={settings.rename.enabled}
+          onNames={() => setSidebarTab("names")}
         />
         {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
-        {namesOpen && (
-          <RenameDialog rename={settings.rename} items={targets.filter((i) => i.status !== "error")}
-            onChange={(rename) => update((s) => ({ ...s, rename }))} onClose={() => setNamesOpen(false)} />
-        )}
         {settingsOpen && (
           <SettingsDialog
             settings={settings}

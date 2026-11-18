@@ -14,18 +14,34 @@ interface Props {
 const isScale = (n: number) => validScale(n) !== null
 
 export function EditViewBox({ trim, onChange }: Props) {
-  const pristine = !trim.enabled && trim.scale === 1 && trim.padding === 0
+  const pristine = !trim.enabled && trim.scale === 1 && trim.sizeUnit === "%" && trim.padding === 0
   return (
     <>
       <div className="plugins__head">
         <span className="panel__label">Edit viewBox</span>
         <button className="link" disabled={pristine} title="Size back to 1×, trim off"
-          onClick={() => onChange({ enabled: false, padding: 0, scale: 1 })}>Reset</button>
+          onClick={() => onChange({ enabled: false, padding: 0, scale: 1, sizeUnit: "%" })}>Reset</button>
       </div>
       <p className="rules__empty text-3">The SVG itself: its width, height and viewBox. New sizes flash on the rows.</p>
-      <SliderField label="Size" value={trim.scale} min={0.1} max={4} step={0.05} suffix="×" accept={isScale}
-        hint="Multiplies the width and height. The viewBox doesn't change, so the artwork grows with it. Click the number to type any value."
-        onChange={(scale) => { if (isScale(scale)) onChange({ scale }) }} />
+      {trim.sizeUnit === "%" ? (
+        <SliderField label="Size" value={+(trim.scale * 100).toFixed(4)} min={10} max={400} step={5} suffix="%" accept={(n) => isScale(n / 100)}
+          hint="Scales the width and height. The viewBox doesn't change, so the artwork grows with it. Click the number to type any value."
+          onChange={(pct) => { if (isScale(pct / 100)) onChange({ scale: pct / 100 }) }} />
+      ) : (
+        <SliderField label={trim.sizeSide === "width" ? "Width" : "Height"} value={trim.sizePx} min={8} max={512} step={1} suffix="px"
+          accept={(n) => n > 0 && n <= 1e5}
+          hint={`Every file gets this exact ${trim.sizeSide}. The ${trim.sizeSide === "width" ? "height" : "width"} follows each file's aspect ratio. Click the number to type any value.`}
+          onChange={(sizePx) => { if (sizePx > 0) onChange({ sizePx }) }} />
+      )}
+      <div className="trim-unit">
+        <span className="text-3">{trim.sizeUnit === "%" ? "% of each file's own size" : `Fixed ${trim.sizeSide}, the other side follows`}</span>
+        {trim.sizeUnit === "px" && (
+          <Segmented label="Fixed side" value={trim.sizeSide} onChange={(sizeSide) => onChange({ sizeSide })}
+            options={[{ value: "width", label: "W" , title: "Fix the width" }, { value: "height", label: "H", title: "Fix the height" }]} />
+        )}
+        <Segmented label="Size unit" value={trim.sizeUnit} onChange={(sizeUnit) => onChange({ sizeUnit })}
+          options={[{ value: "%", label: "%" }, { value: "px", label: "px" }]} />
+      </div>
       <Toggle label="Trim whitespace" hint="Crops the viewBox to the visible artwork (strokes and effects included)"
         checked={trim.enabled} onChange={(enabled) => onChange({ enabled })} />
       {trim.enabled && (

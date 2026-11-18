@@ -21,7 +21,8 @@ export function fileTags(item: SvgItem, settings: SvgoSettings, customOn: number
     tags.push({ label: plural(item.result.replaced, "rule change"), title: "Find & replace and attribute rule changes made to this file" })
   }
   if (t.enabled) tags.push({ label: "Trimmed", title: `Whitespace trimmed, padding ${fmtNum(t.padding, 2)}${t.unit}` })
-  if (t.scale !== 1) tags.push({ label: `Size ×${fmtNum(t.scale, 4)}`, title: "Width and height multiplied" })
+  if (t.sizeUnit === "px") tags.push({ label: `${t.sizeSide === "width" ? "Width" : "Height"} ${fmtNum(t.sizePx, 2)}px`, title: "Exported at a fixed size, the other side follows the aspect ratio" })
+  else if (t.scale !== 1) tags.push({ label: `Size ${fmtNum(t.scale * 100, 2)}%`, title: "Width and height scaled" })
   if (t.artScale !== 1) tags.push({ label: `Artwork ×${fmtNum(t.artScale, 4)}`, title: "Artwork scaled inside the viewBox" })
   if (t.offsetX || t.offsetY) {
     tags.push({ label: "Artwork moved", title: `Moved ${fmtNum(t.offsetX, 2)}% across, ${fmtNum(t.offsetY, 2)}% down` })
