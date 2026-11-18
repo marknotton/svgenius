@@ -25,9 +25,6 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
         <div className="panel__label">Output</div>
         <Toggle label="Multipass" hint="Run the plugins repeatedly until nothing more is saved"
           checked={s.multipass} onChange={(v) => edit((x) => ({ ...x, multipass: v }))} />
-        <Toggle label="Merge overlapping paths"
-          hint="Joins shapes that share a fill and opacity into one path (a boolean union), so see-through overlaps don't show and files get smaller. Shapes with strokes, IDs, masks or filters are left alone"
-          checked={s.mergePaths} onChange={(v) => edit((x) => ({ ...x, mergePaths: v }))} />
         <Toggle label="Pretty print" hint="Indent the markup. Bigger files, easier to read"
           checked={s.pretty} onChange={(v) => edit((x) => ({ ...x, pretty: v }))} />
         <label className="range" title="Decimal places kept in numbers, paths and transforms">
@@ -64,6 +61,23 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
             plugins: { ...x.plugins, ...Object.fromEntries(names.map((n) => [n, on])) }
           }))}
         />
+      </section>
+
+      <section className="panel__section">
+        <div className="panel__label">Beta <span className="pill pill--beta">Experimental</span></div>
+        <p className="panel__hint text-3">Geometry changes made after SVGO. Check the results before exporting.</p>
+        <Toggle label="Flatten transforms"
+          hint="Bakes transform, rotate and matrix attributes into the path data, so no transforms are left. Text, images, masks, filters, gradients and stretched strokes keep theirs"
+          checked={s.flattenTransforms} onChange={(v) => edit((x) => ({ ...x, flattenTransforms: v }))} />
+        <Toggle label="Strokes become cut-outs"
+          hint="Removes strokes and cuts the area they covered out of the shapes painted beneath, so fake clipping becomes real holes. Strokes that don't cover anything stay. Dashed strokes are left alone"
+          checked={s.cutOutStrokes} onChange={(v) => edit((x) => ({ ...x, cutOutStrokes: v }))} />
+        <Toggle label="White shapes become cut-outs"
+          hint="Same again for solid white shapes painted on top of others. White shapes that don't cover anything stay"
+          checked={s.cutOutWhites} onChange={(v) => edit((x) => ({ ...x, cutOutWhites: v }))} />
+        <Toggle label="Merge overlapping paths"
+          hint="Joins shapes that share a fill and opacity into one path (a boolean union), so see-through overlaps don't show and files get smaller. Shapes with strokes, IDs, masks or filters are left alone"
+          checked={s.mergePaths} onChange={(v) => edit((x) => ({ ...x, mergePaths: v }))} />
       </section>
 
       <section className="panel__section">

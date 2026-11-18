@@ -1,5 +1,5 @@
 import { fmtNum } from "./svgRoot"
-import type { SvgItem, SvgoSettings } from "./types"
+import type { GeometryEffect, SvgItem, SvgoSettings } from "./types"
 import { plural } from "./format"
 
 // ── What's been done to a file, as short tags ─────────────────────────────────
@@ -27,7 +27,14 @@ export function fileTags(item: SvgItem, settings: SvgoSettings, customOn: number
   if (t.offsetX || t.offsetY) {
     tags.push({ label: "Artwork moved", title: `Moved ${fmtNum(t.offsetX, 2)}% across, ${fmtNum(t.offsetY, 2)}% down` })
   }
-  if (settings.mergePaths) tags.push({ label: "Merged paths", title: "Shapes sharing a fill and opacity were joined into one path" })
+  // Once optimised, only claim what actually changed the file
+  const did = (e: GeometryEffect, on: boolean) => on && (!item.result?.effects || item.result.effects.includes(e))
+  if (did("flatten", settings.flattenTransforms)) tags.push({ label: "Flattened transforms", title: "Transforms baked into the path data" })
+  if (did("cutouts", settings.cutOutStrokes || settings.cutOutWhites)) {
+    const what = [settings.cutOutStrokes && "strokes", settings.cutOutWhites && "white shapes"].filter(Boolean).join(" and ")
+    tags.push({ label: "Cut-outs", title: `Covering ${what} turned into real holes` })
+  }
+  if (did("merge", settings.mergePaths)) tags.push({ label: "Merged paths", title: "Shapes sharing a fill and opacity were joined into one path" })
   if (settings.appendMarkup.trim()) tags.push({ label: "Extra markup", title: "Markup added before </svg>" })
   if (customOn) tags.push({ label: plural(customOn, "custom plugin"), title: "Third-party SVGO plugins switched on" })
   return tags

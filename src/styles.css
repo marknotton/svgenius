@@ -693,3 +693,25 @@ body.is-resizing * { user-select: none !important; }
 .rename__fields .field-row > span:first-child { width: 64px; }
 .rename__pair { grid-template-columns: 1fr; }
 .sidebar__tab .flag__dot { margin-left: 4px; }
+
+/* ── Beta section ───────────────────────────────────────────────────────────── */
+.pill--beta { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-border); margin-left: 6px; text-transform: none; letter-spacing: 0; font-weight: 500; vertical-align: 1px; }
+.panel__hint { font-size: 11px; margin: 0 0 6px; line-height: 1.4; }
+
+/* ── Report ─────────────────────────────────────────────────────────────────── */
+.modal:has(.report) { width: min(720px, calc(100vw - 32px)); }
+.report { display: flex; flex-direction: column; gap: 10px; }
+.report__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.report__filters { display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.report__field { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-2); }
+.report__cols { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; }
+.report__col { display: inline-flex; align-items: center; gap: 6px; }
+.report__text {
+  width: 100%; height: min(52vh, 460px); resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-2); color: var(--text);
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+  tab-size: 18;
+}
+.report .select { max-width: none; }

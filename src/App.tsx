@@ -14,6 +14,7 @@ import { FileList } from "./components/FileList"
 import { Footer } from "./components/Footer"
 import { PreviewCssBar, PreviewCssContext } from "./components/PreviewCss"
 import { RenamePanel } from "./components/RenamePanel"
+import { ReportDialog } from "./components/ReportDialog"
 import { SettingsDialog } from "./components/SettingsDialog"
 import { Toasts, useToasts } from "./components/Toast"
 import { ViewControls } from "./components/ViewControls"
@@ -49,6 +50,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const actions = useMemo(() => presetActions(update), [update])
 
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [dragging, setDragging] = useState(false)
@@ -194,6 +196,20 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     () => (settings.rename.enabled ? exportNames(targets.filter((i) => i.status !== "error"), settings.rename) : null),
     [targets, settings.rename]
   )
+
+  // Only built while the report is open
+  const reportEntries = useMemo(() => {
+    if (!reportOpen) return []
+    const all = settings.rename.enabled ? exportNames(items.filter((i) => i.status !== "error"), settings.rename) : null
+    return items.map((item) => ({
+      item,
+      settings: settingsFor(item),
+      preset: item.config ? "Own settings" : presetFor(item).name,
+      exportName: previewNames?.get(item.id) ?? all?.get(item.id),
+      tags: tagsFor(item).filter((t) => t.label !== "Own settings").map((t) => t.label),
+      stale: isStale(item)
+    }))
+  }, [reportOpen, items, settings.rename, settingsFor, presetFor, previewNames, tagsFor, isStale])
 
   // Search by original or export name; the rest of the list is hidden
   const [query, setQuery] = useState("")
@@ -680,7 +696,11 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
           }}
           onExport={doExport}
           onNames={() => setSidebarTab("names")}
+          onReport={() => setReportOpen(true)}
         />
+        {reportOpen && (
+          <ReportDialog entries={reportEntries} selected={selection} rename={settings.rename} onClose={() => setReportOpen(false)} />
+        )}
         {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
         {settingsOpen && (
           <SettingsDialog

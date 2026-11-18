@@ -7,20 +7,8 @@
 // Paint order is kept: a shape only joins an earlier one when nothing painted
 // between them overlaps it.
 
-type Paper = typeof import("paper/dist/paper-core")
+import { SVG_NS, withLiveSvg, type Paper } from "./paperKit"
 
-let paperReady: Promise<Paper> | null = null
-function loadPaper() {
-  paperReady ??= import("paper/dist/paper-core").then((m) => {
-    // CommonJS build: Vite hands it over as the default export
-    const paper = ((m as unknown as { default?: Paper }).default ?? m) as Paper
-    paper.setup(new paper.Size(1, 1))
-    return paper
-  })
-  return paperReady
-}
-
-const SVG_NS = "http://www.w3.org/2000/svg"
 const SHAPES = new Set(["path", "rect", "circle", "ellipse", "polygon", "polyline"])
 const GEOMETRY = ["d", "x", "y", "width", "height", "cx", "cy", "r", "rx", "ry", "points", "transform", "pathLength"]
 const PAINT = ["fill", "fill-opacity", "opacity", "fill-rule", "stroke", "class", "style"]
@@ -123,22 +111,5 @@ function mergeIn(paper: Paper, parent: Element, precision: number): number {
 
 export async function mergeOverlappingPaths(svg: string, precision: number) {
   if (!/<(path|rect|circle|ellipse|polygon|polyline)\b/.test(svg)) return svg
-  const doc = new DOMParser().parseFromString(svg, "image/svg+xml")
-  if (doc.documentElement.localName !== "svg" || doc.querySelector("parsererror")) return svg
-  const paper = await loadPaper()
-
-  // Computed styles and getBBox need the SVG in a live document
-  const host = document.createElement("div")
-  host.style.cssText = "position:fixed;left:-99999px;top:0;width:0;height:0;overflow:hidden;visibility:hidden"
-  const root = document.importNode(doc.documentElement, true) as unknown as SVGSVGElement
-  host.appendChild(root)
-  document.body.appendChild(host)
-  try {
-    const n = mergeIn(paper, root, Math.max(precision, 2))
-    if (n === 0) return svg
-    return new XMLSerializer().serializeToString(root)
-  } finally {
-    host.remove()
-    paper.project.clear()
-  }
+  return withLiveSvg(svg, (paper, root) => mergeIn(paper, root, Math.max(precision, 2)))
 }

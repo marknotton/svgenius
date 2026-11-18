@@ -20,6 +20,7 @@ export const IconTrash = (p: P) => <Icon {...p}><path d="M2.5 4h11M6 4V2.75h4V4M
 export const IconBack = (p: P) => <Icon {...p}><path d="M10 3 5 8l5 5" /></Icon>
 export const IconPlay = (p: P) => <Icon {...p}><path d="M4.5 2.75v10.5L13 8 4.5 2.75Z" /></Icon>
 export const IconRefresh = (p: P) => <Icon {...p}><path d="M13.25 8a5.25 5.25 0 1 1-1.54-3.71M13.25 2.5v3h-3" /></Icon>
+export const IconReport = (p: P) => <Icon {...p}><path d="M4 1.5h5.5L12.5 4.5v10h-8.5zM9.5 1.5v3h3M6 8h4.5M6 10.5h4.5M6 5.5h2" /></Icon>
 export const IconDownload = (p: P) => <Icon {...p}><path d="M8 2v8.5M4.5 7 8 10.5 11.5 7M2.5 13.5h11" /></Icon>
 export const IconUpload = (p: P) => <Icon {...p}><path d="M8 10.5V2M4.5 5.5 8 2l3.5 3.5M2.5 13.5h11" /></Icon>
 export const IconEye = (p: P) => <Icon {...p}><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8Z" /><circle cx="8" cy="8" r="2" /></Icon>

@@ -18,6 +18,9 @@ export function defaultSvgoSettings(): SvgoSettings {
     trim: { enabled: false, padding: 0, unit: "%", aspect: "fit", scale: 1, sizeUnit: "%", sizeSide: "height", sizePx: 100, artScale: 1, offsetX: 0, offsetY: 0 },
     appendMarkup: "",
     mergePaths: false,
+    flattenTransforms: false,
+    cutOutStrokes: false,
+    cutOutWhites: false,
     custom: {}
   }
 }
@@ -133,7 +136,7 @@ export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
   const t = settings.trim
   const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.sizeUnit === "px" ? [t.sizeSide, t.sizePx] : t.scale, t.artScale, t.offsetX, t.offsetY]
-  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths])
+  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths, settings.flattenTransforms, settings.cutOutStrokes, settings.cutOutWhites])
 }
 
 export function runSpec(settings: SvgoSettings, plugins: CustomPlugin[]): RunSpec {
@@ -198,6 +201,9 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
     },
     appendMarkup: typeof raw.appendMarkup === "string" ? raw.appendMarkup : "",
     mergePaths: raw.mergePaths === true,
+    flattenTransforms: raw.flattenTransforms === true,
+    cutOutStrokes: raw.cutOutStrokes === true,
+    cutOutWhites: raw.cutOutWhites === true,
     custom,
     attrRules,
     replacements,

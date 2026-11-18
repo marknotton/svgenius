@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { IconDownload, IconPlay } from "../icons"
+import { IconDownload, IconPlay, IconReport } from "../icons"
 import { ContextMenu, type MenuState } from "./ContextMenu"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { SvgItem } from "../lib/types"
@@ -23,6 +23,7 @@ interface Props {
   onExport: (clear: boolean) => void
   /** Shows the export file name options */
   onNames: () => void
+  onReport: () => void
 }
 
 export function Footer(p: Props) {
@@ -60,6 +61,10 @@ export function Footer(p: Props) {
         </span>
       )}
 
+      <button className="btn btn--secondary" onClick={p.onReport} disabled={p.items.length === 0}
+        title="A copyable report of the work done, to log or send to a client">
+        <IconReport /> Report
+      </button>
       <button className={`btn ${outstanding > 0 ? "btn--primary" : "btn--secondary"}`} onClick={p.onOptimise} disabled={n === 0 || p.busy || outstanding === 0}
         title="Run every file with its current settings. Live mode only updates the rows on screen">
         {p.busy ? <span className="spinner spinner--sm" /> : <IconPlay />} Optimise {scope}{plural(n, "file")}

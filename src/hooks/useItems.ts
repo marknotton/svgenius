@@ -4,7 +4,7 @@ import { CONCURRENCY, optimiseSvg, runLimited } from "../lib/optimiser"
 import { newId } from "../lib/settings"
 import { errorMessage, readSvg, scanPaths } from "../lib/tauri"
 import { postProcess } from "../lib/trim"
-import type { OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "../lib/types"
+import type { GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "../lib/types"
 
 // ── File list + optimisation queue ────────────────────────────────────────────
 
@@ -93,9 +93,10 @@ export function useItems() {
       patch(item.id, { status: "running", error: undefined })
       try {
         const { data, replaced } = await optimiseSvg(item.source as string, spec)
-        const output = await postProcess(data, spec.svgo)
+        const effects: GeometryEffect[] = []
+        const output = await postProcess(data, spec.svgo, effects)
         if (runs.current.get(item.id) !== run) return
-        const result = { output, size: byteLength(output), replaced, key: spec.key }
+        const result = { output, size: byteLength(output), replaced, effects, key: spec.key }
         results.set(item.id, result)
         patch(item.id, { status: "done", result, errorKey: undefined })
       } catch (e) {

@@ -76,6 +76,12 @@ export interface SvgoSettings {
   appendMarkup: string
   /** Boolean-union shapes that share a fill and opacity into one path */
   mergePaths: boolean
+  /** Bake transform attributes into the path data (Beta) */
+  flattenTransforms: boolean
+  /** Strokes become real holes in the shapes beneath them (Beta) */
+  cutOutStrokes: boolean
+  /** White shapes become real holes in the shapes beneath them (Beta) */
+  cutOutWhites: boolean
   /** Custom plugin id → on/off and its params as JSON text */
   custom: Record<string, { on: boolean, params: string }>
 }
@@ -161,11 +167,15 @@ export interface ScannedFile {
 
 export type ItemStatus = "loading" | "idle" | "running" | "done" | "error"
 
+export type GeometryEffect = "flatten" | "cutouts" | "merge"
+
 export interface OptimiseResult {
   output: string
   size: number
   /** How many find & replace matches and attribute rule changes were made */
   replaced: number
+  /** Beta geometry steps that actually changed something */
+  effects?: GeometryEffect[]
   /** Fingerprint of the settings used, so we can tell when a result is stale */
   key: string
 }

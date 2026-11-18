@@ -1,7 +1,9 @@
 import { svgDataUrl } from "./format"
 import { mergeOverlappingPaths } from "./mergePaths"
+import { flattenTransforms } from "./flattenTransforms"
+import { cutOutFakeClipping } from "./cutOuts"
 import { fmtNum, getAttr, parseLength, parseViewBox, replaceRoot, rootTag, setAttr, type ViewBox } from "./svgRoot"
-import type { ArtTransform, SvgoSettings, TrimSettings } from "./types"
+import type { ArtTransform, GeometryEffect, SvgoSettings, TrimSettings } from "./types"
 
 // ── Trim whitespace ───────────────────────────────────────────────────────────
 // Renders the SVG to a canvas and scans for visible pixels, so strokes, filters
@@ -198,9 +200,22 @@ export function appendMarkup(svg: string, markup: string) {
 }
 
 /** Everything that happens after SVGO, in order */
-export async function postProcess(svg: string, settings: SvgoSettings) {
+export async function postProcess(svg: string, settings: SvgoSettings, effects?: GeometryEffect[]) {
   const t = settings.trim
-  let out = settings.mergePaths ? await mergeOverlappingPaths(svg, settings.floatPrecision) : svg
+  const p = settings.floatPrecision
+  const step = async (effect: GeometryEffect, on: boolean, input: string, fn: () => Promise<string>) => {
+    if (!on) return input
+    const next = await fn()
+    if (next !== input) effects?.push(effect)
+    return next
+  }
+  // Beta geometry: holes first, so the shapes they leave can still merge
+  let out = await step("flatten", settings.flattenTransforms, svg, () => flattenTransforms(svg, p))
+  const cut = out
+  out = await step("cutouts", settings.cutOutStrokes || settings.cutOutWhites, cut, () =>
+    cutOutFakeClipping(cut, { strokes: settings.cutOutStrokes, whites: settings.cutOutWhites }, p))
+  const merge = out
+  out = await step("merge", settings.mergePaths, merge, () => mergeOverlappingPaths(merge, p))
   out = transformSvg(out, { scale: t.artScale, offsetX: t.offsetX, offsetY: t.offsetY })
   // Outside the artwork group, so it isn't moved or scaled with it
   out = appendMarkup(out, settings.appendMarkup)
