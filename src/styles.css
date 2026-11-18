@@ -777,3 +777,14 @@ body.is-resizing * { user-select: none !important; }
 .filters__value { flex: 1 1 200px; min-width: 140px; max-width: 420px; }
 .filters__pair { display: flex; gap: 6px; }
 .filters__pair .input { flex: 1; min-width: 0; }
+
+/* ── Sticky section headings in the settings sidebar ───────────────────────── */
+/* Each heading sticks to the top while its own section is in view */
+.panel__scroll .panel__section > .panel__label,
+.panel__scroll .panel__section > .plugins__head,
+.panel__scroll .panel__section > * > .plugins__head:first-child {
+  position: sticky; top: 0; z-index: 3;
+  margin: -12px -14px 2px; padding: 12px 14px 6px;
+  background: var(--surface);
+}
+.panel__scroll .panel__foot { border-top: 0; padding-block: 10px 14px; }
