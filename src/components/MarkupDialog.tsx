@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { IconCopy, IconReset, IconX } from "../icons"
 import { elementRanges, rangeAt } from "../lib/markupMap"
-import { convertToPath, removeElement, setAttr } from "../lib/markupEdit"
+import { convertToPath, duplicateElement, moveElement, removeElement, setAttr, type DropPlace } from "../lib/markupEdit"
 import { SHAPES, parsePath, serialisePath, type Seg } from "../lib/pathData"
 import type { Backdrop, SvgItem } from "../lib/types"
 import { CodeEditor } from "./CodeEditor"
@@ -48,6 +48,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return
       if ((e.target as Element | null)?.closest?.(".monaco-editor")) return
+      // A right-click menu closes first
+      if (document.querySelector(".context-menu")) return
       onClose()
     }
     window.addEventListener("keydown", onKey)
@@ -95,11 +97,25 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     setHover(-1)
   }
 
-  const convert = () => {
-    const r = ranges[selected]
-    if (!r || !el) return
-    const next = convertToPath(markup, r, el)
+  const convert = (i = selected) => {
+    const r = ranges[i], target = elements?.[i]
+    if (!r || !target) return
+    const next = convertToPath(markup, r, target)
     if (next) commit(next)
+  }
+
+  // Selects whatever now starts at `start` in the new markup
+  const commitAndSelect = (next: { markup: string, start: number } | null) => {
+    if (!next) return
+    commit(next.markup)
+    const i = elementRanges(next.markup).findIndex((r) => r.start === next.start)
+    setSelected(i)
+    setHover(-1)
+  }
+  const duplicate = (i: number) => { const r = ranges[i]; if (r && i > 0) commitAndSelect(duplicateElement(markup, r)) }
+  const move = (from: number, to: number, place: DropPlace) => {
+    const a = ranges[from], b = ranges[to]
+    if (a && b && from > 0 && from !== to) commitAndSelect(moveElement(markup, a, b, place))
   }
 
   const pick = (i: number, focus = true) => {
@@ -145,7 +161,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
             <div className="panel__label">Layers</div>
             {elements
               ? <LayersTree elements={elements} selected={selected} hover={hover}
-                  onPick={(i) => pick(i, false)} onHover={setHover} onDelete={editable ? deleteElement : undefined} />
+                  onPick={(i) => pick(i, false)} onHover={setHover} onDelete={editable ? deleteElement : undefined}
+                  onDuplicate={duplicate} onConvert={convert} onMove={move} />
               : <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
           </div>
           <InspectPreview markup={markup} backdrop={backdrop} selected={selected}
@@ -158,7 +175,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               <div className="path-panel path-panel--shape">
                 <span className="text-2">This is a <code>&lt;{el.localName}&gt;</code>.</span>
                 {editable
-                  ? <button className="btn btn--secondary btn--sm" onClick={convert} title="Swap it for a path that draws the same shape, keeping its other attributes, so its points can be edited">Convert to path</button>
+                  ? <button className="btn btn--secondary btn--sm" onClick={() => convert()} title="Swap it for a path that draws the same shape, keeping its other attributes, so its points can be edited">Convert to path</button>
                   : <span className="text-3">Switch to Before to convert it to a path.</span>}
               </div>
             )}

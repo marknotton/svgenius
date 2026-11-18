@@ -327,3 +327,63 @@ export function shapeToPathData(el: Element): string | null {
   }
   return null
 }
+
+// ── Moving several points at once ─────────────────────────────────────────────
+
+export interface PointRef { seg: number, kind: PointKind }
+export const pointKey = (p: PointRef) => `${p.seg}:${p.kind}`
+
+/** Every anchor (end point) of the path, for "select all" */
+export const allAnchors = (segs: Seg[]): PointRef[] =>
+  segs.flatMap((s, seg) => (s.c.toLowerCase() === "z" ? [] : [{ seg, kind: "end" as const }]))
+
+/**
+ * Moves points by (dx, dy) in the path's own units. End points bring their
+ * handles; each coordinate moves once, however many selected points share it.
+ */
+export function shiftPoints(segs: Seg[], points: PointRef[], dx: number, dy: number): Seg[] {
+  if (!points.length || (!dx && !dy)) return segs
+  const abs = absolutise(segs).map((s) => ({ c: s.c, v: [...s.v] }))
+  // "seg:valueIndex" of each x to move (y is the next value), plus lone axes
+  const pairs = new Set<string>()
+  const xs = new Set<number>(), ys = new Set<number>()
+  const end = (i: number) => {
+    const s = abs[i]
+    if (!s) return
+    switch (s.c) {
+      case "M": case "L": case "T": pairs.add(`${i}:0`); break
+      case "H": xs.add(i); break
+      case "V": ys.add(i); break
+      case "C": pairs.add(`${i}:4`); pairs.add(`${i}:2`); break
+      case "S": pairs.add(`${i}:2`); pairs.add(`${i}:0`); break
+      case "Q": pairs.add(`${i}:2`); break
+      case "A": pairs.add(`${i}:5`); break
+    }
+    if (abs[i + 1]?.c === "C") pairs.add(`${i + 1}:0`)
+  }
+  for (const p of points) {
+    const s = abs[p.seg]
+    if (!s) continue
+    if (p.kind === "end") end(p.seg)
+    else if (p.kind === "c1" && (s.c === "C" || s.c === "Q")) pairs.add(`${p.seg}:0`)
+    else if (p.kind === "c2" && s.c === "C") pairs.add(`${p.seg}:2`)
+    else if (p.kind === "c2" && s.c === "S") pairs.add(`${p.seg}:0`)
+  }
+  // A quadratic's one handle moves when both its ends do
+  const ends = new Set(points.filter((p) => p.kind === "end").map((p) => p.seg))
+  abs.forEach((s, i) => { if (s.c === "Q" && ends.has(i) && ends.has(i - 1)) pairs.add(`${i}:0`) })
+  for (const key of pairs) {
+    const [i, k] = key.split(":").map(Number)
+    abs[i].v[k] += dx
+    abs[i].v[k + 1] += dy
+  }
+  for (const i of xs) abs[i].v[0] += dx
+  for (const i of ys) abs[i].v[0] += dy
+  return withCase(abs, (i) => isRel(segs[i].c))
+}
+
+/** Where a point is, absolute */
+export function pointAt(geo: SegGeometry[], p: PointRef): Pt | undefined {
+  const g = geo[p.seg]
+  return g ? (p.kind === "end" ? g.to : p.kind === "c1" ? g.c1 : g.c2) : undefined
+}

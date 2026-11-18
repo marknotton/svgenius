@@ -43,3 +43,76 @@ export function convertToPath(markup: string, r: TagRange, el: Element): string 
   if (r.end > r.tagEnd) rest = rest.replace(new RegExp(`</${el.tagName}(\\s*)>$`), "</path$1>")
   return markup.slice(0, r.start) + tag + rest + markup.slice(r.end)
 }
+
+const lineStarted = (markup: string, at: number) => {
+  let i = at
+  while (i > 0 && (markup[i - 1] === " " || markup[i - 1] === "\t")) i--
+  return i === 0 || markup[i - 1] === "\n"
+}
+const indentAt = (markup: string, at: number) => {
+  let i = at
+  while (i > 0 && (markup[i - 1] === " " || markup[i - 1] === "\t")) i--
+  return markup.slice(i, at)
+}
+
+/** The span removeElement takes out */
+function removalSpan(markup: string, r: TagRange): [number, number] {
+  const out = removeElement(markup, r)
+  // Whatever removeElement dropped sits between the unchanged head and tail
+  let a = 0
+  while (a < r.start && markup[a] === out[a]) a++
+  return [a, a + markup.length - out.length]
+}
+
+/** Ids in a copied fragment get a suffix, so the file keeps them unique */
+function uniqueIds(fragment: string, markup: string) {
+  return fragment.replace(/(\sid\s*=\s*)(["'])([\s\S]*?)\2/g, (_m, pre: string, q: string, id: string) => {
+    let n = 2
+    while (markup.includes(`"${id}-${n}"`) || fragment.includes(`"${id}-${n}"`)) n++
+    return `${pre}${q}${id}-${n}${q}`
+  })
+}
+
+/** Copies the element right after itself. Returns where the copy starts */
+export function duplicateElement(markup: string, r: TagRange) {
+  const copy = uniqueIds(markup.slice(r.start, r.end), markup)
+  const own = lineStarted(markup, r.start)
+  const ins = own ? `\n${indentAt(markup, r.start)}${copy}` : copy
+  return { markup: markup.slice(0, r.end) + ins + markup.slice(r.end), start: r.end + ins.length - copy.length }
+}
+
+export type DropPlace = "before" | "after" | "inside"
+
+/**
+ * Moves element `from` before, after or into element `to` (as its last
+ * child). Returns null when that isn't possible, like dropping a group into
+ * itself. `start` is where the moved element now begins.
+ */
+export function moveElement(markup: string, from: TagRange, to: TagRange, place: DropPlace) {
+  if (to.start >= from.start && to.end <= from.end) return null
+  const text = markup.slice(from.start, from.end)
+  const own = lineStarted(markup, from.start)
+  let at: number, ins: string, offset: number
+  if (place === "inside") {
+    if (to.end === to.tagEnd) return null
+    const close = markup.lastIndexOf("</", to.end - 1)
+    if (close < to.tagEnd) return null
+    const ls = markup.lastIndexOf("\n", close - 1) + 1
+    if (own && /^[ \t]*$/.test(markup.slice(ls, close))) {
+      const indent = indentAt(markup, to.start) + "  "
+      at = ls; ins = `${indent}${text}\n`; offset = indent.length
+    } else { at = close; ins = text; offset = 0 }
+  } else if (place === "before") {
+    at = to.start
+    if (own && lineStarted(markup, to.start)) { ins = `${text}\n${indentAt(markup, to.start)}`; offset = 0 }
+    else { ins = text; offset = 0 }
+  } else {
+    at = to.end
+    if (own && lineStarted(markup, to.start)) { const pre = `\n${indentAt(markup, to.start)}`; ins = pre + text; offset = pre.length }
+    else { ins = text; offset = 0 }
+  }
+  const [rs, re] = removalSpan(markup, from)
+  if (at > rs && at < re) return null
+  if (at <= rs) return { markup: markup.slice(0, at) + ins + markup.slice(at, rs) + markup.slice(re), start: at + offset }
+  return { markup: markup.slice(0, rs) + markup.slice(re, at) + ins + markup.slice(at), start: at - (re - rs) + offset }
+}

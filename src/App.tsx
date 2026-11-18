@@ -31,6 +31,7 @@ import { canReveal, openInDefaultApp, errorMessage, exportSvgs, listenFor, liste
 import { preloadMonaco, setEditorTheme } from "./components/CodeEditor"
 import { RenderAnywayContext } from "./components/TooComplex"
 import { isBlocked } from "./lib/complexity"
+import { checkPreviewCss, type CssWarning } from "./lib/cssCheck"
 import { useTheme } from "./lib/theme"
 import { useFileWatch } from "./hooks/useFileWatch"
 import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "./lib/types"
@@ -571,8 +572,20 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       onCssToggle={() => setCssOpen((o) => !o)}
     />
   )
+  // Selectors that match the original but nothing once SVGO is done with it
+  const [cssWarnings, setCssWarnings] = useState<CssWarning[]>([])
+  useEffect(() => {
+    if (!cssOpen || !appliedCss.trim()) { setCssWarnings([]); return }
+    const t = setTimeout(() => {
+      const pairs = items.flatMap((i) => (i.source !== undefined && i.result && !isBlocked(i) ? [{ source: i.source, output: i.result.output }] : []))
+      setCssWarnings(checkPreviewCss(appliedCss, pairs))
+    }, 400)
+    return () => clearTimeout(t)
+  }, [cssOpen, appliedCss, items])
+
   const cssBar = cssOpen && (
     <PreviewCssBar
+      warnings={cssWarnings}
       css={settings.previewCss}
       enabled={settings.previewCssEnabled}
       onCss={(previewCss) => setViewPrefs({ previewCss })}

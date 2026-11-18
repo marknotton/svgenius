@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { Backdrop } from "../lib/types"
-import { geometry, movePoint, serialisePath, type PointKind, type Seg } from "../lib/pathData"
+import { allAnchors, geometry, pointAt, pointKey, serialisePath, shiftPoints, type PointKind, type PointRef, type Seg } from "../lib/pathData"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 
 // ── Inspectable preview ───────────────────────────────────────────────────────
@@ -55,6 +55,9 @@ function prepare(markup: string) {
 
 export function InspectPreview({ markup, backdrop, selected, onPick, onHover, path }: Props) {
   const stage = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLDivElement>(null)
+  // Set by the path overlay when a press was a drag, not a click
+  const swallowClick = useRef(false)
   const [hover, setHover] = useState(-1)
   const [boxes, setBoxes] = useState<{ sel: DOMRect | null, hov: DOMRect | null }>({ sel: null, hov: null })
   const css = usePreviewCss()
@@ -101,14 +104,19 @@ export function InspectPreview({ markup, backdrop, selected, onPick, onHover, pa
   }
 
   return (
-    <div className={`inspect thumb--${backdrop}`}>
+    <div ref={box} className={`inspect thumb--${backdrop}`}>
       <div ref={stage} className="inspect__stage"
-        onMouseMove={(e) => { const i = indexOf(e); if (i !== hover) { setHover(i); onHover(i) } }}
+        onMouseMove={(e) => { const i = Math.max(indexOf(e), 0) || -1; if (i !== hover) { setHover(i); onHover(i) } }}
         onMouseLeave={() => { setHover(-1); onHover(-1) }}
-        onClick={(e) => { const i = indexOf(e); if (i >= 0) onPick(i) }} />
+        onClick={(e) => {
+          if (swallowClick.current) { swallowClick.current = false; return }
+          // The svg itself isn't pickable here, so empty canvas clears the selection
+          const i = indexOf(e)
+          onPick(i > 0 ? i : -1)
+        }} />
       {boxes.hov && <div className="inspect__box inspect__box--hover" style={rect(boxes.hov)} />}
       {boxes.sel && !path && <div className="inspect__box" style={rect(boxes.sel)} />}
-      {path && root && <PathOverlay stage={stage} root={root} edit={path} />}
+      {path && root && <PathOverlay stage={stage} box={box} root={root} edit={path} swallowClick={swallowClick} />}
       {!root && <p className="inspect__error text-3">This markup doesn't parse, so it can't be previewed.</p>}
     </div>
   )
@@ -117,19 +125,41 @@ export function InspectPreview({ markup, backdrop, selected, onPick, onHover, pa
 const rect = (r: DOMRect) => ({ left: r.x, top: r.y, width: Math.max(r.width, 1), height: Math.max(r.height, 1) })
 
 // ── Draggable points for a path ───────────────────────────────────────────────
+// Click a point to select it (Shift adds), drag across the canvas to select
+// several, or press on the path itself to grab all of it. Arrow keys nudge.
 
-interface Drag { seg: number, kind: PointKind, pointer: number }
+interface Drag { pointer: number, from: DOMPoint, base: Seg[], points: PointRef[], grab?: [number, number], moved: boolean, last?: Seg[], whole?: boolean }
+interface Marquee { pointer: number, x0: number, y0: number, x1: number, y1: number, add: boolean }
 
-function PathOverlay({ stage, root, edit }: { stage: React.RefObject<HTMLDivElement | null>, root: Element, edit: PathEdit }) {
+interface OverlayProps {
+  stage: React.RefObject<HTMLDivElement | null>
+  box: React.RefObject<HTMLDivElement | null>
+  root: Element
+  edit: PathEdit
+  swallowClick: React.MutableRefObject<boolean>
+}
+
+const isTyping = (t: EventTarget | null) => {
+  const el = t as HTMLElement | null
+  return !!el?.closest?.("input, textarea, select, [contenteditable=true], .monaco-editor")
+}
+
+function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
   // Maps the path's own coordinates to the stage's pixels
   const [ctm, setCtm] = useState<DOMMatrix | null>(null)
   const [draft, setDraft] = useState<Seg[] | null>(null)
-  const drag = useRef<Drag | null>(null)
+  const [picked, setPicked] = useState<PointRef[]>([])
+  const [marquee, setMarquee] = useState<Marquee | null>(null)
   const segs = draft ?? edit.segs
   const target = () => stage.current?.shadowRoot?.querySelector(`[${ATTR}="${edit.index}"]`) as SVGGraphicsElement | null
+  const live = useRef({ segs, picked, ctm, edit })
+  live.current = { segs, picked, ctm, edit }
 
   // A commit comes back as new segments, so the draft can go
   useEffect(() => setDraft(null), [edit.segs])
+  // A different path, a different set of points
+  useEffect(() => setPicked([]), [edit.index])
+  useEffect(() => setPicked((p) => p.filter((x) => x.seg < edit.segs.length)), [edit.segs.length])
 
   useEffect(() => {
     const measure = () => {
@@ -147,8 +177,137 @@ function PathOverlay({ stage, root, edit }: { stage: React.RefObject<HTMLDivElem
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [root, edit.index])
 
+  // The click that follows a drag isn't a pick. Cleared after this event
+  // loop turn in case that click lands somewhere else
+  const swallow = () => { swallowClick.current = true; setTimeout(() => { swallowClick.current = false }, 0) }
+
+  /** Pointer position in the path's own units */
+  const toUser = (e: { clientX: number, clientY: number }) => {
+    const base = stage.current?.getBoundingClientRect()
+    const m = live.current.ctm
+    if (!base || !m) return null
+    return new DOMPoint(e.clientX - base.x, e.clientY - base.y).matrixTransform(m.inverse())
+  }
+
+  const startDrag = (e: PointerEvent | React.PointerEvent, points: PointRef[], grab?: [number, number], whole = false) => {
+    const from = toUser(e)
+    if (!from || live.current.edit.readOnly) return
+    ;(document.activeElement as HTMLElement | null)?.blur?.()
+    const d: Drag = { pointer: e.pointerId, from, base: live.current.segs, points, grab, moved: false, whole }
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== d.pointer) return
+      const p = toUser(ev)
+      if (!p) return
+      let dx = p.x - d.from.x, dy = p.y - d.from.y
+      if (!d.moved && Math.hypot(ev.clientX - (e.clientX), ev.clientY - (e.clientY)) < 2) return
+      d.moved = true
+      // Shift snaps the grabbed point to whole numbers
+      if (ev.shiftKey && d.grab) { dx = Math.round(d.grab[0] + dx) - d.grab[0]; dy = Math.round(d.grab[1] + dy) - d.grab[1] }
+      const next = shiftPoints(d.base, d.points, dx, dy)
+      d.last = next
+      setDraft(next)
+      // Straight onto the preview, the markup catches up on release
+      target()?.setAttribute("d", serialisePath(next))
+    }
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== d.pointer) return
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+      window.removeEventListener("pointercancel", up)
+      if (d.moved || d.whole) swallow()
+      if (!d.moved || !d.last) return
+      live.current.edit.onCommit(d.last)
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+    window.addEventListener("pointercancel", up)
+  }
+
+  // Presses on the canvas: on the path grabs all of it, elsewhere starts a
+  // selection box. A press that doesn't move is still a normal click
+  useEffect(() => {
+    const el = box.current
+    if (!el) return
+    const down = (e: PointerEvent) => {
+      if (e.button !== 0 || !live.current.ctm) return
+      const t = e.composedPath()[0] as Element | undefined
+      if (t?.closest?.(".po__anchor, .po__ctrl")) return
+      const hit = t?.closest?.(`[${ATTR}]`)
+      const index = hit ? Number(hit.getAttribute(ATTR)) : -1
+      const { edit: ed, segs: cur } = live.current
+      if (index === ed.index && !ed.readOnly) {
+        const all = allAnchors(cur)
+        setPicked(all)
+        startDrag(e, all, undefined, true)
+        return
+      }
+      const base = stage.current?.getBoundingClientRect()
+      if (!base) return
+      const x = e.clientX - base.x, y = e.clientY - base.y
+      const m: Marquee = { pointer: e.pointerId, x0: x, y0: y, x1: x, y1: y, add: e.shiftKey }
+      let started = false
+      const move = (ev: PointerEvent) => {
+        if (ev.pointerId !== m.pointer) return
+        m.x1 = ev.clientX - base.x
+        m.y1 = ev.clientY - base.y
+        if (!started && Math.hypot(m.x1 - m.x0, m.y1 - m.y0) < 4) return
+        started = true
+        setMarquee({ ...m })
+      }
+      const up = (ev: PointerEvent) => {
+        if (ev.pointerId !== m.pointer) return
+        window.removeEventListener("pointermove", move)
+        window.removeEventListener("pointerup", up)
+        window.removeEventListener("pointercancel", up)
+        setMarquee(null)
+        if (!started) return
+        swallow()
+        const { segs: now, ctm: mat } = live.current
+        if (!mat) return
+        const left = Math.min(m.x0, m.x1), right = Math.max(m.x0, m.x1)
+        const top = Math.min(m.y0, m.y1), bottom = Math.max(m.y0, m.y1)
+        const geo = geometry(now)
+        const inside = allAnchors(now).filter((p) => {
+          const q = pointAt(geo, p)
+          if (!q) return false
+          const s = new DOMPoint(q[0], q[1]).matrixTransform(mat)
+          return s.x >= left && s.x <= right && s.y >= top && s.y <= bottom
+        })
+        setPicked((prev) => {
+          if (!m.add) return inside
+          const keys = new Set(prev.map(pointKey))
+          return [...prev, ...inside.filter((p) => !keys.has(pointKey(p)))]
+        })
+      }
+      window.addEventListener("pointermove", move)
+      window.addEventListener("pointerup", up)
+      window.addEventListener("pointercancel", up)
+    }
+    el.addEventListener("pointerdown", down)
+    return () => el.removeEventListener("pointerdown", down)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Arrow keys nudge the selected points, Escape lets go of them
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      const { picked: sel, segs: cur, edit: ed } = live.current
+      if (!sel.length || isTyping(e.target) || e.metaKey || e.ctrlKey) return
+      if (e.key === "Escape") { e.preventDefault(); setPicked([]); return }
+      const dir: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+      const d = dir[e.key]
+      if (!d || ed.readOnly) return
+      e.preventDefault()
+      const step = e.shiftKey ? 10 : e.altKey ? 0.1 : 1
+      ed.onCommit(shiftPoints(cur, sel, d[0] * step, d[1] * step))
+    }
+    window.addEventListener("keydown", key)
+    return () => window.removeEventListener("keydown", key)
+  }, [])
+
   const geo = useMemo(() => geometry(segs), [segs])
   const d = useMemo(() => serialisePath(segs), [segs])
+  const pickedKeys = useMemo(() => new Set(picked.map(pointKey)), [picked])
   if (!ctm) return null
   const at = (p: [number, number]) => { const q = new DOMPoint(p[0], p[1]).matrixTransform(ctm); return [q.x, q.y] as const }
   const showHandles = !edit.readOnly && segs.length <= MAX_HANDLES
@@ -157,27 +316,19 @@ function PathOverlay({ stage, root, edit }: { stage: React.RefObject<HTMLDivElem
     if (e.button !== 0) return
     e.preventDefault()
     e.stopPropagation()
-    ;(e.currentTarget as Element).setPointerCapture(e.pointerId)
-    drag.current = { seg, kind, pointer: e.pointerId }
+    const ref = { seg, kind }
+    const key = pointKey(ref)
+    let sel = picked
+    if (e.shiftKey) {
+      sel = pickedKeys.has(key) ? picked.filter((p) => pointKey(p) !== key) : [...picked, ref]
+      setPicked(sel)
+      if (pickedKeys.has(key)) return
+    } else if (!pickedKeys.has(key)) {
+      sel = [ref]
+      setPicked(sel)
+    }
     edit.onActive(seg)
-  }
-  const move = (e: React.PointerEvent) => {
-    const g = drag.current
-    if (!g || g.pointer !== e.pointerId) return
-    const base = stage.current?.getBoundingClientRect()
-    if (!base) return
-    const p = new DOMPoint(e.clientX - base.x, e.clientY - base.y).matrixTransform(ctm.inverse())
-    // Shift snaps to whole numbers
-    const x = e.shiftKey ? Math.round(p.x) : p.x, y = e.shiftKey ? Math.round(p.y) : p.y
-    const next = movePoint(segs, g.seg, g.kind, x, y)
-    setDraft(next)
-    // Straight onto the preview, the markup catches up on release
-    target()?.setAttribute("d", serialisePath(next))
-  }
-  const up = (e: React.PointerEvent) => {
-    if (!drag.current || drag.current.pointer !== e.pointerId) return
-    drag.current = null
-    if (draft) edit.onCommit(draft)
+    startDrag(e, sel, pointAt(geo, ref))
   }
 
   const handles: React.ReactNode[] = []
@@ -191,27 +342,38 @@ function PathOverlay({ stage, root, edit }: { stage: React.RefObject<HTMLDivElem
         if (!p) return
         const q = at(p), f = at(from)
         handles.push(<line key={`${i}${kind}l`} className="po__arm" x1={f[0]} y1={f[1]} x2={q[0]} y2={q[1]} />)
-        handles.push(<circle key={`${i}${kind}`} className={`po__ctrl${on ? " is-active" : ""}`} cx={q[0]} cy={q[1]} r={4}
+        handles.push(<circle key={`${i}${kind}`} className={`po__ctrl${on ? " is-active" : ""}${pickedKeys.has(`${i}:${kind}`) ? " is-picked" : ""}`} cx={q[0]} cy={q[1]} r={4}
           onPointerDown={(e) => down(e, i, kind)} onPointerEnter={() => edit.onActive(i)} />)
       }
       ctrl(g.c1, g.from, "c1")
       ctrl(g.c2, g.to, "c2")
       if (c === "q" && g.c1) handles.push(<line key={`${i}q2`} className="po__arm" x1={at(g.c1)[0]} y1={at(g.c1)[1]} x2={anchor[0]} y2={anchor[1]} />)
-      handles.push(<rect key={`${i}e`} className={`po__anchor${on ? " is-active" : ""}${c === "m" ? " is-start" : ""}`}
+      handles.push(<rect key={`${i}e`} className={`po__anchor${on ? " is-active" : ""}${c === "m" ? " is-start" : ""}${pickedKeys.has(`${i}:end`) ? " is-picked" : ""}`}
         x={anchor[0] - 4} y={anchor[1] - 4} width={8} height={8}
         onPointerDown={(e) => down(e, i, "end")} onPointerEnter={() => edit.onActive(i)} />)
     })
   }
   // The active segment, drawn on its own so it stands out
-  const g = edit.active >= 0 ? geo[edit.active] : undefined
-  const activeD = g && segs[edit.active] ? segmentD(segs, edit.active, geo) : ""
+  const activeD = edit.active >= 0 && segs[edit.active] ? segmentD(segs, edit.active, geo) : ""
+  const matrix = `matrix(${ctm.a} ${ctm.b} ${ctm.c} ${ctm.d} ${ctm.e} ${ctm.f})`
 
   return (
-    <svg className="po" onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
-      <path className="po__outline" d={d} transform={`matrix(${ctm.a} ${ctm.b} ${ctm.c} ${ctm.d} ${ctm.e} ${ctm.f})`} />
-      {activeD && <path className="po__segment" d={activeD} transform={`matrix(${ctm.a} ${ctm.b} ${ctm.c} ${ctm.d} ${ctm.e} ${ctm.f})`} />}
-      {handles}
-    </svg>
+    <>
+      <svg className="po">
+        <path className="po__outline" d={d} transform={matrix} />
+        {activeD && <path className="po__segment" d={activeD} transform={matrix} />}
+        {handles}
+        {marquee && <rect className="po__marquee" x={Math.min(marquee.x0, marquee.x1)} y={Math.min(marquee.y0, marquee.y1)}
+          width={Math.abs(marquee.x1 - marquee.x0)} height={Math.abs(marquee.y1 - marquee.y0)} />}
+      </svg>
+      {!edit.readOnly && (
+        <p className="po__hint text-3">
+          {picked.length
+            ? `${picked.length} ${picked.length === 1 ? "point" : "points"} selected. Drag or use the arrow keys to move (Shift for 10), Esc to let go`
+            : "Drag across points to select them, or press on the path to move all of it"}
+        </p>
+      )}
+    </>
   )
 }
 

@@ -848,6 +848,10 @@ body.is-resizing * { user-select: none !important; }
 .layer__detail { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .layer__delete { margin-left: auto; flex: none; display: none; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--text-3); cursor: pointer; }
 .layer:hover .layer__delete, .layer.is-selected .layer__delete { display: inline-grid; }
+.layer.is-dragging { opacity: .45; }
+.layer.is-drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.layer.is-drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.layer.is-drop-inside { background: var(--accent-soft); outline: 1px dashed var(--accent); outline-offset: -1px; }
 .layer__delete:hover { color: var(--text); background: var(--surface-2); }
 
 /* Path commands */
@@ -876,6 +880,10 @@ body.is-resizing * { user-select: none !important; }
 .po__ctrl { fill: var(--accent); stroke: #fff; }
 .po__anchor.is-active, .po__ctrl.is-active { stroke-width: 2.5; }
 .po__anchor:hover, .po__ctrl:hover { stroke-width: 3; }
+.po__anchor.is-picked { fill: var(--accent); stroke: #fff; stroke-width: 2; }
+.po__ctrl.is-picked { fill: #fff; stroke: var(--accent); stroke-width: 2; }
+.po__marquee { fill: rgba(var(--accent-rgb), .1); stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; }
+.po__hint { position: absolute; left: 8px; bottom: 6px; right: 8px; margin: 0; font-size: 11px; pointer-events: none; text-shadow: 0 0 3px var(--bg), 0 0 3px var(--bg); }
 
 /* Too complex to render */
 .too-complex { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 6px; text-align: center; border: 1px dashed var(--border); border-radius: var(--radius-sm); background: var(--surface); font-size: 11px; flex: none; }
@@ -1010,3 +1018,6 @@ input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hove
 .btn-join > :not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; }
 .btn-join > :not(:last-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .btn-join > .is-on { position: relative; z-index: 1; }
+
+.css-bar__warnings { list-style: none; margin: 6px 0 0; padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--accent-border); border-radius: var(--radius-sm); background: var(--accent-soft); font-size: 12px; color: var(--text); }
+.css-bar__warnings code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--accent-ink); }

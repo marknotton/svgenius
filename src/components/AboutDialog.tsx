@@ -1,5 +1,5 @@
 import { IconX, Logo } from "../icons"
-import { APP_VERSION, CREDITS, HISTORY } from "../lib/about"
+import { APP_VERSION, CREDITS, HISTORY, INSPIRATION } from "../lib/about"
 import { DOWNLOAD_URL, REPO_URL, isDesktop } from "../lib/platform"
 import { Modal } from "./Dialogs"
 
@@ -46,6 +46,19 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
           <p className="text-3">SVGenius stands on the shoulders of these open source projects. Thank you to everyone who makes them.</p>
           <ul className="about__credits">
             {CREDITS.map((c) => (
+              <li key={c.name}>
+                <a href={c.url} target="_blank" rel="noopener">{c.name}</a> <span className="text-3">{c.licence}</span>
+                <div className="text-2">{c.what}</div>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="settings__section">
+          <span className="panel__label">Inspired by</span>
+          <p className="text-3">Ideas worth borrowing. SVGenius's own versions are written from scratch.</p>
+          <ul className="about__credits">
+            {INSPIRATION.map((c) => (
               <li key={c.name}>
                 <a href={c.url} target="_blank" rel="noopener">{c.name}</a> <span className="text-3">{c.licence}</span>
                 <div className="text-2">{c.what}</div>

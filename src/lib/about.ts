@@ -11,6 +11,18 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.6.0",
+    date: "18 November 2026",
+    notes: [
+      "Drag across a path's points to select several, then drag them or nudge them with the arrow keys",
+      "Press on the selected path to move all of it",
+      "Right-click a layer to duplicate, convert, move or delete it, or drag layers to reorder them",
+      "Clicking empty canvas clears the selection instead of picking the whole SVG",
+      "The CSS bar says when a selector stops matching after optimising, and which SVGO plugin is the likely cause",
+      "About lists the tools that inspired SVGenius"
+    ]
+  },
+  {
     version: "0.5.0",
     date: "18 November 2026",
     notes: [
@@ -117,6 +129,13 @@ export const CREDITS: Credit[] = [
   { name: "Rust and Serde", url: "https://serde.rs", licence: "MIT / Apache-2.0", what: "The desktop side: scanning folders, reading and writing files." },
   { name: "CSSTree and CSSO", url: "https://github.com/csstree/csstree", licence: "MIT", what: "Parse and minify the CSS inside SVGs, via SVGO." },
   { name: "GitHub Pages and Actions", url: "https://pages.github.com", licence: "Service", what: "Free hosting for the browser version and builds for the desktop app." },
-  { name: "SVG Path Editor", url: "https://github.com/Yqnn/svg-path-editor", licence: "AGPL-3.0", what: "Yqnn's path editor inspired the path tools: the command list, draggable points and Reverse. Ours is written from scratch, no code is shared." },
   { name: "Playwright", url: "https://playwright.dev", licence: "Apache-2.0", what: "Used to test the app and take the README screenshots." }
+]
+
+/** Tools whose ideas shaped SVGenius. No code is borrowed from them */
+export const INSPIRATION: Credit[] = [
+  { name: "SVG Path Editor", url: "https://github.com/Yqnn/svg-path-editor", licence: "by Yqnn · AGPL-3.0", what: "The path tools: the command list, draggable points and handles, absolute and relative switching, and Reverse." },
+  { name: "Inkscape", url: "https://inkscape.org", licence: "GPL-2.0+", what: "Its XML editor and layers panel inspired the layers tree you can select, reorder and duplicate from." },
+  { name: "Browser developer tools", url: "https://developer.chrome.com/docs/devtools", licence: "Chromium / Firefox", what: "The Inspect picker: hover the artwork, click a shape, land on its markup." },
+  { name: "SVGOMG", url: "https://github.com/jakearchibald/svgomg", licence: "by Jake Archibald · MIT", what: "The original friendly face for SVGO, with live before and after previews." }
 ]

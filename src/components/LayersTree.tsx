@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { IconCaret, IconTrash } from "../icons"
+import type { DropPlace } from "../lib/markupEdit"
+import { SHAPES } from "../lib/pathData"
+import { ContextMenu, type MenuState } from "./ContextMenu"
+
+/** Elements that can hold others, so things can be dropped into them */
+const CONTAINERS = new Set(["svg", "g", "defs", "symbol", "mask", "clipPath", "a", "switch", "pattern", "marker"])
 
 // ── Layers: every element of the SVG as a tree ────────────────────────────────
 // Indices are tree order, the same numbering as the inspect preview and the
@@ -11,8 +17,11 @@ interface Props {
   hover: number
   onPick: (index: number) => void
   onHover: (index: number) => void
-  /** Only in the editable markup */
+  /** The rest only in the editable markup */
   onDelete?: (index: number) => void
+  onDuplicate?: (index: number) => void
+  onConvert?: (index: number) => void
+  onMove?: (from: number, to: number, place: DropPlace) => void
 }
 
 interface Node { i: number, depth: number, parent: number, kids: number, label: string, detail: string }
@@ -28,7 +37,7 @@ function describe(el: Element) {
   return { label: el.localName, detail }
 }
 
-export function LayersTree({ elements, selected, hover, onPick, onHover, onDelete }: Props) {
+export function LayersTree({ elements, selected, hover, onPick, onHover, onDelete, onDuplicate, onConvert, onMove }: Props) {
   const nodes = useMemo(() => {
     const index = new Map(elements.map((el, i) => [el, i]))
     return elements.map((el, i): Node => {
@@ -83,6 +92,48 @@ export function LayersTree({ elements, selected, hover, onPick, onHover, onDelet
     return next
   })
 
+  const [menu, setMenu] = useState<MenuState | null>(null)
+  const [drag, setDrag] = useState<{ from: number, over: number, place: DropPlace } | null>(null)
+  const indexOf = useMemo(() => new Map(elements.map((el, i) => [el, i])), [elements])
+  const sibling = (i: number, dir: -1 | 1) => {
+    const el = elements[i]
+    const s = dir < 0 ? el?.previousElementSibling : el?.nextElementSibling
+    return s ? indexOf.get(s) ?? -1 : -1
+  }
+
+  const openMenu = (e: React.MouseEvent, i: number) => {
+    e.preventDefault()
+    onPick(i)
+    if (!onDelete) return
+    const el = elements[i]
+    const up = sibling(i, -1), down = sibling(i, 1)
+    setMenu({
+      x: e.clientX, y: e.clientY,
+      items: [
+        { label: "Duplicate", run: () => onDuplicate?.(i), disabled: i === 0 },
+        ...(SHAPES.has(el.localName) ? [{ label: "Convert to path", run: () => onConvert?.(i) }] : []),
+        "-",
+        { label: "Move up", run: () => onMove?.(i, up, "before"), disabled: i === 0 || up < 0 },
+        { label: "Move down", run: () => onMove?.(i, down, "after"), disabled: i === 0 || down < 0 },
+        "-",
+        { label: "Delete", run: () => onDelete(i), danger: true, disabled: i === 0 },
+      ],
+    })
+  }
+
+  const placeFor = (e: React.DragEvent, i: number): DropPlace => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const y = (e.clientY - r.top) / r.height
+    if (i === 0) return "inside"
+    if (CONTAINERS.has(elements[i].localName)) return y < 0.25 ? "before" : y > 0.75 ? "after" : "inside"
+    return y < 0.5 ? "before" : "after"
+  }
+  const canDrop = (from: number, to: number) => {
+    // Not onto itself or into its own children
+    for (let p: Element | null = elements[to]; p; p = p.parentElement) if (p === elements[from]) return false
+    return true
+  }
+
   const onKey = (e: React.KeyboardEvent) => {
     if (selected < 0) return
     const at = visible.findIndex((n) => n.i === selected)
@@ -99,8 +150,20 @@ export function LayersTree({ elements, selected, hover, onPick, onHover, onDelet
       {visible.map((n) => (
         <div key={n.i} data-layer={n.i} role="treeitem" aria-selected={n.i === selected}
           aria-expanded={n.kids ? !collapsed.has(n.i) : undefined}
-          className={`layer${n.i === selected ? " is-selected" : ""}${n.i === hover ? " is-hover" : ""}`}
+          className={`layer${n.i === selected ? " is-selected" : ""}${n.i === hover ? " is-hover" : ""}${drag?.over === n.i ? ` is-drop-${drag.place}` : ""}${drag?.from === n.i ? " is-dragging" : ""}`}
           style={{ paddingLeft: 4 + n.depth * 12 }}
+          draggable={!!onMove && n.i > 0}
+          onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(n.i)); setDrag({ from: n.i, over: -1, place: "before" }) }}
+          onDragOver={(e) => {
+            if (!drag || !canDrop(drag.from, n.i)) return
+            e.preventDefault()
+            const place = placeFor(e, n.i)
+            if (drag.over !== n.i || drag.place !== place) setDrag({ ...drag, over: n.i, place })
+          }}
+          onDragLeave={() => { if (drag?.over === n.i) setDrag({ ...drag, over: -1 }) }}
+          onDrop={(e) => { e.preventDefault(); if (drag && drag.over >= 0) onMove?.(drag.from, drag.over, drag.place); setDrag(null) }}
+          onDragEnd={() => setDrag(null)}
+          onContextMenu={(e) => openMenu(e, n.i)}
           onMouseEnter={() => onHover(n.i)}
           onClick={() => onPick(n.i)}>
           {n.kids > 0
@@ -115,6 +178,7 @@ export function LayersTree({ elements, selected, hover, onPick, onHover, onDelet
           )}
         </div>
       ))}
+      {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
     </div>
   )
 }

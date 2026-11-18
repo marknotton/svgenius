@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react"
+import type { CssWarning } from "../lib/cssCheck"
 
 // ── Preview-only CSS ──────────────────────────────────────────────────────────
 // Injected into each SVG as a <style> just before </svg>, so it wins over the
@@ -33,9 +34,10 @@ interface BarProps {
   enabled: boolean
   onCss: (css: string) => void
   onEnabled: (on: boolean) => void
+  warnings?: CssWarning[]
 }
 
-export function PreviewCssBar({ css, enabled, onCss, onEnabled }: BarProps) {
+export function PreviewCssBar({ css, enabled, onCss, onEnabled, warnings = [] }: BarProps) {
   return (
     <div className="css-bar">
       <div className="css-bar__head">
@@ -52,6 +54,15 @@ export function PreviewCssBar({ css, enabled, onCss, onEnabled }: BarProps) {
         value={css}
         onChange={(e) => onCss(e.target.value)}
       />
+      {warnings.length > 0 && (
+        <ul className="css-bar__warnings">
+          {warnings.map((w) => (
+            <li key={w.selector}>
+              <code>{w.selector}</code> matches the original but nothing after optimising{w.files > 1 ? ` (${w.files} files)` : ""}. {w.hint}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
