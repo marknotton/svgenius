@@ -27,7 +27,8 @@ export async function geometryBounds(svg: string): Promise<ViewBox | null> {
           continue
         }
         if (!SHAPES.has(el.localName)) { unsupported = true; return }
-        if (cs.visibility === "hidden" || Number(cs.opacity) === 0) continue
+        // (visibility is skipped: the measuring host itself is hidden)
+        if (Number(cs.opacity) === 0) continue
         const fill = cs.fill !== "none" && Number(cs.fillOpacity) > 0 && el.localName !== "line"
         const stroke = cs.stroke !== "none" && parseFloat(cs.strokeWidth) > 0 && Number(cs.strokeOpacity) > 0
         if (!fill && !stroke) continue
@@ -56,5 +57,6 @@ export async function geometryBounds(svg: string): Promise<ViewBox | null> {
   })
   if (unsupported || !box) return null
   const b = box as paper.Rectangle
-  return b.width > 0 && b.height > 0 ? { x: b.x, y: b.y, w: b.width, h: b.height } : null
+  const ok = [b.x, b.y, b.width, b.height].every(Number.isFinite) && b.width > 0 && b.height > 0
+  return ok ? { x: b.x, y: b.y, w: b.width, h: b.height } : null
 }

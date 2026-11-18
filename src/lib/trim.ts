@@ -103,7 +103,7 @@ export async function trimSvg(svg: string, trim: TrimSettings, precision: number
   if (!vb) return svg
 
   const box = (await exactBounds(svg, vb)) ?? await contentBounds(svg, vb)
-  if (!box) return svg
+  if (!box || ![box.x, box.y, box.w, box.h].every(Number.isFinite)) return svg
 
   const pad = trim.unit === "%" ? (Math.max(box.w, box.h) * trim.padding) / 100 : trim.padding
   // Never let a big inset flip the box inside out

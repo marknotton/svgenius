@@ -76,7 +76,7 @@ export const FileRow = memo(function FileRow(p: Props) {
             <figcaption className="text-3">Before{original && ` · ${fmtNum(original.w, 2)} × ${fmtNum(original.h, 2)}`}</figcaption>
           </figure>
           <figure className="file-card__pane">
-            <Thumb svg={item.result?.output} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
+            <Thumb svg={item.result?.output} pending={item.status === "running"} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
             <figcaption className="text-3">
               After{size && item.result && <> · <span key={flash} className={`file-row__dims${flash ? " is-flash" : ""}`}>{dims}</span></>}
             </figcaption>
@@ -100,10 +100,10 @@ export const FileRow = memo(function FileRow(p: Props) {
       {p.compare ? (
         <div className="file-row__compare">
           <Thumb svg={item.source} size={thumbPx} backdrop={backdrop} label={`${item.name} before`} />
-          <Thumb svg={item.result?.output} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
+          <Thumb svg={item.result?.output} pending={item.status === "running"} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
         </div>
       ) : (
-        <Thumb svg={item.result?.output ?? item.source} size={thumbPx} backdrop={backdrop} label={item.name} />
+        <Thumb svg={item.result?.output ?? item.source} pending={item.status === "running"} size={thumbPx} backdrop={backdrop} label={item.name} />
       )}
       <div className="file-row__meta">
         <div className="file-row__name" title={item.path}><Name item={item} to={p.exportName} /></div>
