@@ -11,6 +11,11 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.3.1",
+    date: "18 November 2026",
+    notes: ["A bigger app icon"]
+  },
+  {
     version: "0.3.0",
     date: "18 November 2026",
     notes: [
