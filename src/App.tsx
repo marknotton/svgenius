@@ -14,6 +14,7 @@ import { FileList } from "./components/FileList"
 import { Footer } from "./components/Footer"
 import { PreviewCssBar, PreviewCssContext } from "./components/PreviewCss"
 import { RenamePanel } from "./components/RenamePanel"
+import { InfoTip } from "./components/InfoTip"
 import { FilterBar } from "./components/FilterBar"
 import { activeRules, emptyFilters, matchesFilters, nextFlag, type FilterSet } from "./lib/filters"
 import { ReportDialog } from "./components/ReportDialog"
@@ -22,7 +23,7 @@ import { Toasts, useToasts } from "./components/Toast"
 import { ViewControls } from "./components/ViewControls"
 import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/useAppSettings"
 import { useItems } from "./hooks/useItems"
-import { IconInfo, IconX } from "./icons"
+import { IconX } from "./icons"
 import { planExport } from "./lib/exportPlan"
 import { plural } from "./lib/format"
 import { activeCustom, buildExport, defaultLayout, hashCode, mergeImport, newId, PREVIEW_PX, runSpec, SIDEBAR } from "./lib/settings"
@@ -605,16 +606,20 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 focusId={focusId}
                 onVisible={setVisibleIds}
                 liveToggle={
-                  <label className="footer__check live-toggle"
-                    title={"Live preview: as you change settings, the files on screen (and the one you're inspecting) re-optimise straight away so the previews and sizes stay current.\n\nFiles further down catch up as you scroll. Turn it off for very large batches, then use Optimise when you're ready."}>
-                    <input type="checkbox" className="checkbox" checked={settings.liveUpdates}
-                      onChange={(e) => update((s) => ({ ...s, liveUpdates: e.target.checked }))} />
-                    Live preview <IconInfo />
-                  </label>
+                  <span className="live-toggle-wrap">
+                    <label className="footer__check live-toggle">
+                      <input type="checkbox" className="checkbox" checked={settings.liveUpdates}
+                        onChange={(e) => update((s) => ({ ...s, liveUpdates: e.target.checked }))} />
+                      Live preview
+                    </label>
+                    <InfoTip label="About live preview">
+                      <p><strong>Live preview</strong> re-optimises the files on screen (and the one you're inspecting) as you change settings, so previews and sizes stay current.</p>
+                      <p>Files further down catch up as you scroll near them. With it off, nothing updates until you press Optimise.</p>
+                      <p>Turn it off for very large batches, then Optimise when you're ready.</p>
+                    </InfoTip>
+                  </span>
                 }
                 onSelectAll={selectAll}
-                onPreset={(id, presetId) => setPreset([id], presetId)}
-                onNewPreset={newPresetForItem}
                 onContextMenu={rowMenu}
                 onFlag={flagClick}
                 filterCount={filterCount}
@@ -640,7 +645,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
           <aside className="sidebar">
             <div className="sidebar__tabs" role="tablist">
               <button role="tab" aria-selected={sidebarTab === "preset"} className={`sidebar__tab${sidebarTab === "preset" ? " is-active" : ""}`}
-                onClick={() => setSidebarTab("preset")}>Preset</button>
+                onClick={() => setSidebarTab("preset")}>Config</button>
               <button role="tab" aria-selected={sidebarTab === "names"} className={`sidebar__tab${sidebarTab === "names" ? " is-active" : ""}`}
                 onClick={() => setSidebarTab("names")}>File names{settings.rename.enabled && <span className="flag__dot" />}</button>
               {focused ? (
@@ -717,7 +722,6 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             if (res.size > 0) push({ tone: "success", text: `Optimised ${plural(res.size, "file")}. Ready to export` })
           }}
           onExport={doExport}
-          onNames={() => setSidebarTab("names")}
           onReport={() => setReportOpen(true)}
         />
         {reportOpen && (

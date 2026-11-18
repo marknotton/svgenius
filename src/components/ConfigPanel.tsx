@@ -54,13 +54,7 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
           </button>
           <span className="text-3">{usage ? `Used by ${plural(usage, "file")}` : "Not used by any files yet"}</span>
         </div>
-      </div>
-
-      <div className="panel__scroll">
-        <PresetEditor settings={s} edit={edit} customPlugins={settings.customPlugins}
-          onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} />
-        {/* Scrolls with the settings rather than sitting fixed at the bottom */}
-        <div className="panel__foot">
+        <div className="panel__actions">
           <button className="btn btn--ghost btn--sm" onClick={p.onReset} title="Reset this preset to SVGO's defaults">
             <IconReset /> Reset
           </button>
@@ -70,6 +64,10 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
         </div>
       </div>
 
+      <div className="panel__scroll">
+        <PresetEditor settings={s} edit={edit} customPlugins={settings.customPlugins}
+          onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} />
+      </div>
     </aside>
   )
 }

@@ -22,8 +22,6 @@ interface Props {
   isStale: (item: SvgItem) => boolean
   onToggle: (id: string, e: MouseEvent) => void
   onSelectAll: (all: boolean) => void
-  onPreset: (id: string, presetId: string | null) => void
-  onNewPreset: (item: SvgItem) => void
   onContextMenu: (id: string, e: MouseEvent) => void
   onFlag: (id: string, e: MouseEvent) => void
   /** Number of active filter rules, and the filter panel itself */
@@ -142,8 +140,6 @@ export function FileList(p: Props) {
             presets={settings.presets}
             defaultPreset={p.defaultPreset}
             onToggle={p.onToggle}
-            onPreset={p.onPreset}
-            onNewPreset={p.onNewPreset}
             onFlag={p.onFlag}
           />
         ))}

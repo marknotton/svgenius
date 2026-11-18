@@ -105,7 +105,8 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
         </section>
 
         <section className="panel__section inspector__code">
-          <div className="plugins__head">
+          <div className="panel__label">Markup</div>
+          <div className="inspector__codehead">
             <Segmented label="Markup" value={tab} onChange={setTab}
               options={[{ value: "source", label: "Before (editable)" }, { value: "output", label: "After" }]} />
             {tab === "source" && edited && <button className="link" onClick={p.onRevert} title="Throw away edits and reload the file's markup"><IconReset width={11} height={11} /> Revert</button>}
@@ -132,34 +133,39 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
 
         <section className="panel__section">
           <div className="panel__label">Settings for this file</div>
+          <Segmented label="Settings source" value={item.config ? "own" : "preset"}
+            onChange={(v) => (v === "own" ? p.onCustomise() : p.onUsePreset())}
+            options={[
+              { value: "preset", label: "Use a preset", title: "Share settings with other files" },
+              { value: "own", label: "Bespoke", title: "One-of-a-kind settings for just this file" }
+            ]} />
           {item.config ? (
             <>
-              <p className="text-3 inspector__hint">This file has its own copy of every setting. Changes here only affect it.</p>
-              <div className="inspector__own">
-                <button className="btn btn--secondary btn--sm" onClick={p.onSaveAsPreset} title="Turn these settings into a preset you can use on other files">Save as preset…</button>
-                <button className="btn btn--ghost btn--sm" onClick={p.onUsePreset} title="Drop this file's own settings">Use a preset again</button>
-              </div>
+              <p className="text-3 inspector__hint">This file has its own one-of-a-kind settings. Changes below only affect it.</p>
+              <button className="link inspector__save" onClick={p.onSaveAsPreset} title="Turn these settings into a preset you can use on other files">Save these as a preset…</button>
             </>
           ) : (
             <>
-              <label className="field-row">
-                <span>Preset</span>
-                <PresetSelect label={`Preset for ${item.name}`} presets={presets} defaultPreset={defaultPreset}
-                  value={item.presetId} onChange={p.onPreset} onCreateNew={p.onNewPreset} newLabel="New preset for this file…" />
-              </label>
-              <button className="btn btn--secondary btn--sm inspector__customise" onClick={p.onCustomise}
-                title={`Starts as a copy of “${p.presetName}”`}>Customise this file…</button>
-              <p className="text-3 inspector__hint">Gives this file every preset setting to change on its own, starting from “{p.presetName}”.</p>
+              <PresetSelect label={`Preset for ${item.name}`} presets={presets} defaultPreset={defaultPreset}
+                value={item.presetId} onChange={p.onPreset} onCreateNew={p.onNewPreset} newLabel="New preset for this file…" />
+              <p className="text-3 inspector__hint">Edit the preset in the Config tab (it changes every file that uses it), or open Advanced customisation to give just this file its own settings.</p>
             </>
           )}
         </section>
+        <details className="accordion" open={!!item.config}
+          onToggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open && !item.config) p.onCustomise() }}>
+          <summary className="accordion__summary">
+            <span className="panel__label">Advanced customisation</span>
+            <span className="text-3 accordion__hint">{item.config ? "Bespoke settings" : `Starts from “${p.presetName}”, only this file`}</span>
+          </summary>
+          {item.config && (
+            <PresetEditor settings={item.config} edit={p.onConfig} customPlugins={p.customPlugins}
+              onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} />
+          )}
+        </details>
         {big && (
           <MarkupDialog item={item} tab={tab} onTab={setTab} inspect={big.inspect} onInspect={(inspect) => setBig({ inspect })}
             backdrop={backdrop} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => setBig(null)} />
-        )}
-        {item.config && (
-          <PresetEditor settings={item.config} edit={p.onConfig} customPlugins={p.customPlugins}
-            onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} />
         )}
       </div>
     </div>

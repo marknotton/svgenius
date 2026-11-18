@@ -23,8 +23,6 @@ interface Props {
   onKeepStructure: (v: boolean) => void
   onOptimise: () => void
   onExport: (clear: boolean) => void
-  /** Shows the export file name options */
-  onNames: () => void
   onReport: () => void
 }
 
@@ -82,12 +80,10 @@ export function Footer(p: Props) {
             const r = e.currentTarget.getBoundingClientRect()
             setMenu({
               x: r.right - 220,
-              y: r.top - 8 - 4 * 30,
+              y: r.top - 8 - 2 * 30,
               items: [
                 { label: `Export ${scope}${count}…`, run: () => p.onExport(false) },
-                { label: `Export and clear ${count}…`, run: () => p.onExport(true) },
-                "-",
-                { label: "File names…", run: p.onNames }
+                { label: `Export and clear ${count}…`, run: () => p.onExport(true) }
               ]
             })
           }}>▾</button>

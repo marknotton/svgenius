@@ -1,11 +1,10 @@
-import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react"
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react"
 import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "../lib/svgRoot"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { FileTag } from "../lib/tags"
 import { FLAGS } from "../lib/filters"
 import { IconFlag } from "../icons"
 import type { Backdrop, Preset, SvgItem } from "../lib/types"
-import { PresetSelect } from "./PresetSelect"
 import { Thumb } from "./Thumb"
 
 interface Props {
@@ -25,12 +24,9 @@ interface Props {
   onToggle: (id: string, e: MouseEvent) => void
   onRowClick: (id: string, e: MouseEvent) => void
   onContextMenu: (id: string, e: MouseEvent) => void
-  onPreset: (id: string, presetId: string | null) => void
-  onNewPreset: (item: SvgItem) => void
   onFlag: (id: string, e: MouseEvent) => void
 }
 
-const OWN = "__own__"
 const NOT_YET = "Not optimised yet. Click Optimise, or turn on Live preview"
 
 export const FileRow = memo(function FileRow(p: Props) {
@@ -106,67 +102,61 @@ export const FileRow = memo(function FileRow(p: Props) {
       ) : (
         <Thumb svg={item.result?.output ?? item.source} pending={item.status === "running"} size={thumbPx} backdrop={backdrop} label={item.name} />
       )}
-      <div className="file-row__meta">
-        <div className="file-row__name" title={item.path}><Name item={item} to={p.exportName} /></div>
-        <div className="file-row__dir" title={item.path}>
-          {size && (
-            <span key={flash} className={`file-row__dims${flash ? " is-flash" : ""}`} title="Width × height">
-              {p.details && resized && original && <span className="strike text-3">{fmtNum(original.w, 2)} × {fmtNum(original.h, 2)}</span>}
-              {p.details && resized && " → "}
-              {dims}
+      <div className="file-row__main">
+        <div className="file-row__top">
+          <div className="file-row__name" title={item.path}><Name item={item} to={p.exportName} /></div>
+          <Stats item={item} stale={stale} compact />
+        </div>
+        <dl className="facts">
+          <Fact label="Size">
+            {item.result
+              ? <><span className="strike text-3">{formatBytes(item.size)}</span> {formatBytes(item.result.size)}</>
+              : formatBytes(item.size)}
+          </Fact>
+          <Fact label="Dimensions">
+            <span key={flash} className={`file-row__dims${flash ? " is-flash" : ""}`}>
+              {resized && original && <><span className="strike text-3">{fmtNum(original.w, 2)} × {fmtNum(original.h, 2)}</span> </>}
+              {dims || "–"}
             </span>
-          )}
-          {vbDiffers && <span className="file-row__dims" title="viewBox width × height"> · viewBox {fmtNum(vb.w, 2)} × {fmtNum(vb.h, 2)}</span>}
-          {size && dir && " · "}
-          {dir}
-        </div>
+          </Fact>
+          {vbDiffers && <Fact label="viewBox">{fmtNum(vb.w, 2)} × {fmtNum(vb.h, 2)}</Fact>}
+          <Fact label="Settings">{item.config ? "Own settings" : (p.presets.find((x) => x.id === item.presetId) ?? p.defaultPreset).name}</Fact>
+          {dir && <Fact label="Folder" wide>{dir}</Fact>}
+        </dl>
+        {p.tags.length > 0 && (
+          <div className="tags">
+            {p.tags.map((t) => <span key={t.label} className={`tag${t.tone ? ` tag--${t.tone}` : ""}`} title={t.title}>{t.label}</span>)}
+          </div>
+        )}
       </div>
-      {item.config ? (
-        <select className="select file-row__preset" aria-label={`Preset for ${item.name}`} value={OWN}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => p.onPreset(item.id, e.target.value === "__default__" ? null : e.target.value)}>
-          <option value={OWN}>Own settings</option>
-          <option disabled>──────────</option>
-          <option value="__default__">Use default preset</option>
-          {p.presets.map((x) => <option key={x.id} value={x.id}>Use {x.name}</option>)}
-        </select>
-      ) : (
-        <PresetSelect
-          className="file-row__preset"
-          label={`Preset for ${item.name}`}
-          presets={p.presets}
-          defaultPreset={p.defaultPreset}
-          value={item.presetId}
-          onChange={(id) => p.onPreset(item.id, id)}
-          onCreateNew={() => p.onNewPreset(item)}
-          newLabel="New preset for this file…"
-        />
-      )}
-      <Stats item={item} stale={stale} />
-      {p.tags.length > 0 && (
-        <div className="tags file-row__tags">
-          {p.tags.map((t) => <span key={t.label} className={`tag${t.tone ? ` tag--${t.tone}` : ""}`} title={t.title}>{t.label}</span>)}
-        </div>
-      )}
     </li>
   )
 })
 
-function Stats({ item, stale }: { item: SvgItem, stale: boolean }) {
+function Fact({ label, children, wide }: { label: string, children: ReactNode, wide?: boolean }) {
+  return (
+    <div className={`facts__item${wide ? " facts__item--wide" : ""}`}>
+      <dt>{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  )
+}
+
+function Stats({ item, stale, compact }: { item: SvgItem, stale: boolean, compact?: boolean }) {
   if (item.status === "loading") return <div className="file-row__stats"><span className="spinner" /></div>
   if (item.status === "error") return <div className="file-row__stats"><span className="pill pill--error" title={item.error}>Error</span></div>
   if (item.status === "running") {
-    return <div className="file-row__stats"><span className="text-2">{formatBytes(item.size)}</span><span className="spinner" /></div>
+    return <div className="file-row__stats">{!compact && <span className="text-2">{formatBytes(item.size)}</span>}<span className="spinner" /></div>
   }
   if (!item.result) {
-    return <div className="file-row__stats"><span className="text-2">{formatBytes(item.size)}</span></div>
+    return <div className="file-row__stats">{compact ? <span className="text-3">Not optimised</span> : <span className="text-2">{formatBytes(item.size)}</span>}</div>
   }
   const pct = savingPercent(item.size, item.result.size)
   return (
     <div className={`file-row__stats${stale ? " is-stale" : ""}`} title={stale ? "Settings have changed since this ran" : undefined}>
       {item.result.replaced > 0 && <span className="pill" title="Find & replace and attribute rule changes">{plural(item.result.replaced, "change")}</span>}
-      <span className="text-3 strike">{formatBytes(item.size)}</span>
-      <span>{formatBytes(item.result.size)}</span>
+      {!compact && <span className="text-3 strike">{formatBytes(item.size)}</span>}
+      {!compact && <span>{formatBytes(item.result.size)}</span>}
       <span className={`pill ${pct > 0 ? "pill--success" : "pill--warning"}`}>{formatSaving(item.size, item.result.size)}</span>
     </div>
   )
