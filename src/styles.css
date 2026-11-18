@@ -686,8 +686,6 @@ body.is-resizing * { user-select: none !important; }
 .list-search { width: 180px; flex: none; }
 .list-empty { padding: 24px 16px; text-align: center; }
 
-.live-toggle { display: inline-flex; align-items: center; gap: 5px; cursor: help; }
-.live-toggle svg { color: var(--text-3); }
 
 .rename { padding-bottom: 12px; }
 .rename__explain { margin: -2px 0 0; font-size: 11px; line-height: 1.45; }
@@ -828,9 +826,14 @@ body.is-resizing * { user-select: none !important; }
 .infotip p { margin: 0; }
 .infotip p + p { margin-top: 6px; }
 .infotip strong { color: var(--accent-ink); }
-.live-toggle-wrap { display: inline-flex; align-items: center; gap: 2px; }
 
 /* ── Range sliders in the brand colour (accent-color gets darkened by WebKit/Blink) */
 input[type="range"] { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: var(--border-input); outline-offset: 4px; }
 input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); box-shadow: 0 0 0 1px rgba(0, 0, 0, .18), var(--shadow-sm); cursor: pointer; }
 input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hover); }
+
+/* ── Live + Optimise, together ─────────────────────────────────────────────── */
+.run-group { display: inline-flex; align-items: center; gap: 4px; padding: 2px 2px 2px 10px; border: 1px solid var(--border-input); border-radius: var(--radius); background: var(--surface); }
+.run-group.is-live { border-color: var(--accent-border); background: var(--accent-soft); }
+.run-group__live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; cursor: pointer; }
+.run-group__btn { box-shadow: none; }

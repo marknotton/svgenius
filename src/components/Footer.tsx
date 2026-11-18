@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { IconDownload, IconPlay, IconReport } from "../icons"
 import { ContextMenu, type MenuState } from "./ContextMenu"
+import { InfoTip } from "./InfoTip"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { SvgItem } from "../lib/types"
 
@@ -18,6 +19,9 @@ interface Props {
   selectionCount: number
   /** Filters are narrowing the list */
   filtered: boolean
+  /** Live preview: re-optimise files on screen as settings change */
+  live: boolean
+  onLive: (on: boolean) => void
   busy: boolean
   keepStructure: boolean
   onKeepStructure: (v: boolean) => void
@@ -65,10 +69,23 @@ export function Footer(p: Props) {
         title="A copyable report of the work done, to log or send to a client">
         <IconReport /> Report
       </button>
-      <button className={`btn ${outstanding > 0 ? "btn--primary" : "btn--secondary"}`} onClick={p.onOptimise} disabled={n === 0 || p.busy || outstanding === 0}
-        title="Run every file with its current settings. Live mode only updates the rows on screen">
-        {p.busy ? <span className="spinner spinner--sm" /> : <IconPlay />} Optimise {scope}{plural(n, "file")}
-      </button>
+      {/* One place for running files: Live keeps the files on screen up to date, Optimise runs them all */}
+      <div className={`run-group${p.live ? " is-live" : ""}`}>
+        <label className="run-group__live" title="Live preview: files on screen re-optimise as you change settings">
+          <input type="checkbox" className="toggle__input" checked={p.live} onChange={(e) => p.onLive(e.target.checked)} />
+          <span className="toggle__track" aria-hidden="true"><span className="toggle__thumb" /></span>
+          Live
+        </label>
+        <InfoTip label="About Live and Optimise">
+          <p><strong>Live</strong> re-optimises the files on screen (and the one you're inspecting) as you change settings. Files further down catch up as you scroll near them.</p>
+          <p><strong>Optimise</strong> runs every file now, including ones you haven't scrolled to. Export needs every file optimised first.</p>
+          <p>Turn Live off for very large batches, then Optimise when you're ready.</p>
+        </InfoTip>
+        <button className={`btn run-group__btn ${outstanding > 0 ? "btn--primary" : "btn--secondary"}`} onClick={p.onOptimise} disabled={n === 0 || p.busy || outstanding === 0}
+          title={outstanding === 0 ? "Everything is up to date" : "Run every file with its current settings now"}>
+          {p.busy ? <span className="spinner spinner--sm" /> : <IconPlay />} {outstanding > 0 ? `Optimise ${scope}${plural(n, "file")}` : "All optimised"}
+        </button>
+      </div>
       <div className="split">
         <button className={`btn ${outstanding > 0 ? "btn--secondary" : "btn--primary"}`} onClick={() => p.onExport(false)} disabled={!canExport}
           title={canExport ? "Save the optimised files to a folder" : "Optimise first, so every exported file matches its current settings"}>

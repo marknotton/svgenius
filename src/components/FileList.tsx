@@ -16,7 +16,6 @@ interface Props {
   focusId: string | null
   onRowClick: (id: string, e: MouseEvent) => void
   onVisible: (ids: Set<string>) => void
-  liveToggle: ReactNode
   settings: AppSettings
   defaultPreset: Preset
   isStale: (item: SvgItem) => boolean
@@ -110,7 +109,6 @@ export function FileList(p: Props) {
           <IconFilter /> Filters{p.filterCount > 0 && <span className="filters-btn__count">{p.filterCount}</span>}
         </button>
         <div className="toolbar__spacer" />
-        {p.liveToggle}
         {p.viewControls}
       </div>
       {p.filtersOpen && p.filterBar}

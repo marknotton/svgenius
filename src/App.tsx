@@ -14,7 +14,6 @@ import { FileList } from "./components/FileList"
 import { Footer } from "./components/Footer"
 import { PreviewCssBar, PreviewCssContext } from "./components/PreviewCss"
 import { RenamePanel } from "./components/RenamePanel"
-import { InfoTip } from "./components/InfoTip"
 import { FilterBar } from "./components/FilterBar"
 import { activeRules, emptyFilters, matchesFilters, nextFlag, type FilterSet } from "./lib/filters"
 import { ReportDialog } from "./components/ReportDialog"
@@ -605,20 +604,6 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onRowClick={rowClick}
                 focusId={focusId}
                 onVisible={setVisibleIds}
-                liveToggle={
-                  <span className="live-toggle-wrap">
-                    <label className="footer__check live-toggle">
-                      <input type="checkbox" className="checkbox" checked={settings.liveUpdates}
-                        onChange={(e) => update((s) => ({ ...s, liveUpdates: e.target.checked }))} />
-                      Live preview
-                    </label>
-                    <InfoTip label="About live preview">
-                      <p><strong>Live preview</strong> re-optimises the files on screen (and the one you're inspecting) as you change settings, so previews and sizes stay current.</p>
-                      <p>Files further down catch up as you scroll near them. With it off, nothing updates until you press Optimise.</p>
-                      <p>Turn it off for very large batches, then Optimise when you're ready.</p>
-                    </InfoTip>
-                  </span>
-                }
                 onSelectAll={selectAll}
                 onContextMenu={rowMenu}
                 onFlag={flagClick}
@@ -714,6 +699,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
           failed={failedCount}
           selectionCount={selection.size}
           filtered={filterCount > 0}
+          live={settings.liveUpdates}
+          onLive={(liveUpdates) => update((s) => ({ ...s, liveUpdates }))}
           busy={busy}
           keepStructure={settings.keepStructure}
           onKeepStructure={(keepStructure) => update((s) => ({ ...s, keepStructure }))}
