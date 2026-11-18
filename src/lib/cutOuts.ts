@@ -61,7 +61,7 @@ const STROKE_ATTRS = ["stroke", "stroke-width", "stroke-opacity", "stroke-lineca
 // paper.js can't outline a stroke, so build it from the flattened centre line:
 // a quad per segment, plus joins and caps, all united.
 
-function strokeOutline(paper: Paper, shape: paper.PathItem, width: number, cs: CSSStyleDeclaration) {
+export function strokeOutline(paper: Paper, shape: paper.PathItem, width: number, cs: CSSStyleDeclaration) {
   const hw = width / 2
   const join = cs.strokeLinejoin
   const cap = cs.strokeLinecap

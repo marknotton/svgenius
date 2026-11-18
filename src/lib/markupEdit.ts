@@ -1,20 +1,30 @@
 import type { TagRange } from "./markupMap"
-import { SHAPE_ATTRS, shapeToPathData } from "./pathData"
+import { SHAPE_ATTRS, allAnchors, parsePath, serialisePath, shapeToPathData, shiftPoints, fmt } from "./pathData"
 
 // ── Small surgical edits to markup ────────────────────────────────────────────
 // Everything outside the touched element stays byte for byte as it was.
 
 const escapeAttr = (v: string) => v.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;")
 
-/** Sets (or adds) an attribute on the element's start tag */
-export function setAttr(markup: string, r: TagRange, name: string, value: string) {
-  const tag = markup.slice(r.start, r.tagEnd)
-  const re = new RegExp(`(\\s${name}\\s*=\\s*)(["'])[\\s\\S]*?\\2`)
-  const next = re.test(tag)
-    ? tag.replace(re, (_m, pre: string) => `${pre}"${escapeAttr(value)}"`)
-    : tag.replace(/\s*(\/?)>$/, (_m, slash: string) => ` ${name}="${escapeAttr(value)}"${slash ? " /" : ""}>`)
-  return markup.slice(0, r.start) + next + markup.slice(r.tagEnd)
+const attrRe = (name: string) => new RegExp(`(\\s${name.replace(/[:.]/g, "\\$&")}\\s*=\\s*)(["'])[\\s\\S]*?\\2`)
+
+/** Sets (or adds) attributes in a start tag's text. null removes one */
+export function tagWithAttrs(tag: string, attrs: Record<string, string | null>) {
+  for (const [name, value] of Object.entries(attrs)) {
+    const re = attrRe(name)
+    if (value === null) tag = tag.replace(re, "")
+    else if (re.test(tag)) tag = tag.replace(re, (_m, pre: string) => `${pre}"${escapeAttr(value)}"`)
+    else tag = tag.replace(/\s*(\/?)>$/, (_m, slash: string) => ` ${name}="${escapeAttr(value)}"${slash ? " /" : ""}>`)
+  }
+  return tag
 }
+
+/** Sets (or adds, or with null removes) attributes on the element's start tag */
+export function setAttrs(markup: string, r: TagRange, attrs: Record<string, string | null>) {
+  return markup.slice(0, r.start) + tagWithAttrs(markup.slice(r.start, r.tagEnd), attrs) + markup.slice(r.tagEnd)
+}
+
+export const setAttr = (markup: string, r: TagRange, name: string, value: string) => setAttrs(markup, r, { [name]: value })
 
 /** Removes the element, and its line when nothing else is on it */
 export function removeElement(markup: string, r: TagRange) {
@@ -115,4 +125,111 @@ export function moveElement(markup: string, from: TagRange, to: TagRange, place:
   if (at > rs && at < re) return null
   if (at <= rs) return { markup: markup.slice(0, at) + ins + markup.slice(at, rs) + markup.slice(re), start: at + offset }
   return { markup: markup.slice(0, rs) + markup.slice(re, at) + ins + markup.slice(at), start: at - (re - rs) + offset }
+}
+
+
+// ── Moving ────────────────────────────────────────────────────────────────────
+
+const plainNumber = (v: string | null) => v === null || /^\s*[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?\s*(px)?\s*$/i.test(v)
+const num = (v: string | null) => (v === null ? 0 : parseFloat(v) || 0)
+
+/** The attribute changes that move an element by (dx, dy) in its parent's units */
+export function translateAttrs(el: Element, dx: number, dy: number): Record<string, string | null> {
+  const tf = el.getAttribute("transform")
+  const viaTransform = () => {
+    // Fold into a translate that's already at the front
+    const m = tf?.match(/^\s*translate\(\s*([+-]?[\d.e-]+)(?:[\s,]+([+-]?[\d.e-]+))?\s*\)\s*(.*)$/i)
+    if (m) {
+      const x = num(m[1]) + dx, y = num(m[2] ?? "0") + dy
+      return { transform: `translate(${fmt(x)} ${fmt(y)})${m[3] ? ` ${m[3]}` : ""}` }
+    }
+    return { transform: `translate(${fmt(dx)} ${fmt(dy)})${tf ? ` ${tf.trim()}` : ""}` }
+  }
+  if (tf) return viaTransform()
+  const shift = (names: [string, number][]) => {
+    if (!names.every(([n]) => plainNumber(el.getAttribute(n)))) return null
+    return Object.fromEntries(names.map(([n, d]) => [n, fmt(num(el.getAttribute(n)) + d)]))
+  }
+  let out: Record<string, string> | null = null
+  switch (el.localName) {
+    case "path": {
+      try {
+        const segs = parsePath(el.getAttribute("d") ?? "")
+        return { d: serialisePath(shiftPoints(segs, allAnchors(segs), dx, dy)) }
+      } catch { return viaTransform() }
+    }
+    case "rect": case "image": case "use": case "foreignObject": case "svg": out = shift([["x", dx], ["y", dy]]); break
+    case "circle": case "ellipse": out = shift([["cx", dx], ["cy", dy]]); break
+    case "line": out = shift([["x1", dx], ["y1", dy], ["x2", dx], ["y2", dy]]); break
+    case "polyline": case "polygon": {
+      const nums = (el.getAttribute("points") ?? "").match(/[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/g)?.map(Number) ?? []
+      const pts: string[] = []
+      for (let k = 0; k + 1 < nums.length; k += 2) pts.push(`${fmt(nums[k] + dx)},${fmt(nums[k + 1] + dy)}`)
+      return { points: pts.join(" ") }
+    }
+  }
+  return out ?? viaTransform()
+}
+
+// ── Grouping ──────────────────────────────────────────────────────────────────
+
+/** Wraps elements (sorted, none inside another) in a new <g> where the first was */
+export function groupElements(markup: string, rs: TagRange[]) {
+  if (!rs.length) return null
+  const sorted = [...rs].sort((a, b) => a.start - b.start)
+  const first = sorted[0]
+  const texts = sorted.map((r) => markup.slice(r.start, r.end))
+  const own = lineStarted(markup, first.start)
+  const indent = indentAt(markup, first.start)
+  const group = own
+    ? `<g>\n${texts.map((t) => `${indent}  ${t}`).join("\n")}\n${indent}</g>`
+    : `<g>${texts.join("")}</g>`
+  let out = markup
+  for (const r of sorted.slice(1).reverse()) out = removeElement(out, r)
+  out = out.slice(0, first.start) + group + out.slice(first.end)
+  return { markup: out, start: first.start }
+}
+
+/** Group attributes that can't simply move down onto the children */
+const UNGROUP_BLOCKERS = ["opacity", "filter", "mask", "clip-path", "style"]
+
+/**
+ * Takes a group's children out of it. Its transform and paint attributes move
+ * down onto each child (a child's own value wins). Returns null, with a
+ * reason, when that would change how things look.
+ */
+export function ungroupElement(markup: string, g: TagRange, el: Element, kids: TagRange[]): { markup: string } | { error: string } {
+  const blocker = UNGROUP_BLOCKERS.find((a) => el.hasAttribute(a))
+  if (blocker) return { error: `This group has ${blocker === "style" ? "a style attribute" : `a ${blocker}`}, which would look different spread over its children` }
+  const tf = el.getAttribute("transform")
+  const cls = el.getAttribute("class")
+  const inherit = [...el.attributes].filter((a) => !["id", "class", "transform"].includes(a.name) && !a.name.startsWith("xmlns"))
+  let out = markup
+  // Back to front, so earlier offsets stay put
+  for (const k of [...kids].sort((a, b) => b.start - a.start)) {
+    const tag = out.slice(k.start, k.tagEnd)
+    const attrs: Record<string, string | null> = {}
+    const own = (name: string) => tag.match(attrRe(name))?.[0].replace(/^[^=]*=\s*["']|["']$/g, "") ?? null
+    if (tf) { const t = own("transform"); attrs.transform = t ? `${tf.trim()} ${t.trim()}` : tf.trim() }
+    if (cls) { const c = own("class"); attrs.class = c ? `${cls} ${c}` : cls }
+    for (const a of inherit) if (own(a.name) === null) attrs[a.name] = a.value
+    out = out.slice(0, k.start) + tagWithAttrs(tag, attrs) + out.slice(k.tagEnd)
+  }
+  const grown = out.length - markup.length
+  const end = g.end + grown
+  const close = out.lastIndexOf("</", end - 1)
+  // The end tag first (it's later), then the start tag, each with its line if alone
+  out = cutTag(out, close, end)
+  out = cutTag(out, g.start, g.tagEnd)
+  return { markup: out }
+}
+
+/** Removes a tag, and its line when nothing else is on it */
+function cutTag(markup: string, a: number, b: number) {
+  let s = a, e = b
+  while (s > 0 && (markup[s - 1] === " " || markup[s - 1] === "\t")) s--
+  let t = e
+  while (t < markup.length && (markup[t] === " " || markup[t] === "\t")) t++
+  if ((s === 0 || markup[s - 1] === "\n") && (markup[t] === "\n" || t >= markup.length)) return markup.slice(0, s) + markup.slice(Math.min(t + 1, markup.length))
+  return markup.slice(0, a) + markup.slice(b)
 }

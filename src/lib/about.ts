@@ -11,6 +11,15 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.7.0",
+    date: "18 November 2026",
+    notes: [
+      "Select several elements in the editor: ⌘-click or Shift-click shapes and layers, or drag a box over empty canvas (⌘A selects every shape)",
+      "Drag the selection to move it, or nudge it with the arrow keys (Shift for 10)",
+      "Bulk tools on a toolbar, the right-click menu and shortcuts: duplicate (⌘D), delete, group (⌘G), ungroup (⇧⌘G), bring forward and send backward (⌘] ⌘[), convert to path and stroke to path"
+    ]
+  },
+  {
     version: "0.6.1",
     date: "18 November 2026",
     notes: [

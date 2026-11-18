@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { IconCopy, IconRedo, IconReset, IconUndo, IconX } from "../icons"
 import { elementRanges, rangeAt } from "../lib/markupMap"
-import { convertToPath, duplicateElement, moveElement, removeElement, setAttr, type DropPlace } from "../lib/markupEdit"
-import { SHAPES, parsePath, serialisePath, type Seg } from "../lib/pathData"
+import { moveElement, setAttr, setAttrs, translateAttrs, type DropPlace } from "../lib/markupEdit"
+import { parsePath, serialisePath, type Seg } from "../lib/pathData"
+import { ACTIONS, topLevel, type ActionContext, type EditorAction } from "../lib/editorActions"
+import { ContextMenu, type MenuItem, type MenuState } from "./ContextMenu"
 import type { Backdrop, SvgItem } from "../lib/types"
 import { CodeEditor } from "./CodeEditor"
-import { InspectPreview } from "./InspectPreview"
+import { InspectPreview, type ElementMove } from "./InspectPreview"
 import { LayersTree } from "./LayersTree"
 import { PathPanel } from "./PathPanel"
 
@@ -37,7 +39,13 @@ interface Props {
 export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onClose }: Props) {
   const markup = (tab === "source" ? item.source : item.result?.output) ?? ""
   const ranges = useMemo(() => elementRanges(markup), [markup])
-  const [selected, setSelected] = useState(-1)
+  // Several elements can be selected; path tools show when it's just one path
+  const [selection, setSelection] = useState<number[]>([])
+  const selected = selection.length === 1 ? selection[0] : -1
+  const setSelected = (i: number) => setSelection(i >= 0 ? [i] : [])
+  const [menu, setMenu] = useState<MenuState | null>(null)
+  const [note, setNote] = useState("")
+  useEffect(() => { if (!note) return; const t = setTimeout(() => setNote(""), 5000); return () => clearTimeout(t) }, [note])
   const [hover, setHover] = useState(-1)
   const [reveal, setReveal] = useState<{ start: number, end: number, n: number, focus?: boolean } | null>(null)
   const [copied, setCopied] = useState(false)
@@ -48,13 +56,16 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return
       if ((e.target as Element | null)?.closest?.(".monaco-editor")) return
-      // A right-click menu closes first
+      // A right-click menu closes first, then the selection goes
       if (document.querySelector(".context-menu")) return
+      if (selRef.current.length) { setSelection([]); return }
       onClose()
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [onClose])
+  const selRef = useRef(selection)
+  selRef.current = selection
 
   // A new tab or a hand edit changes what the element numbers point at. Edits
   // made here (dragging points, deleting) keep track themselves
@@ -138,21 +149,6 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ranges, selected, markup])
 
-  const deleteElement = (i: number) => {
-    const r = ranges[i]
-    if (!r || i === 0 || !editable) return
-    commit(removeElement(markup, r))
-    setSelected(-1)
-    setHover(-1)
-  }
-
-  const convert = (i = selected) => {
-    const r = ranges[i], target = elements?.[i]
-    if (!r || !target) return
-    const next = convertToPath(markup, r, target)
-    if (next) commit(next)
-  }
-
   // Selects whatever now starts at `start` in the new markup
   const commitAndSelect = (next: { markup: string, start: number } | null) => {
     if (!next) return
@@ -161,19 +157,117 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     setSelected(i)
     setHover(-1)
   }
-  const duplicate = (i: number) => { const r = ranges[i]; if (r && i > 0) commitAndSelect(duplicateElement(markup, r)) }
+
+  // ── Actions on the selection ──────────────────────────────────────────────
+  const ctx = (): ActionContext | null => elements && editable
+    ? { markup, ranges, elements, selection: topLevel(selection, elements) }
+    : null
+  const available = (pick = selection) => {
+    if (!elements || !editable) return []
+    const c = { markup, ranges, elements, selection: topLevel(pick, elements) }
+    return ACTIONS.filter((a) => a.applies(c))
+  }
+  const run = async (action: EditorAction, c = ctx()) => {
+    if (!c) return
+    try {
+      const out = await action.run(c)
+      if (!out) return
+      if ("error" in out) { setNote(out.error); return }
+      commit(out.markup)
+      if (out.select) setSelection(out.select)
+      setHover(-1)
+      if (out.note) setNote(out.note)
+    } catch (e) {
+      setNote((e as Error).message)
+    }
+  }
+  const runRef = useRef({ run, ctx, available })
+  runRef.current = { run, ctx, available }
+
+  /** Moves elements by (dx, dy) in their parents' units */
+  const moveBy = (moves: ElementMove[]) => {
+    if (!elements || !editable) return
+    let next = markup
+    // Back to front, so earlier offsets stay put
+    for (const m of [...moves].sort((a, b) => b.index - a.index)) {
+      const r = elementRanges(next)[m.index], el = elements[m.index]
+      if (r && el && m.index > 0) next = setAttrs(next, r, translateAttrs(el, m.dx, m.dy))
+    }
+    commit(next)
+  }
+  const moveRef = useRef(moveBy)
+  moveRef.current = moveBy
+
+  // Shortcuts for the actions, arrow keys to nudge, ⌘A to select every shape
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return
+      const t = e.target as HTMLElement | null
+      if (t?.closest?.("input, textarea, select, .monaco-editor, [contenteditable=true]")) return
+      const c = runRef.current.ctx()
+      if (!c) return
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault()
+        setSelection(c.elements.map((el, i) => (i > 0 && /^(path|rect|circle|ellipse|line|polyline|polygon|text|image|use)$/.test(el.localName) && !el.closest("defs, clipPath, mask, symbol, marker, pattern") ? i : -1)).filter((i) => i > 0))
+        return
+      }
+      const dir: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+      if (dir[e.key] && c.selection.length && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault()
+        const step = e.shiftKey ? 10 : e.altKey ? 0.1 : 1
+        moveRef.current(c.selection.map((index) => ({ index, dx: dir[e.key][0] * step, dy: dir[e.key][1] * step })))
+        return
+      }
+      const action = ACTIONS.find((a) => a.keys?.(e) && a.applies(c))
+      if (!action) return
+      e.preventDefault()
+      runRef.current.run(action, c)
+    }
+    window.addEventListener("keydown", key)
+    return () => window.removeEventListener("keydown", key)
+  }, [])
+
+  const openMenu = (i: number, e: React.MouseEvent) => {
+    e.preventDefault()
+    if (!editable) return
+    // Right-clicking outside the selection selects that one thing
+    const pick = i > 0 && !selection.includes(i) ? [i] : selection
+    if (pick !== selection) setSelection(pick)
+    const acts = available(pick)
+    if (!acts.length) return
+    const c = elements ? { markup, ranges, elements, selection: topLevel(pick, elements) } : null
+    const items: Array<MenuItem | "-"> = []
+    let last = ""
+    for (const a of acts) {
+      if (last && a.group !== last) items.push("-")
+      last = a.group
+      items.push({ label: a.shortcut ? `${a.label}    ${a.shortcut}` : a.label, danger: a.danger, run: () => { if (c) run(a, c) } })
+    }
+    setMenu({ x: e.clientX, y: e.clientY, items })
+  }
+
   const move = (from: number, to: number, place: DropPlace) => {
     const a = ranges[from], b = ranges[to]
     if (a && b && from > 0 && from !== to) commitAndSelect(moveElement(markup, a, b, place))
   }
 
-  const pick = (i: number, focus = true) => {
-    setSelected(i)
+  // Where Shift-click ranges start from
+  const anchor = useRef(-1)
+  const pick = (i: number, mode: "only" | "add" | "range" = "only") => {
+    if (i < 0) { if (mode === "only") setSelection([]); return }
+    if (mode === "add") setSelection((s) => (s.includes(i) ? s.filter((x) => x !== i) : [...s, i]))
+    else if (mode === "range" && anchor.current >= 0) {
+      const [a, b] = anchor.current < i ? [anchor.current, i] : [i, anchor.current]
+      setSelection([...Array.from({ length: b - a + 1 }, (_, k) => a + k).filter((k) => k !== i && k > 0), i])
+    } else setSelection([i])
+    if (mode !== "range") anchor.current = i
+    // Show it in the markup, without taking the keyboard away from shortcuts
     const r = ranges[i]
-    // The whole element, so Delete or Backspace removes it
-    if (r) setReveal((x) => ({ start: r.start, end: r.end, n: (x?.n ?? 0) + 1, focus }))
+    if (r) setReveal((x) => ({ start: r.start, end: r.end, n: (x?.n ?? 0) + 1, focus: false }))
   }
-  const markRange = hover >= 0 ? ranges[hover] : selected >= 0 ? ranges[selected] : null
+  const last = selection.length ? selection[selection.length - 1] : -1
+  const markRange = hover >= 0 ? ranges[hover] : last >= 0 ? ranges[last] : null
+  const actions = available()
 
   // The optimised markup becomes the editable source; Revert still has the original
   const applyOptimised = () => {
@@ -213,23 +307,39 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
           <div className="markup-dialog__layers">
             <div className="panel__label">Layers</div>
             {elements
-              ? <LayersTree elements={elements} selected={selected} hover={hover}
-                  onPick={(i) => pick(i, false)} onHover={setHover} onDelete={editable ? deleteElement : undefined}
-                  onDuplicate={duplicate} onConvert={convert} onMove={move} />
+              ? <LayersTree elements={elements} selection={selection} hover={hover}
+                  onPick={pick} onHover={setHover} onMenu={openMenu}
+                  onDelete={editable ? (i) => { const d = ACTIONS.find((a) => a.id === "delete"); const c = elements && { markup, ranges, elements, selection: [i] }; if (d && c) run(d, c) } : undefined}
+                  onMove={editable ? move : undefined} />
               : <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
           </div>
-          <InspectPreview markup={markup} backdrop={backdrop} selected={selected}
-            onPick={pick} onHover={setHover} hover={hover}
-            path={segs ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath } : null} />
+          <div className="markup-dialog__canvas">
+            {editable && (
+              <div className="edit-toolbar">
+                <span className="text-3 edit-toolbar__count">
+                  {selection.length ? `${selection.length} selected` : "Click, ⌘-click or drag a box to select"}
+                </span>
+                {actions.filter((a) => a.toolbar).map((a) => (
+                  <button key={a.id} className="btn btn--secondary btn--sm" onClick={() => run(a)}
+                    title={`${a.hint ?? a.label}${a.shortcut ? ` (${a.shortcut})` : ""}`}>{a.label}</button>
+                ))}
+                {note && <span className="edit-toolbar__note">{note}</span>}
+              </div>
+            )}
+            <InspectPreview markup={markup} backdrop={backdrop} selection={selection}
+              onPick={(i, add) => { (document.activeElement as HTMLElement | null)?.blur?.(); pick(i, add ? "add" : "only") }}
+              onSelect={(found, add) => setSelection((s) => (add ? [...s, ...found.filter((i) => !s.includes(i))] : found))}
+              onMoveBy={moveBy} onContextMenu={openMenu} readOnly={!editable}
+              onHover={setHover} hover={hover}
+              path={segs ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath } : null} />
+          </div>
           <div className="markup-dialog__side">
             {segs && <PathPanel segs={segs} readOnly={!editable} active={active} onActive={setActive} onChange={writePath} />}
             {path && "error" in path && <p className="rule__error">This path's data doesn't parse: {path.error}</p>}
-            {el && SHAPES.has(el.localName) && (
+            {el && ["rect", "circle", "ellipse", "line", "polyline", "polygon"].includes(el.localName) && (
               <div className="path-panel path-panel--shape">
-                <span className="text-2">This is a <code>&lt;{el.localName}&gt;</code>.</span>
-                {editable
-                  ? <button className="btn btn--secondary btn--sm" onClick={() => convert()} title="Swap it for a path that draws the same shape, keeping its other attributes, so its points can be edited">Convert to path</button>
-                  : <span className="text-3">Switch to Before to convert it to a path.</span>}
+                <span className="text-2">This is a <code>&lt;{el.localName}&gt;</code>. Convert it to a path to edit its points.</span>
+                {!editable && <span className="text-3">Switch to Before to convert it.</span>}
               </div>
             )}
             <CodeEditor
@@ -245,6 +355,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
             />
           </div>
         </div>
+        {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
         {tab === "output" && !item.result && <p className="text-3">Not optimised yet.</p>}
         {item.status === "error" && <p className="rule__error">{item.error}</p>}
       </div>

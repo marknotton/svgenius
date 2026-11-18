@@ -12,15 +12,28 @@ import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 interface Props {
   markup: string
   backdrop: Backdrop
-  /** Tree-order index of the picked element */
-  selected: number
-  onPick: (index: number) => void
+  /** Tree-order indices of the selected elements */
+  selection: number[]
+  /** A click: plain replaces the selection, add toggles the element in it */
+  onPick: (index: number, add: boolean) => void
+  /** A box drawn over empty canvas */
+  onSelect?: (indices: number[], add: boolean) => void
+  /** Elements dragged across the canvas, by (dx, dy) in each one's parent units */
+  onMoveBy?: (moves: ElementMove[]) => void
+  onContextMenu?: (index: number, e: React.MouseEvent) => void
+  readOnly?: boolean
   onHover: (index: number) => void
   /** Hovered element, from here or from the layers list */
   hover?: number
   /** The selected path's points, drawn as draggable handles */
   path?: PathEdit | null
 }
+
+export interface ElementMove { index: number, dx: number, dy: number }
+
+/** Shapes a selection box picks up (not groups, not things in <defs>) */
+const PICKABLE = "path, rect, circle, ellipse, line, polyline, polygon, text, image, use"
+const UNPAINTED = "defs, clipPath, mask, symbol, marker, pattern"
 
 export interface PathEdit {
   index: number
@@ -56,12 +69,16 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selected, onPick, onHover, hover = -1, path }: Props) {
+export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
   const swallowClick = useRef(false)
-  const [boxes, setBoxes] = useState<{ sel: DOMRect | null, hov: DOMRect | null }>({ sel: null, hov: null })
+  const [boxes, setBoxes] = useState<{ sel: DOMRect[], hov: DOMRect | null }>({ sel: [], hov: null })
+  const [marquee, setMarquee] = useState<{ x0: number, y0: number, x1: number, y1: number } | null>(null)
+  const live = useRef({ selection, path, readOnly, onSelect, onMoveBy })
+  live.current = { selection, path, readOnly, onSelect, onMoveBy }
+  const selKey = selection.join(",")
   const css = usePreviewCss()
   // Preview CSS goes in last, so element numbers still match the markup. In
   // a shadow root :root means the page, so it becomes :host, which the SVG
@@ -96,13 +113,103 @@ export function InspectPreview({ markup, backdrop, selected, onPick, onHover, ho
         const r = t.getBoundingClientRect()
         return new DOMRect(r.x - base.x, r.y - base.y, r.width, r.height)
       }
-      setBoxes({ sel: box(selected), hov: hover !== selected ? box(hover) : null })
+      setBoxes({ sel: selection.map(box).filter((b): b is DOMRect => !!b), hov: !selection.includes(hover) ? box(hover) : null })
     }
     measure()
     const ro = new ResizeObserver(measure)
     if (stage.current) ro.observe(stage.current)
     return () => ro.disconnect()
-  }, [selected, hover, root])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selKey, hover, root])
+
+  // Element mode (no path's points showing): drag shapes to move them, or
+  // drag over empty canvas to select everything the box touches
+  useEffect(() => {
+    const host = box.current
+    if (!host) return
+    const swallow = () => { swallowClick.current = true; setTimeout(() => { swallowClick.current = false }, 0) }
+    const down = (e: PointerEvent) => {
+      const cur = live.current
+      if (e.button !== 0 || cur.path) return
+      const shadow = stage.current?.shadowRoot
+      const base = stage.current?.getBoundingClientRect()
+      if (!shadow || !base) return
+      const t = e.composedPath()[0] as Element | undefined
+      const hit = t?.closest?.(`[${ATTR}]`)
+      const index = hit ? Number(hit.getAttribute(ATTR)) : -1
+      const listen = (move: (ev: PointerEvent) => void, up: (ev: PointerEvent) => void) => {
+        const end = (ev: PointerEvent) => {
+          if (ev.pointerId !== e.pointerId) return
+          window.removeEventListener("pointermove", mv)
+          window.removeEventListener("pointerup", end)
+          window.removeEventListener("pointercancel", end)
+          up(ev)
+        }
+        const mv = (ev: PointerEvent) => { if (ev.pointerId === e.pointerId) move(ev) }
+        window.addEventListener("pointermove", mv)
+        window.addEventListener("pointerup", end)
+        window.addEventListener("pointercancel", end)
+      }
+
+      if (index > 0) {
+        // Modifier clicks add to the selection, they don't drag
+        if (cur.readOnly || !cur.onMoveBy || e.shiftKey || e.metaKey || e.ctrlKey) return
+        const ids = cur.selection.includes(index) ? cur.selection.filter((i) => i > 0) : [index]
+        const els = ids.map((i) => shadow.querySelector(`[${ATTR}="${i}"]`) as SVGGraphicsElement | null)
+        // Screen pixels → each element's parent units
+        const inv = els.map((el) => {
+          const m = (el?.parentNode as SVGGraphicsElement | null)?.getScreenCTM?.()
+          return m ? new DOMMatrix([m.a, m.b, m.c, m.d, 0, 0]).inverse() : null
+        })
+        const orig = els.map((el) => el?.getAttribute("transform") ?? null)
+        let moved = false
+        const delta = (ev: PointerEvent, k: number) => {
+          const p = new DOMPoint(ev.clientX - e.clientX, ev.clientY - e.clientY).matrixTransform(inv[k] ?? new DOMMatrix())
+          return ev.shiftKey ? { x: Math.round(p.x), y: Math.round(p.y) } : { x: p.x, y: p.y }
+        }
+        listen((ev) => {
+          if (!moved && Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 3) return
+          if (!moved && !cur.selection.includes(index)) cur.onSelect?.([index], false)
+          moved = true
+          els.forEach((el, k) => {
+            const d = delta(ev, k)
+            el?.setAttribute("transform", `translate(${d.x} ${d.y})${orig[k] ? ` ${orig[k]}` : ""}`)
+          })
+        }, (ev) => {
+          if (!moved) return
+          swallow()
+          live.current.onMoveBy?.(ids.map((i, k) => ({ index: i, dx: delta(ev, k).x, dy: delta(ev, k).y })))
+        })
+        return
+      }
+
+      // Empty canvas: a selection box
+      if (!cur.onSelect) return
+      const x0 = e.clientX - base.x, y0 = e.clientY - base.y
+      let started = false
+      let box1 = { x0, y0, x1: x0, y1: y0 }
+      listen((ev) => {
+        box1 = { x0, y0, x1: ev.clientX - base.x, y1: ev.clientY - base.y }
+        if (!started && Math.hypot(box1.x1 - x0, box1.y1 - y0) < 4) return
+        started = true
+        setMarquee(box1)
+      }, () => {
+        setMarquee(null)
+        if (!started) return
+        swallow()
+        const l = Math.min(box1.x0, box1.x1) + base.x, r = Math.max(box1.x0, box1.x1) + base.x
+        const tp = Math.min(box1.y0, box1.y1) + base.y, b = Math.max(box1.y0, box1.y1) + base.y
+        const found = [...shadow.querySelectorAll(PICKABLE)].filter((el) => {
+          if (el.closest(UNPAINTED)) return false
+          const q = el.getBoundingClientRect()
+          return q.width + q.height > 0 && q.right >= l && q.left <= r && q.bottom >= tp && q.top <= b
+        }).map((el) => Number(el.getAttribute(ATTR)))
+        live.current.onSelect?.(found, e.shiftKey)
+      })
+    }
+    host.addEventListener("pointerdown", down)
+    return () => host.removeEventListener("pointerdown", down)
+  }, [])
 
   // Events from inside the shadow root are retargeted, so use the real target
   const indexOf = (e: { nativeEvent: Event }) => {
@@ -122,10 +229,12 @@ export function InspectPreview({ markup, backdrop, selected, onPick, onHover, ho
           if (swallowClick.current) { swallowClick.current = false; return }
           // The svg itself isn't pickable here, so empty canvas clears the selection
           const i = indexOf(e)
-          onPick(i > 0 ? i : -1)
-        }} />
+          onPick(i > 0 ? i : -1, e.shiftKey || e.metaKey || e.ctrlKey)
+        }}
+        onContextMenu={(e) => { if (onContextMenu) { const i = indexOf(e); onContextMenu(i > 0 ? i : -1, e) } }} />
       {boxes.hov && <div className="inspect__box inspect__box--hover" style={rect(boxes.hov)} />}
-      {boxes.sel && !path && <div className="inspect__box" style={rect(boxes.sel)} />}
+      {!path && boxes.sel.map((b, k) => <div key={k} className="inspect__box" style={rect(b)} />)}
+      {marquee && <div className="inspect__marquee" style={{ left: Math.min(marquee.x0, marquee.x1), top: Math.min(marquee.y0, marquee.y1), width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0) }} />}
       {path && root && <PathOverlay stage={stage} box={box} root={root} edit={path} swallowClick={swallowClick} />}
       </div>
       {!root && <p className="inspect__error text-3">This markup doesn't parse, so it can't be previewed.</p>}
