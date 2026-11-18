@@ -67,6 +67,7 @@ export function defaultAppSettings(): AppSettings {
     keepStructure: true,
     rename: defaultRename(),
     liveUpdates: true,
+    theme: "system",
     ...defaultLayout()
   }
 }
@@ -349,6 +350,7 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     showDetails: raw.showDetails === true,
     galleryPx: clampNum(raw.galleryPx, PREVIEW_PX.gallery.min, 4000, PREVIEW_PX.gallery.default),
     backdrop: raw.backdrop === "dark" ? "dark" : "light",
+    theme: raw.theme === "light" || raw.theme === "dark" ? raw.theme : "system",
     keepStructure: typeof raw.keepStructure === "boolean" ? raw.keepStructure : true,
     rename: sanitiseRename(raw.rename),
     previewCss: typeof raw.previewCss === "string" ? raw.previewCss : "",

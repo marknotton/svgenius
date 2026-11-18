@@ -17,7 +17,7 @@
   --accent:        #EFA94B;
   --accent-hover:  #E39A35;
   --accent-ink:    #A8610C;
-  --on-accent:     #2B1A04;
+  --on-accent:     #ffffff;
   --accent-soft:   #FDF4E7;
   --accent-border: #F5CD94;
   --accent-rgb:    239, 169, 75;
@@ -49,6 +49,75 @@
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
   user-select: none;
+}
+
+/* ── Dark mode: follows the system unless Settings picks one ─── */
+:root { --overlay: rgba(17, 24, 39, .35); --glass: rgba(255,255,255,.7); --hairline: rgba(0, 0, 0, .12); color-scheme: light; }
+:root[data-theme="dark"] {
+  --bg:            #16171b;
+  --surface:       #1d1e23;
+  --surface-2:     #26272d;
+  --border:        #2f3037;
+  --border-input:  #3d3e46;
+
+  --text:          #ececef;
+  --text-2:        #a1a1aa;
+  --text-3:        #71717a;
+  --text-disabled: #4b4b53;
+
+  --accent-hover:  #F4B65F;
+  --accent-ink:    #F2B866;
+  --accent-soft:   #2e2416;
+  --accent-border: #6b4a1c;
+
+  --success: #4ade80;  --success-soft: #11251a;  --success-border: #1f5133;
+  --warning: #fbbf24;  --warning-soft: #2a2010;  --warning-border: #5c4512;
+  --error:   #f87171;  --error-soft:   #2c1517;  --error-border:   #63262a;
+
+  --check-light-a: #ffffff;
+  --check-light-b: #e5e7eb;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow:    0 1px 3px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.3);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.4);
+  --overlay:   rgba(0, 0, 0, .55);
+  --glass:     rgba(22, 23, 27, .75);
+  --hairline:  rgba(255, 255, 255, .12);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+  --bg:            #16171b;
+  --surface:       #1d1e23;
+  --surface-2:     #26272d;
+  --border:        #2f3037;
+  --border-input:  #3d3e46;
+
+  --text:          #ececef;
+  --text-2:        #a1a1aa;
+  --text-3:        #71717a;
+  --text-disabled: #4b4b53;
+
+  --accent-hover:  #F4B65F;
+  --accent-ink:    #F2B866;
+  --accent-soft:   #2e2416;
+  --accent-border: #6b4a1c;
+
+  --success: #4ade80;  --success-soft: #11251a;  --success-border: #1f5133;
+  --warning: #fbbf24;  --warning-soft: #2a2010;  --warning-border: #5c4512;
+  --error:   #f87171;  --error-soft:   #2c1517;  --error-border:   #63262a;
+
+  --check-light-a: #ffffff;
+  --check-light-b: #e5e7eb;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow:    0 1px 3px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.3);
+  --shadow-lg: 0 10px 30px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.4);
+  --overlay:   rgba(0, 0, 0, .55);
+  --glass:     rgba(22, 23, 27, .75);
+  --hairline:  rgba(255, 255, 255, .12);
+  color-scheme: dark;
+  }
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -234,7 +303,7 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
   border-radius: 50%;
   animation: spin .7s linear infinite;
 }
-.spinner--sm { width: 12px; height: 12px; border-color: rgba(0,0,0,.12); border-top-color: currentColor; }
+.spinner--sm { width: 12px; height: 12px; border-color: var(--hairline); border-top-color: currentColor; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Checkerboard thumbnails ─────────────────────────────────── */
@@ -328,7 +397,7 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
   flex: 1; display: flex; align-items: center; justify-content: center;
   border: 2px dashed var(--accent); border-radius: 12px;
   color: var(--accent-ink); font-size: 16px; font-weight: 600;
-  background: rgba(255,255,255,.7);
+  background: var(--glass);
 }
 
 /* ── Config panel ────────────────────────────────────────────── */
@@ -371,7 +440,7 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
 .modal-backdrop {
   position: fixed; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(17, 24, 39, .35);
+  background: var(--overlay);
   z-index: 50;
 }
 .modal {
@@ -850,7 +919,7 @@ body.is-resizing * { user-select: none !important; }
 
 /* ── Range sliders in the brand colour (accent-color gets darkened by WebKit/Blink) */
 input[type="range"] { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: var(--border-input); outline-offset: 4px; }
-input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); box-shadow: 0 0 0 1px rgba(0, 0, 0, .18), var(--shadow-sm); cursor: pointer; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--hairline), var(--shadow-sm); cursor: pointer; }
 input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hover); }
 
 /* ── Live + Optimise, together ─────────────────────────────────────────────── */

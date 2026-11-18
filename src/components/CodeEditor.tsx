@@ -9,6 +9,13 @@ type Monaco = typeof import("monaco-editor/editor")
 let monacoReady: Promise<Monaco> | null = null
 const loadMonaco = () => (monacoReady ??= import("../lib/monaco").then((m) => m.monaco))
 
+let editorTheme = "vs"
+/** Light or dark code editors, now and for any opened later */
+export function setEditorTheme(dark: boolean) {
+  editorTheme = dark ? "vs-dark" : "vs"
+  monacoReady?.then((m) => m.editor.setTheme(editorTheme)).catch(() => {})
+}
+
 /** Warms Monaco up in the background so the first editor opens quickly */
 export function preloadMonaco() {
   const go = () => { loadMonaco().catch(() => { monacoReady = null }) }
@@ -48,6 +55,7 @@ export function CodeEditor({ value, onChange, readOnly, className, label, reveal
       const editor = monaco.editor.create(host.current, {
         value: latest.current.value,
         language: "xml",
+        theme: editorTheme,
         readOnly,
         automaticLayout: true,
         wordWrap: "on",

@@ -3,7 +3,7 @@ import { useDragSort } from "../hooks/useDragSort"
 import type { PresetActions } from "../hooks/useAppSettings"
 import { IconDownload, IconDuplicate, IconGrip, IconStar, IconTrash, IconUpload, IconX } from "../icons"
 import { plural } from "../lib/format"
-import type { AppSettings, Backdrop } from "../lib/types"
+import type { AppSettings, Backdrop, ThemeChoice } from "../lib/types"
 import { Modal } from "./Dialogs"
 import { Segmented } from "./Segmented"
 import { Toggle } from "./Toggle"
@@ -84,6 +84,15 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
             checked={settings.liveUpdates} onChange={(v) => set("liveUpdates", v)} />
           <Toggle label="Keep folder structure on export" hint="Recreate sub-folders inside the export folder"
             checked={settings.keepStructure} onChange={(v) => set("keepStructure", v)} />
+        </section>
+
+        <section className="settings__section">
+          <div className="panel__label">Appearance</div>
+          <div className="field-row">
+            <span>Theme</span>
+            <Segmented<ThemeChoice> label="App theme" value={settings.theme} onChange={(v) => set("theme", v)}
+              options={[{ value: "system", label: "System", title: "Follow your computer's light or dark setting" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
+          </div>
         </section>
 
         <section className="settings__section">

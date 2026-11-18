@@ -161,6 +161,8 @@ export interface AppSettings {
   /** Thumbnail size in the gallery (showDetails off) */
   galleryPx: number
   backdrop: Backdrop
+  /** App colours: follow the system, or always light or dark */
+  theme: ThemeChoice
   keepStructure: boolean
   rename: RenameSettings
   /** CSS injected into previews only */
@@ -186,6 +188,7 @@ export type Flag = "red" | "orange" | "yellow" | "green" | "blue" | "purple"
 export type ItemStatus = "loading" | "idle" | "running" | "done" | "error"
 
 export type GeometryEffect = "flatten" | "cutouts" | "merge" | "centre"
+export type ThemeChoice = "system" | "light" | "dark"
 export type PrecisionTolerance = "strict" | "balanced" | "loose"
 
 export interface OptimiseResult {

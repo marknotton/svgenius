@@ -28,11 +28,14 @@ import { fileTags } from "./lib/tags"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
 import { canReveal, errorMessage, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, pickSvgs, reveal, saveJson } from "./lib/platform"
-import { preloadMonaco } from "./components/CodeEditor"
+import { preloadMonaco, setEditorTheme } from "./components/CodeEditor"
+import { useTheme } from "./lib/theme"
 import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "./lib/types"
 
 export default function App() {
   const { settings, update, loadError } = useAppSettings()
+  const dark = useTheme(settings?.theme)
+  useEffect(() => setEditorTheme(dark), [dark])
   if (!settings) return <div className="app app--loading"><span className="spinner" /></div>
   return <Workspace settings={settings} update={update} loadError={loadError} />
 }

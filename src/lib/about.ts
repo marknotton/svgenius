@@ -15,7 +15,9 @@ export const HISTORY: Release[] = [
     date: "18 November 2026",
     notes: [
       "Beta: Optical centring moves artwork so its visual weight sits in the middle, with a strength slider",
-      "Auto precision finds the fewest decimal places each file can keep without looking different"
+      "Auto precision finds the fewest decimal places each file can keep without looking different",
+      "Dark mode: follows your system, or pick Light or Dark in Settings",
+      "White text on orange buttons, and the app icon's star nudged left so it looks centred"
     ]
   },
   {
