@@ -7,6 +7,8 @@ export const scanPaths = (paths: string[]) => invoke<ScannedFile[]>("scan_paths"
 
 export const readSvg = (path: string) => invoke<string>("read_svg", { path })
 
+export const fileMtimes = (paths: string[]) => invoke<Array<number | null>>("file_mtimes", { paths })
+
 export const existingFiles = (outDir: string, relPaths: string[]) =>
   invoke<string[]>("existing_files", { outDir, relPaths })
 

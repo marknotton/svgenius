@@ -87,7 +87,7 @@ export function Footer(p: Props) {
         </InfoTip>
         <button className={`btn run-group__btn ${outstanding > 0 ? "btn--primary" : "btn--secondary"}`} onClick={p.onOptimise} disabled={n === 0 || p.busy || outstanding === 0}
           title={outstanding === 0 ? "Everything is up to date" : "Run every file with its current settings now"}>
-          {p.busy ? <span className="spinner spinner--sm" /> : <IconPlay />} {outstanding > 0 ? `Optimise ${scope}${plural(n, "file")}` : "All optimised"}
+          {p.busy ? <span className="spinner spinner--sm" /> : <IconPlay />} {outstanding > 0 ? `Apply & optimise ${scope}${plural(n, "file")}` : "All optimised"}
         </button>
       </div>
       <div className="split">

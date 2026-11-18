@@ -38,6 +38,9 @@ interface Props {
   onLoadPlugin: () => void
   onRemovePlugin: (p: CustomPlugin) => void
   advanced: boolean
+  /** The big markup editor (double-clicking a row opens it too) */
+  markupOpen: boolean
+  onMarkupOpen: (open: boolean) => void
 }
 
 function viewBoxOf(svg?: string) {
@@ -49,7 +52,6 @@ const dims = (s: { w: number, h: number } | null) => (s ? `${fmtNum(s.w, 2)} × 
 
 export function FileInspector({ item, presets, defaultPreset, backdrop, previewPx, ...p }: Props) {
   const [tab, setTab] = useState<MarkupTab>("source")
-  const [big, setBig] = useState(false)
   const [copied, setCopied] = useState(false)
   const out = item.result?.output
   const before = useMemo(() => ({ size: svgSize(item.source), vb: viewBoxOf(item.source) }), [item.source])
@@ -111,7 +113,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             <div className="toolbar__spacer" />
             {tab === "source" && edited && <button className="link" onClick={p.onRevert} title="Throw away edits and reload the file's markup"><IconReset width={11} height={11} /> Revert</button>}
             {tab === "output" && <button className="link" onClick={copy} disabled={!out}><IconCopy width={11} height={11} /> {copied ? "Copied" : "Copy"}</button>}
-            <button className="link" onClick={() => setBig(true)} title="A big editor with a preview you can click to find shapes in the markup"><IconExpand width={11} height={11} /> Expand</button>
+            <button className="link" onClick={() => p.onMarkupOpen(true)} title="A big editor with a preview you can click to find shapes in the markup"><IconExpand width={11} height={11} /> Expand</button>
           </div>
           {tab === "source" ? (
             <>
@@ -156,9 +158,9 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             )}
           </details>
         )}
-        {big && (
+        {p.markupOpen && (
           <MarkupDialog item={item} tab={tab} onTab={setTab}
-            backdrop={backdrop} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => setBig(false)} />
+            backdrop={backdrop} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => p.onMarkupOpen(false)} />
         )}
       </div>
     </div>

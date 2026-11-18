@@ -30,6 +30,7 @@ import { probePlugin } from "./lib/optimiser"
 import { canReveal, openInDefaultApp, errorMessage, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, pickSvgs, reveal, saveJson } from "./lib/platform"
 import { preloadMonaco, setEditorTheme } from "./components/CodeEditor"
 import { useTheme } from "./lib/theme"
+import { useFileWatch } from "./hooks/useFileWatch"
 import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "./lib/types"
 
 export default function App() {
@@ -47,7 +48,7 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise } = useItems()
+  const { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk } = useItems()
   // Once there are files, get the code editor ready before anyone opens it
   const hasItems = items.length > 0
   useEffect(() => { if (hasItems) preloadMonaco() }, [hasItems])
@@ -57,6 +58,13 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
+  // The big markup editor, for the focused file
+  const [markupOpen, setMarkupOpen] = useState(false)
+  const openMarkup = useCallback((id: string) => {
+    setFocusId(id)
+    setSidebarTab("file")
+    setMarkupOpen(true)
+  }, [])
   const [reportOpen, setReportOpen] = useState(false)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [selection, setSelection] = useState<Set<string>>(new Set())
@@ -126,6 +134,18 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   // Finder "Open With", including cold launches
   useEffect(() => listenForOpenedFiles(add), [add])
+
+  // Files saved in another app come straight back in
+  useFileWatch(itemsRef, reloadFromDisk, (changes) => {
+    const kept = changes.filter((c) => c.result === "kept")
+    const one = changes.length === 1 ? changes[0].name : plural(changes.length, "file")
+    push({
+      tone: "info",
+      text: kept.length
+        ? `${one} changed on disk. ${kept.length === 1 ? "It has" : "Some have"} edits made here, so those were kept: use Revert to load the saved version`
+        : `Reloaded ${one}: saved in another app`
+    })
+  })
 
   useEffect(() => {
     if (loadError) push({ tone: "error", text: `Couldn't load saved presets: ${loadError}` })
@@ -581,6 +601,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 isStale={isStale}
                 onToggle={toggle}
                 onRowClick={rowClick}
+                onOpenMarkup={openMarkup}
                 focusId={focusId}
                 onVisible={setVisibleIds}
                 onSelectAll={selectAll}
@@ -646,6 +667,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onLoadPlugin={loadPlugin}
                 onRemovePlugin={removePlugin}
                 advanced={settings.advanced}
+                markupOpen={markupOpen}
+                onMarkupOpen={setMarkupOpen}
               />
             ) : (
               <ConfigPanel

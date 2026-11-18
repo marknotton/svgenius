@@ -103,6 +103,21 @@ export function useItems() {
       : i)))
   }, [])
 
+  /**
+   * The file changed on disk (saved in another app). Untouched files take the
+   * new markup; files edited in here keep their edits, and Revert loads the
+   * new version. Settings, flags and presets stay as they are.
+   */
+  const reloadFromDisk = useCallback((path: string, text: string): "updated" | "kept" | "same" => {
+    const item = itemsRef.current.find((i) => i.path === path)
+    if (!item || item.fileSource === text) return "same"
+    const edited = item.fileSource !== undefined && item.source !== item.fileSource
+    setItems((list) => list.map((i) => (i.path !== path ? i
+      : edited ? { ...i, fileSource: text }
+      : { ...i, source: text, fileSource: text, size: byteLength(text), rev: i.rev + 1, status: i.status === "error" ? "idle" : i.status, errorKey: undefined })))
+    return edited ? "kept" : "updated"
+  }, [])
+
   /** Give a file its own settings (or undefined to go back to its preset) */
   const setConfig = useCallback((id: string, config: SvgoSettings | undefined) => patch(id, { config }), [patch])
 
@@ -147,5 +162,5 @@ export function useItems() {
     return results
   }, [patch])
 
-  return { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise }
+  return { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk }
 }

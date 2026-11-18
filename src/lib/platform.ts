@@ -232,6 +232,10 @@ export async function exportSvgs(
 
 export const canReveal = isDesktop
 
+/** Last-modified times for files on disk. Desktop only (browser files can't change under us) */
+export const fileMtimes = async (paths: string[]): Promise<Array<number | null>> =>
+  isDesktop && paths.length ? desktop.fileMtimes(paths) : paths.map(() => null)
+
 /** Opens the original file in whatever app the system uses for SVGs. Desktop only */
 export const openInDefaultApp = (path: string) => {
   if (isDesktop) openPath(path).catch(() => {})

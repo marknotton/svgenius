@@ -54,9 +54,6 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
         )}
       </section>
 
-      {!advanced && (
-        <p className="panel__simple text-3">Switch on <strong>Advanced</strong> above for the viewBox, contents, rules, every SVGO plugin and Beta tools.</p>
-      )}
       {advanced && <>
       <section className="panel__section">
         <EditViewBox trim={s.trim} onChange={trim} />
@@ -75,6 +72,8 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
         <AttrRuleList rules={s.attrRules} onChange={(attrRules) => edit((x) => ({ ...x, attrRules }))} />
       </section>
 
+      </>}
+
       <section className="panel__section">
         <PluginList
           settings={s}
@@ -86,6 +85,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
         />
       </section>
 
+      {advanced && <>
       <section className="panel__section">
         <div className="panel__label">Beta <span className="pill pill--beta">Experimental</span></div>
         <p className="panel__hint text-3">Geometry changes made after SVGO. Check the results before exporting.</p>
@@ -130,6 +130,9 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
         />
       </section>
       </>}
+      {!advanced && (
+        <p className="panel__simple text-3">Switch on <strong>Advanced</strong> at the top for the viewBox and contents tools, rules, custom plugins and Beta tools.</p>
+      )}
     </>
   )
 }

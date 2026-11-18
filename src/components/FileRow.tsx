@@ -24,6 +24,8 @@ interface Props {
   defaultPreset: Preset
   onToggle: (id: string, e: MouseEvent) => void
   onRowClick: (id: string, e: MouseEvent) => void
+  /** Double-click: open the big markup editor */
+  onOpenMarkup: (id: string) => void
   onContextMenu: (id: string, e: MouseEvent) => void
   onFlag: (id: string, e: MouseEvent) => void
 }
@@ -59,6 +61,7 @@ export const FileRow = memo(function FileRow(p: Props) {
         className={`file-card${selected ? " is-selected" : ""}${p.focused ? " is-focused" : ""}`}
         data-id={item.id}
         onClick={(e) => p.onRowClick(item.id, e)}
+        onDoubleClick={() => p.onOpenMarkup(item.id)}
         onContextMenu={(e) => p.onContextMenu(item.id, e)}
         aria-selected={selected}
       >
@@ -91,6 +94,7 @@ export const FileRow = memo(function FileRow(p: Props) {
       style={{ "--thumb": `${p.compare ? thumbPx * 2 + 4 : thumbPx}px` } as CSSProperties}
       data-id={item.id}
       onClick={(e) => p.onRowClick(item.id, e)}
+      onDoubleClick={() => p.onOpenMarkup(item.id)}
       onContextMenu={(e) => p.onContextMenu(item.id, e)}
       aria-selected={selected}
     >

@@ -52,6 +52,14 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
   }
   const markRange = hover >= 0 ? ranges[hover] : selected >= 0 ? ranges[selected] : null
 
+  // The optimised markup becomes the editable source; Revert still has the original
+  const applyOptimised = () => {
+    const out = item.result?.output
+    if (!out) return
+    onEdit(out)
+    onTab("source")
+  }
+
   const copy = async () => {
     try { await navigator.clipboard.writeText(markup); setCopied(true); setTimeout(() => setCopied(false), 1500) } catch { /* unavailable */ }
   }
@@ -66,6 +74,12 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
           <div className="markup-dialog__spacer" />
           {tab === "source" && edited && <button className="link" onClick={onRevert} title="Throw away edits and reload the file's markup"><IconReset width={11} height={11} /> Revert</button>}
           {tab === "output" && <button className="link" onClick={copy} disabled={!markup}><IconCopy width={11} height={11} /> {copied ? "Copied" : "Copy"}</button>}
+          {tab === "output" && item.result && (
+            <button className="btn btn--primary btn--sm" onClick={applyOptimised}
+              title="Make the optimised markup the file's markup and carry on editing it in Before. Revert brings back the original">
+              Apply optimisation
+            </button>
+          )}
           <button className="btn btn--icon" onClick={onClose} title="Close (Esc)" aria-label="Close"><IconX /></button>
         </div>
         <div className="markup-dialog__body is-inspecting">

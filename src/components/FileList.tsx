@@ -15,6 +15,7 @@ interface Props {
   selection: Set<string>
   focusId: string | null
   onRowClick: (id: string, e: MouseEvent) => void
+  onOpenMarkup: (id: string) => void
   onVisible: (ids: Set<string>) => void
   settings: AppSettings
   defaultPreset: Preset
@@ -129,6 +130,7 @@ export function FileList(p: Props) {
             selected={selection.has(item.id)}
             focused={p.focusId === item.id}
             onRowClick={p.onRowClick}
+            onOpenMarkup={p.onOpenMarkup}
             stale={p.isStale(item)}
             thumbPx={settings.showDetails ? settings.thumbPx : settings.galleryPx}
             compare

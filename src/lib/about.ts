@@ -11,6 +11,16 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.4.1",
+    date: "18 November 2026",
+    notes: [
+      "Files saved in another app reload straight away (desktop), keeping your settings and flags",
+      "Apply optimisation in the expanded editor turns the optimised markup into the editable version",
+      "Double-click a file to open the expanded editor",
+      "The SVGO plugins show in the simple view too"
+    ]
+  },
+  {
     version: "0.4.0",
     date: "18 November 2026",
     notes: [

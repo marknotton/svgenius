@@ -175,6 +175,22 @@ fn read_svg(path: String) -> Result<String, String> {
     fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
+/// Last-modified times (ms since the epoch) for each path, or null if it's gone.
+/// The app polls this to pick up files saved in another editor.
+#[tauri::command]
+fn file_mtimes(paths: Vec<String>) -> Vec<Option<u64>> {
+    paths
+        .iter()
+        .map(|p| {
+            fs::metadata(p)
+                .and_then(|m| m.modified())
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as u64)
+        })
+        .collect()
+}
+
 /// Which of these relative paths already exist inside `out_dir`.
 #[tauri::command]
 fn existing_files(out_dir: String, rel_paths: Vec<String>) -> Result<Vec<String>, String> {
@@ -344,6 +360,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scan_paths,
             read_svg,
+            file_mtimes,
             existing_files,
             export_files,
             load_settings,
