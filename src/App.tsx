@@ -13,6 +13,7 @@ import { FileInspector } from "./components/FileInspector"
 import { FileList } from "./components/FileList"
 import { Footer } from "./components/Footer"
 import { PreviewCssBar, PreviewCssContext } from "./components/PreviewCss"
+import { RenameDialog } from "./components/RenameDialog"
 import { SettingsDialog } from "./components/SettingsDialog"
 import { Toasts, useToasts } from "./components/Toast"
 import { ViewControls } from "./components/ViewControls"
@@ -22,6 +23,7 @@ import { IconX } from "./icons"
 import { planExport } from "./lib/exportPlan"
 import { plural } from "./lib/format"
 import { activeCustom, buildExport, defaultLayout, hashCode, mergeImport, newId, PREVIEW_PX, runSpec, SIDEBAR } from "./lib/settings"
+import { exportNames } from "./lib/rename"
 import { fileTags } from "./lib/tags"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
@@ -47,6 +49,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const actions = useMemo(() => presetActions(update), [update])
 
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [namesOpen, setNamesOpen] = useState(false)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [dragging, setDragging] = useState(false)
@@ -186,7 +189,12 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   const selectAll = (all: boolean) => setSelection(all ? new Set(items.map((i) => i.id)) : new Set())
 
-  const targets = selection.size ? items.filter((i) => selection.has(i.id)) : items
+  const targets = useMemo(() => (selection.size ? items.filter((i) => selection.has(i.id)) : items), [items, selection])
+  // Export names, previewed on the rows of the files that would be exported
+  const previewNames = useMemo(
+    () => (settings.rename.enabled ? exportNames(targets.filter((i) => i.status !== "error"), settings.rename) : null),
+    [targets, settings.rename]
+  )
 
   // ── Running ─────────────────────────────────────────────────────────────────
 
@@ -235,7 +243,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   // Export writes the results already on screen; the footer only enables it
   // once every target is up to date
-  const doExport = async () => {
+  const doExport = async (clearAfter = false) => {
     const list = targets
     const ready = list.filter(isFresh)
     const results = new Map(ready.map((i) => [i.id, i.result]))
@@ -246,7 +254,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     const outDir = await open({ directory: true, title: `Export ${plural(ready.length, "file")} to…` })
     if (typeof outDir !== "string") return
 
-    const plan = planExport(ready, settings.keepStructure)
+    const plan = planExport(ready, settings.keepStructure, exportNames(ready, settings.rename))
     try {
       const clashes = await existingFiles(outDir, plan.map((x) => x.relPath))
       if (clashes.length > 0) {
@@ -268,9 +276,11 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         contents: (results.get(item.id)?.output) ?? ""
       })))
       const skipped = list.length - ready.length
+      // Job done: only the exported files leave the list, failures stay to fix
+      if (clearAfter) remove(new Set(ready.map((i) => i.id)))
       push({
         tone: "success",
-        text: `Exported ${plural(written.length, "file")}${skipped ? `, skipped ${skipped} with errors` : ""}`,
+        text: `Exported ${plural(written.length, "file")}${clearAfter ? " and cleared them from the list" : ""}${skipped ? `, skipped ${skipped} with errors` : ""}`,
         action: written[0] ? { label: "Show in Finder", run: () => { revealItemInDir(written[0]).catch(() => {}) } } : undefined
       })
     } catch (e) {
@@ -563,6 +573,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onNewPreset={newPresetForItem}
                 onContextMenu={rowMenu}
                 tagsFor={tagsFor}
+                exportNames={previewNames}
                 onAddFiles={addFiles}
                 onAddFolder={addFolder}
                 onRemove={removeItems}
@@ -643,8 +654,14 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             if (res.size > 0) push({ tone: "success", text: `Optimised ${plural(res.size, "file")}. Ready to export` })
           }}
           onExport={doExport}
+          onNames={() => setNamesOpen(true)}
+          renaming={settings.rename.enabled}
         />
         {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
+        {namesOpen && (
+          <RenameDialog rename={settings.rename} items={targets.filter((i) => i.status !== "error")}
+            onChange={(rename) => update((s) => ({ ...s, rename }))} onClose={() => setNamesOpen(false)} />
+        )}
         {settingsOpen && (
           <SettingsDialog
             settings={settings}

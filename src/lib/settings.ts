@@ -1,6 +1,7 @@
 import type { Config } from "svgo/browser"
 import { PLUGINS, PLUGIN_NAMES } from "./plugins"
-import type { AppSettings, AttrRule, CustomPlugin, CustomRun, Preset, Replacement, RunSpec, SvgoSettings } from "./types"
+import { CASES, defaultRename } from "./rename"
+import type { RenameSettings, AppSettings, AttrRule, CustomPlugin, CustomRun, Preset, Replacement, RunSpec, SvgoSettings } from "./types"
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,7 @@ export function defaultAppSettings(): AppSettings {
     defaultPresetId: preset.id,
     editingPresetId: preset.id,
     keepStructure: true,
+    rename: defaultRename(),
     liveUpdates: true,
     ...defaultLayout()
   }
@@ -270,6 +272,24 @@ const sanitiseCustomList = (raw: unknown) => Array.isArray(raw)
   ? raw.map(sanitiseCustomPlugin).filter((p): p is CustomPlugin => p !== null)
   : []
 
+function sanitiseRename(raw: unknown): RenameSettings {
+  const d = defaultRename()
+  if (!isObj(raw)) return d
+  const str = (v: unknown, fallback: string) => (typeof v === "string" ? v.slice(0, 200) : fallback)
+  return {
+    enabled: raw.enabled === true,
+    base: str(raw.base, d.base),
+    prefix: str(raw.prefix, d.prefix),
+    suffix: str(raw.suffix, d.suffix),
+    case: CASES.some((c) => c.value === raw.case) ? raw.case as RenameSettings["case"] : d.case,
+    index: (["none", "prefix", "suffix", "only"] as const).find((v) => v === raw.index) ?? d.index,
+    pad: typeof raw.pad === "boolean" ? raw.pad : d.pad,
+    start: Math.round(clampNum(raw.start, 0, 1e6, d.start)),
+    scope: raw.scope === "folder" ? "folder" : "all",
+    separator: str(raw.separator, d.separator).slice(0, 5)
+  }
+}
+
 export function sanitiseAppSettings(raw: unknown): AppSettings {
   const base = defaultAppSettings()
   if (!isObj(raw)) return base
@@ -293,6 +313,7 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     galleryPx: clampNum(raw.galleryPx, PREVIEW_PX.gallery.min, 4000, PREVIEW_PX.gallery.default),
     backdrop: raw.backdrop === "dark" ? "dark" : "light",
     keepStructure: typeof raw.keepStructure === "boolean" ? raw.keepStructure : true,
+    rename: sanitiseRename(raw.rename),
     previewCss: typeof raw.previewCss === "string" ? raw.previewCss : "",
     previewCssEnabled: typeof raw.previewCssEnabled === "boolean" ? raw.previewCssEnabled : true,
     sidebarWidth: clampNum(raw.sidebarWidth, SIDEBAR.min, SIDEBAR.max, SIDEBAR.default),

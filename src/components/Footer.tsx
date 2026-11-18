@@ -1,4 +1,6 @@
+import { useState } from "react"
 import { IconDownload, IconPlay } from "../icons"
+import { ContextMenu, type MenuState } from "./ContextMenu"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { SvgItem } from "../lib/types"
 
@@ -18,7 +20,10 @@ interface Props {
   keepStructure: boolean
   onKeepStructure: (v: boolean) => void
   onOptimise: () => void
-  onExport: () => void
+  onExport: (clear: boolean) => void
+  /** Opens the export file name options */
+  onNames: () => void
+  renaming: boolean
 }
 
 export function Footer(p: Props) {
@@ -29,6 +34,8 @@ export function Footer(p: Props) {
   const scope = p.selectionCount === 0 ? "all " : ""
   const outstanding = n - p.ready - p.failed
   const canExport = n > 0 && p.ready > 0 && outstanding === 0 && !p.busy
+  const [menu, setMenu] = useState<MenuState | null>(null)
+  const count = plural(n - p.failed, "file")
 
   return (
     <footer className="footer">
@@ -58,10 +65,32 @@ export function Footer(p: Props) {
         title="Run every file with its current settings. Live mode only updates the rows on screen">
         {p.busy ? <span className="spinner spinner--sm" /> : <IconPlay />} Optimise {scope}{plural(n, "file")}
       </button>
-      <button className={`btn ${outstanding > 0 ? "btn--secondary" : "btn--primary"}`} onClick={p.onExport} disabled={!canExport}
-        title={canExport ? "Save the optimised files to a folder" : "Optimise first, so every exported file matches its current settings"}>
-        <IconDownload /> Export {scope}{plural(n - p.failed, "file")}…
+      <button className={`btn btn--ghost btn--sm footer__names${p.renaming ? " is-on" : ""}`} onClick={p.onNames}
+        title="Rename exported files: prefix, suffix, case and numbering">
+        {p.renaming ? "Renaming on" : "File names…"}
       </button>
+      <div className="split">
+        <button className={`btn ${outstanding > 0 ? "btn--secondary" : "btn--primary"}`} onClick={() => p.onExport(false)} disabled={!canExport}
+          title={canExport ? "Save the optimised files to a folder" : "Optimise first, so every exported file matches its current settings"}>
+          <IconDownload /> Export {scope}{count}…
+        </button>
+        <button className={`btn split__more ${outstanding > 0 ? "btn--secondary" : "btn--primary"}`} disabled={!canExport}
+          aria-label="More export options" title="More export options"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect()
+            setMenu({
+              x: r.right - 220,
+              y: r.top - 8 - 4 * 30,
+              items: [
+                { label: `Export ${scope}${count}…`, run: () => p.onExport(false) },
+                { label: `Export and clear ${count}…`, run: () => p.onExport(true) },
+                "-",
+                { label: "File names…", run: p.onNames }
+              ]
+            })
+          }}>▾</button>
+      </div>
+      {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
     </footer>
   )
 }

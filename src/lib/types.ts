@@ -99,6 +99,24 @@ export interface Preset {
   settings: SvgoSettings
 }
 
+/** How exported files are named */
+export interface RenameSettings {
+  enabled: boolean
+  /** Replaces the name; {name} is the original. Empty keeps the original */
+  base: string
+  prefix: string
+  suffix: string
+  case: "keep" | "lower" | "upper" | "kebab" | "snake" | "camel" | "pascal" | "title"
+  /** Where the number goes, if anywhere. "only" names files 01.svg, 02.svg… */
+  index: "none" | "prefix" | "suffix" | "only"
+  /** 01, 02… rather than 1, 2… */
+  pad: boolean
+  start: number
+  /** Number across everything, or restart in each folder */
+  scope: "all" | "folder"
+  separator: string
+}
+
 export interface AppSettings {
   version: 1
   presets: Preset[]
@@ -118,6 +136,7 @@ export interface AppSettings {
   galleryPx: number
   backdrop: Backdrop
   keepStructure: boolean
+  rename: RenameSettings
   /** CSS injected into previews only */
   previewCss: string
   previewCssEnabled: boolean

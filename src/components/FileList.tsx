@@ -22,6 +22,7 @@ interface Props {
   onNewPreset: (item: SvgItem) => void
   onContextMenu: (id: string, e: MouseEvent) => void
   tagsFor: (item: SvgItem) => FileTag[]
+  exportNames: Map<string, string> | null
   onAddFiles: () => void
   onAddFolder: () => void
   onRemove: () => void
@@ -109,6 +110,7 @@ export function FileList(p: Props) {
             compare={settings.listCompare}
             details={settings.showDetails}
             tags={settings.showDetails ? p.tagsFor(item) : NO_TAGS}
+            exportName={p.exportNames?.get(item.id)}
             onContextMenu={p.onContextMenu}
             backdrop={settings.backdrop}
             presets={settings.presets}

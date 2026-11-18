@@ -15,6 +15,8 @@ interface Props {
   compare: boolean
   details: boolean
   tags: FileTag[]
+  /** The exported file name, when renaming changes it */
+  exportName?: string
   backdrop: Backdrop
   presets: Preset[]
   defaultPreset: Preset
@@ -68,7 +70,7 @@ export const FileRow = memo(function FileRow(p: Props) {
             onClick={(e) => { e.stopPropagation(); p.onToggle(item.id, e) }}
             onChange={() => {}}
           />
-          <span className="file-card__name" title={item.path}>{item.name}</span>
+          <span className="file-card__name" title={item.path}><Name item={item} to={p.exportName} /></span>
           <Stats item={item} stale={stale} />
         </div>
         <div className="file-card__panes">
@@ -112,7 +114,7 @@ export const FileRow = memo(function FileRow(p: Props) {
         <Thumb svg={item.result?.output ?? item.source} size={thumbPx} backdrop={backdrop} label={item.name} />
       )}
       <div className="file-row__meta">
-        <div className="file-row__name" title={item.path}>{item.name}</div>
+        <div className="file-row__name" title={item.path}><Name item={item} to={p.exportName} /></div>
         <div className="file-row__dir" title={item.path}>
           {size && (
             <span key={flash} className={`file-row__dims${flash ? " is-flash" : ""}`} title="Width × height">
@@ -175,4 +177,9 @@ function Stats({ item, stale }: { item: SvgItem, stale: boolean }) {
       <span className={`pill ${pct > 0 ? "pill--success" : "pill--warning"}`}>{formatSaving(item.size, item.result.size)}</span>
     </div>
   )
+}
+
+function Name({ item, to }: { item: SvgItem, to?: string }) {
+  if (!to || to === item.name) return <>{item.name}</>
+  return <>{item.name} <span className="file-row__rename" title="Name it will be exported with">→ {to}</span></>
 }
