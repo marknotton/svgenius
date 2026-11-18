@@ -4,6 +4,10 @@ import { ContextMenu, type MenuState } from "./ContextMenu"
 import { InfoTip } from "./InfoTip"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { SvgItem } from "../lib/types"
+import { isDesktop } from "../lib/platform"
+
+// A folder picker follows on the desktop; the browser downloads straight away
+const dots = isDesktop ? "…" : ""
 
 // ── Footer: totals, Optimise, Export ──────────────────────────────────────────
 // Export only writes finished results, so it waits until every file it would
@@ -89,7 +93,7 @@ export function Footer(p: Props) {
       <div className="split">
         <button className={`btn ${outstanding > 0 ? "btn--secondary" : "btn--primary"}`} onClick={() => p.onExport(false)} disabled={!canExport}
           title={canExport ? "Save the optimised files to a folder" : "Optimise first, so every exported file matches its current settings"}>
-          <IconDownload /> Export {scope}{count}…
+          <IconDownload /> Export {scope}{count}{dots}
         </button>
         <button className={`btn split__more ${outstanding > 0 ? "btn--secondary" : "btn--primary"}`} disabled={!canExport}
           aria-label="More export options" title="More export options"
@@ -99,8 +103,8 @@ export function Footer(p: Props) {
               x: r.right - 220,
               y: r.top - 8 - 2 * 30,
               items: [
-                { label: `Export ${scope}${count}…`, run: () => p.onExport(false) },
-                { label: `Export and clear ${count}…`, run: () => p.onExport(true) }
+                { label: `Export ${scope}${count}${dots}`, run: () => p.onExport(false) },
+                { label: `Export and clear ${count}${dots}`, run: () => p.onExport(true) }
               ]
             })
           }}>▾</button>

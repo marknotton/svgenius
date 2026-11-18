@@ -1,8 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react"
-import { listen } from "@tauri-apps/api/event"
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
-import { open, save } from "@tauri-apps/plugin-dialog"
-import { revealItemInDir } from "@tauri-apps/plugin-opener"
 import { AppBar } from "./components/AppBar"
 import { ConfigPanel } from "./components/ConfigPanel"
 import { ContextMenu, type MenuState } from "./components/ContextMenu"
@@ -30,7 +26,7 @@ import { exportNames } from "./lib/rename"
 import { fileTags } from "./lib/tags"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
-import { errorMessage, existingFiles, exportFiles, readJsonFile, readPluginFile, takePendingOpenFiles, writeJsonFile } from "./lib/tauri"
+import { DOWNLOAD_URL, WEB_FILE_LIMIT, canReveal, errorMessage, exportSvgs, isDesktop, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, pickSvgs, reveal, saveJson } from "./lib/platform"
 import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "./lib/types"
 
 export default function App() {
@@ -95,49 +91,38 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   // ── Adding files ────────────────────────────────────────────────────────────
 
   const add = useCallback(async (paths: string[]) => {
-    if (paths.length === 0) return
+    if (paths.length === 0) {
+      push({ tone: "info", text: "No SVGs found there" })
+      return
+    }
     try {
-      const n = await addPaths(paths)
-      if (n === 0) push({ tone: "info", text: "No new SVGs found there" })
+      const { added, skipped } = await addPaths(paths, isDesktop ? Infinity : WEB_FILE_LIMIT)
+      if (skipped > 0) {
+        push({
+          tone: "info",
+          text: `The browser version holds up to ${WEB_FILE_LIMIT} files, so ${plural(skipped, "file")} ${skipped === 1 ? "was" : "were"} left out. The free desktop app has no limit.`,
+          action: { label: "Get the app", run: () => { window.open(DOWNLOAD_URL, "_blank", "noopener") } }
+        })
+      } else if (added === 0) push({ tone: "info", text: "No new SVGs found there" })
     } catch (e) {
       push({ tone: "error", text: errorMessage(e) })
     }
   }, [addPaths, push])
 
   const addFiles = async () => {
-    const picked = await open({ multiple: true, filters: [{ name: "SVG", extensions: ["svg"] }] })
-    if (picked) add(Array.isArray(picked) ? picked : [picked])
+    const picked = await pickSvgs("files")
+    if (picked) add(picked)
   }
 
   const addFolder = async () => {
-    const picked = await open({ directory: true, multiple: true })
-    if (picked) add(Array.isArray(picked) ? picked : [picked])
+    const picked = await pickSvgs("folder")
+    if (picked) add(picked)
   }
 
-  // Native drag and drop gives us real paths
-  useEffect(() => {
-    let unlisten: (() => void) | undefined
-    getCurrentWebviewWindow()
-      .onDragDropEvent((e) => {
-        if (e.payload.type === "enter" || e.payload.type === "over") setDragging(true)
-        else if (e.payload.type === "leave") setDragging(false)
-        else if (e.payload.type === "drop") {
-          setDragging(false)
-          add(e.payload.paths)
-        }
-      })
-      .then((fn) => { unlisten = fn })
-      .catch(() => {})
-    return () => unlisten?.()
-  }, [add])
+  useEffect(() => listenForDrops({ onHover: setDragging, onDrop: add }), [add])
 
   // Finder "Open With", including cold launches
-  useEffect(() => {
-    let unlisten: (() => void) | undefined
-    takePendingOpenFiles().then(add).catch(() => {})
-    listen<string[]>("files:opened", (e) => add(e.payload)).then((fn) => { unlisten = fn }).catch(() => {})
-    return () => unlisten?.()
-  }, [add])
+  useEffect(() => listenForOpenedFiles(add), [add])
 
   useEffect(() => {
     if (loadError) push({ tone: "error", text: `Couldn't load saved presets: ${loadError}` })
@@ -291,14 +276,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       push({ tone: "error", text: "Nothing to export. Check the files for errors." })
       return
     }
-    const outDir = await open({ directory: true, title: `Export ${plural(ready.length, "file")} to…` })
-    if (typeof outDir !== "string") return
-
     const plan = planExport(ready, settings.keepStructure, exportNames(ready, settings.rename))
     try {
-      const clashes = await existingFiles(outDir, plan.map((x) => x.relPath))
-      if (clashes.length > 0) {
-        const ok = await dialogs.confirm({
+      const confirmReplace = (clashes: string[]) =>
+        dialogs.confirm({
           title: `Replace ${plural(clashes.length, "file")}?`,
           body: <>
             <p>These already exist in the export folder and will be overwritten:</p>
@@ -308,20 +289,19 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
           confirmLabel: "Replace",
           danger: true
         })
-        if (!ok) return
-      }
       setBusy(true)
-      const written = await exportFiles(outDir, plan.map(({ item, relPath }) => ({
+      const written = await exportSvgs(plan.map(({ item, relPath }) => ({
         relPath,
         contents: (results.get(item.id)?.output) ?? ""
-      })))
+      })), `Export ${plural(ready.length, "file")} to…`, confirmReplace)
+      if (!written) return
       const skipped = list.length - ready.length
       // Job done: only the exported files leave the list, failures stay to fix
       if (clearAfter) remove(new Set(ready.map((i) => i.id)))
       push({
         tone: "success",
-        text: `Exported ${plural(written.length, "file")}${clearAfter ? " and cleared them from the list" : ""}${skipped ? `, skipped ${skipped} with errors` : ""}`,
-        action: written[0] ? { label: "Show in Finder", run: () => { revealItemInDir(written[0]).catch(() => {}) } } : undefined
+        text: `${written.download ? `Downloaded ${written.download} with` : "Exported"} ${plural(written.count, "file")}${clearAfter ? " and cleared them from the list" : ""}${skipped ? `, skipped ${skipped} with errors` : ""}`,
+        action: written.reveal ? { label: "Show in Finder", run: written.reveal } : undefined
       })
     } catch (e) {
       push({ tone: "error", text: `Export failed: ${errorMessage(e)}` })
@@ -394,10 +374,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   }
 
   const importPresets = async () => {
-    const path = await open({ filters: [{ name: "SVGenius settings", extensions: ["json"] }] })
-    if (typeof path !== "string") return
     try {
-      const { next, added, updated } = mergeImport(settings, JSON.parse(await readJsonFile(path)))
+      const json = await openJson()
+      if (json === null) return
+      const { next, added, updated } = mergeImport(settings, JSON.parse(json))
       update(() => next)
       push({ tone: "success", text: `Imported presets: ${added} added, ${updated} updated` })
     } catch (e) {
@@ -406,10 +386,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   }
 
   const exportPresets = async () => {
-    const path = await save({ defaultPath: "svgenius-presets.json", filters: [{ name: "JSON", extensions: ["json"] }] })
-    if (!path) return
     try {
-      await writeJsonFile(path, JSON.stringify(buildExport(settings), null, 2))
+      if (!(await saveJson("svgenius-presets.json", JSON.stringify(buildExport(settings), null, 2)))) return
       push({ tone: "success", text: `Exported ${plural(settings.presets.length, "preset")}` })
     } catch (e) {
       push({ tone: "error", text: `Export failed: ${errorMessage(e)}` })
@@ -419,10 +397,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   // ── Custom plugins ──────────────────────────────────────────────────────────
 
   const loadPlugin = async () => {
-    const path = await open({ filters: [{ name: "SVGO plugin", extensions: ["js", "mjs"] }] })
-    if (typeof path !== "string") return
     try {
-      const { fileName, code } = await readPluginFile(path)
+      const picked = await openPlugin()
+      if (!picked) return
+      const { fileName, code } = picked
       const { name, description } = await probePlugin(code)
       const existing = settings.customPlugins.find((c) => c.name === name)
       const plugin: CustomPlugin = { id: existing?.id ?? newId(), name, description, fileName, code, hash: hashCode(code) }
@@ -494,7 +472,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       y: e.clientY,
       items: [
         { label: "Inspect", run: () => { setFocusId(id); setSidebarTab("file") } },
-        { label: "Reveal in Finder", run: () => { revealItemInDir(item.path).catch(() => {}) } },
+        ...(canReveal ? [{ label: "Reveal in Finder", run: () => reveal(item.path) }] : []),
         "-",
         { label: "Remove from list", run: () => removeIds(new Set([id])) },
         ...(inSelection ? [{ label: `Remove ${plural(selection.size, "selected file")}`, danger: true, run: () => removeIds(new Set(selection)) }] : [])
@@ -504,13 +482,12 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   // Settings: ⌘, from the menu or the keyboard
   useEffect(() => {
-    let unlisten: (() => void) | undefined
-    listen("menu:settings", () => setSettingsOpen(true)).then((fn) => { unlisten = fn }).catch(() => {})
+    const unlisten = listenFor("menu:settings", () => setSettingsOpen(true))
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === ",") { e.preventDefault(); setSettingsOpen(true) }
     }
     window.addEventListener("keydown", onKey)
-    return () => { unlisten?.(); window.removeEventListener("keydown", onKey) }
+    return () => { unlisten(); window.removeEventListener("keydown", onKey) }
   }, [])
 
   const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbPx" | "galleryPx" | "inspectorPx" | "listCompare" | "showDetails" | "backdrop" | "previewCss" | "previewCssEnabled" | "circleOverlay" | "circleClip">>) =>
@@ -533,11 +510,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     push({ tone: "info", text: "Layout reset" })
   }, [update, push])
 
-  useEffect(() => {
-    let unlisten: (() => void) | undefined
-    listen("menu:reset-layout", resetLayout).then((fn) => { unlisten = fn }).catch(() => {})
-    return () => unlisten?.()
-  }, [resetLayout])
+  useEffect(() => listenFor("menu:reset-layout", resetLayout), [resetLayout])
 
   // ── Preview CSS ─────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPreset, defaultSvgoSettings, duplicateAfter, sanitiseAppSettings } from "../lib/settings"
-import { loadSettingsFile, saveSettingsFile } from "../lib/tauri"
+import { loadSettings, saveSettings } from "../lib/platform"
 import type { AppSettings, Preset, SvgoSettings } from "../lib/types"
 
 // ── Persistent app settings ───────────────────────────────────────────────────
@@ -12,7 +12,7 @@ export function useAppSettings() {
   const latest = useRef<AppSettings | null>(null)
 
   useEffect(() => {
-    loadSettingsFile()
+    loadSettings()
       .then((json) => setSettings(sanitiseAppSettings(json ? JSON.parse(json) : null)))
       .catch((e) => {
         setLoadError(String(e))
@@ -25,14 +25,14 @@ export function useAppSettings() {
     if (!settings) return
     latest.current = settings
     const t = setTimeout(() => {
-      saveSettingsFile(JSON.stringify(settings, null, 2)).catch((e) => console.error("Couldn't save settings", e))
+      saveSettings(JSON.stringify(settings, null, 2)).catch((e) => console.error("Couldn't save settings", e))
     }, 250)
     return () => clearTimeout(t)
   }, [settings])
 
   useEffect(() => {
     const flush = () => {
-      if (latest.current) saveSettingsFile(JSON.stringify(latest.current, null, 2)).catch(() => {})
+      if (latest.current) saveSettings(JSON.stringify(latest.current, null, 2)).catch(() => {})
     }
     window.addEventListener("beforeunload", flush)
     return () => window.removeEventListener("beforeunload", flush)

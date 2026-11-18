@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react"
 import { byteLength } from "../lib/format"
 import { CONCURRENCY, optimiseSvg, runLimited } from "../lib/optimiser"
 import { newId } from "../lib/settings"
-import { errorMessage, readSvg, scanPaths } from "../lib/tauri"
+import { errorMessage, forgetFiles, readSvg, scanPaths } from "../lib/platform"
 import { postProcess } from "../lib/trim"
 import type { GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "../lib/types"
 
@@ -21,14 +21,21 @@ export function useItems() {
     setItems((list) => list.map((i) => (i.id === id ? { ...i, ...p } : i)))
   }, [])
 
-  /** Scans paths (files or folders), adds new SVGs and returns how many were added */
-  const addPaths = useCallback(async (paths: string[]) => {
+  /**
+   * Scans paths (files or folders) and adds new SVGs, up to `limit` in the list.
+   * Returns how many were added and how many didn't fit.
+   */
+  const addPaths = useCallback(async (paths: string[], limit = Infinity) => {
     const scanned = await scanPaths(paths)
     const known = new Set(itemsRef.current.map((i) => i.path))
-    const fresh: SvgItem[] = scanned
+    const all: SvgItem[] = scanned
       .filter((f) => !known.has(f.path) && (known.add(f.path), true))
       .map((f) => ({ ...f, id: newId(), status: "loading", presetId: null, rev: 0 }))
-    if (fresh.length === 0) return 0
+    const room = Math.max(0, limit - itemsRef.current.length)
+    const fresh = all.slice(0, room)
+    forgetFiles(all.slice(room).map((i) => i.path))
+    const result = { added: fresh.length, skipped: all.length - fresh.length }
+    if (fresh.length === 0) return result
     setItems((list) => [...list, ...fresh])
 
     await runLimited(fresh, 8, async (item) => {
@@ -39,14 +46,18 @@ export function useItems() {
         patch(item.id, { status: "error", error: errorMessage(e) })
       }
     })
-    return fresh.length
+    return result
   }, [patch])
 
   const remove = useCallback((ids: Set<string>) => {
+    forgetFiles(itemsRef.current.filter((i) => ids.has(i.id)).map((i) => i.path))
     setItems((list) => list.filter((i) => !ids.has(i.id)))
   }, [])
 
-  const clear = useCallback(() => setItems([]), [])
+  const clear = useCallback(() => {
+    forgetFiles(itemsRef.current.map((i) => i.path))
+    setItems([])
+  }, [])
 
   const setPreset = useCallback((ids: string[], presetId: string | null) => {
     const set = new Set(ids)

@@ -1,51 +1,71 @@
 # SVGenius
 
-A small macOS-first desktop app for optimising SVGs in bulk with [SVGO](https://github.com/svg/svgo), so a whole folder of assets follows the same rules.
+**Tidy up a whole folder of SVGs in one go.** Drop in your icons, pick your rules once, and SVGenius squeezes every file down with [SVGO](https://github.com/svg/svgo), trims the empty space around the artwork and hands them back ready to ship. Usually 60–80% smaller, and the same rules apply to every file.
 
-- Add SVGs by file, by folder (searched recursively) or by dragging them onto the window
-- Tiny / medium / large previews on a light or dark checkerboard
-- Full SVGO plugin settings, saved as named **presets** that persist between launches
-- Give individual files their own preset, or make a new one just for that file
-- Live updates: rows on or near screen re-run as you change settings (buffer in `src/lib/config.ts`)
-- Finder-style selection (click, Cmd-click, Shift-click) and a file inspector with live, editable markup, viewBox info, a per-file preset and a per-file transform (scale, move X/Y)
-- Bulk optimise and export, optionally keeping the folder structure
-- Review selected files side by side (before / after) with size savings, tweak settings and see them re-run live
-- Find & replace rules per preset (match case, first or all, optional regex, before or after SVGO)
-- Attribute rules (recipes): for chosen elements (`*` or `path, rect, circle`), if they have / lack / match an attribute, then set, add if missing, remove or rename an attribute, or remove the element
-- Size & trim: output scale factor, plus trim whitespace that crops the viewBox to the visible artwork, with padding (positive) or inset (negative) in % or viewBox units, and fit-content or preserve-aspect-ratio modes
-- Width × height on every row and in review, plus circle guide and circle clip toggles for avatar-style crops
-- Resizable settings sidebar (remembered), app menu with About and Reset Layout
-- Preview CSS (e.g. `:root { --symbol-colour: red; }`) applied to every preview but never to exported files
-- Third-party SVGO plugins: load a single-file `.js`/`.mjs` plugin (see `examples/plugins/`), toggle it per preset and pass JSON params
-- Import and export presets as JSON
+**[Open SVGenius in your browser →](https://marknotton.github.io/svgenius/)** · [Download the desktop app](https://github.com/marknotton/svgenius/releases/latest)
 
-## Stack
+![SVGenius with a folder of icons, each row showing its saving and new size](docs/screenshots/list.png)
 
-Tauri v2 (Rust) + React 19 + TypeScript, built with Vite and Yarn 4. SVGO runs in Web Workers inside the webview (`svgo/browser`), so there are no sidecars. Custom plugin code is imported from a blob URL inside those workers only (hence `script-src blob:` in the CSP), so it never touches the window or Tauri's IPC. Rust only handles file IO: scanning folders, reading SVGs, writing exports and the settings file.
+## What it does
 
-Settings live in the app config folder (`~/Library/Application Support/studio.yello.svgenius/settings.json` on macOS).
+- **Bulk optimise.** Add files or whole folders (sub-folders included) and optimise them all at once. Live mode re-runs as you change settings, so you see the result straight away.
+- **Before and after, side by side.** Big previews on a light or dark checkerboard, with a circle guide for avatar-style crops.
+- **Trim whitespace.** The viewBox hugs the artwork exactly, curves and round caps included, with optional padding.
+- **Presets.** Save your favourite SVGO settings as named presets, give odd files their own, and import or export them as JSON to share with the team.
+- **Find, filter and flag.** Filter by colour, element, attribute, markup text, file name or status. Flag files in colours and do things like "optimise everything except the red ones".
+- **Edit the markup.** A proper code editor with an Inspect picker: click part of the artwork and jump to its markup.
+- **Rules and recipes.** Find and replace, attribute rules, added markup, scale and nudge, plus custom SVGO plugins.
+- **A plain-English report.** Copy a summary of what changed for a pull request or a client.
 
-## Commands
+![Big before and after previews with the file inspector and markup editor](docs/screenshots/previews.png)
+
+![Filtering the list to files that use a particular red](docs/screenshots/filters.png)
+
+![The report dialog summarising savings in plain English](docs/screenshots/report.png)
+
+## Browser or desktop?
+
+Both run the same app. Nothing is uploaded either way: SVGO runs on your own machine.
+
+| | Browser | Desktop app |
+|---|---|---|
+| Install | Nothing, or "Install app" from the address bar | Download from [Releases](https://github.com/marknotton/svgenius/releases/latest) |
+| Files at once | Up to 250 | No limit |
+| Export | One file downloads, more come as a zip | Writes straight into a folder you pick, keeping the folder structure |
+| Settings and presets | Saved in the browser | Saved in the app's settings file |
+| Works offline | Yes, after the first visit | Yes |
+
+For big batches (hundreds of icons, or a whole design system), use the desktop app. Browsers keep every file in memory, so the online version keeps batches to a sensible size.
+
+> The desktop app isn't signed yet. On a Mac, right-click it and choose **Open** the first time.
+
+## For developers
+
+Tauri v2 (Rust) + React 19 + TypeScript, built with Vite and Yarn 4. SVGO runs in a pool of Web Workers (`svgo/browser`). Rust only handles file IO on the desktop: scanning folders, reading SVGs, writing exports and the settings file. `src/lib/platform.ts` swaps those for browser equivalents (file pickers, drag and drop, zip downloads, `localStorage`) when the app runs on the web.
+
+Custom plugin code is imported from a blob URL inside the workers only (hence `script-src blob:` in the CSP), so it never touches the window or Tauri's IPC.
 
 | Command | What it does |
 |---|---|
-| `yarn install` | Install JS dependencies |
-| `yarn tauri:dev` | Run the app with hot reload (Vite on :1420) |
+| `yarn install` | Install dependencies |
+| `yarn tauri:dev` | Run the desktop app with hot reload (Vite on :1420) |
+| `yarn dev` | Run the browser version at http://localhost:1420 |
 | `yarn tauri:build` | Build the `.app` / `.dmg` into `src-tauri/target/release/bundle/` |
-| `yarn build` | Typecheck and build the frontend only |
+| `yarn build:web` | Build the browser version for GitHub Pages into `dist/` |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Rust unit tests |
-| `yarn tauri icon assets/icon.png` | Regenerate app icons |
 
-## Layout
+**Publishing.** Every push to `main` builds the browser version and publishes it to GitHub Pages (`.github/workflows/pages.yml`). To make a desktop release, run the **Desktop release** workflow from the Actions tab (or push a tag like `v0.2.0`). It builds macOS and Windows installers into a draft release that you publish when happy.
 
 ```
 src/
-  App.tsx                 wiring: files, presets, review, export
-  components/             UI pieces (FileList, ConfigPanel, ReviewView, …)
+  App.tsx                 wiring: files, presets, export
+  components/             UI pieces (FileList, ConfigPanel, FileInspector, …)
   hooks/useAppSettings.ts persisted settings + preset actions
   hooks/useItems.ts       file list and optimisation queue
+  lib/platform.ts         desktop (Tauri) or browser: files, dialogs, settings
   lib/plugins.ts          SVGO plugin catalogue (labels, defaults, order)
   lib/settings.ts         defaults, validation, SVGO config, import/export
   lib/optimiser*.ts       Web Worker pool running SVGO
+public/                   web app manifest, service worker, icons
 src-tauri/src/lib.rs      file IO commands
 ```

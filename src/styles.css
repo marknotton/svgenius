@@ -78,6 +78,15 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
   -webkit-app-region: drag;
 }
 .appbar * { -webkit-app-region: no-drag; }
+/* No traffic lights to clear in the browser */
+.is-web .appbar { padding-left: 16px; }
+.appbar__get {
+  position: absolute; right: 44px; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--text-2); text-decoration: none;
+}
+.appbar__get:hover { color: var(--accent-ink); }
+.empty__body a { color: var(--accent-ink); }
 .appbar__title { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; pointer-events: none; }
 
 .workspace { flex: 1; min-height: 0; display: flex; }
