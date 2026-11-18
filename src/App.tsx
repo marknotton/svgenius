@@ -14,6 +14,7 @@ import { FilterBar } from "./components/FilterBar"
 import { activeRules, emptyFilters, matchesFilters, nextFlag, type FilterSet } from "./lib/filters"
 import { ReportDialog } from "./components/ReportDialog"
 import { SettingsDialog } from "./components/SettingsDialog"
+import { AboutDialog } from "./components/AboutDialog"
 import { Toasts, useToasts } from "./components/Toast"
 import { ViewControls } from "./components/ViewControls"
 import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/useAppSettings"
@@ -26,7 +27,8 @@ import { exportNames } from "./lib/rename"
 import { fileTags } from "./lib/tags"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
-import { DOWNLOAD_URL, WEB_FILE_LIMIT, canReveal, errorMessage, exportSvgs, isDesktop, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, pickSvgs, reveal, saveJson } from "./lib/platform"
+import { canReveal, errorMessage, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, pickSvgs, reveal, saveJson } from "./lib/platform"
+import { preloadMonaco } from "./components/CodeEditor"
 import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "./lib/types"
 
 export default function App() {
@@ -43,11 +45,15 @@ interface WorkspaceProps {
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise } = useItems()
+  // Once there are files, get the code editor ready before anyone opens it
+  const hasItems = items.length > 0
+  useEffect(() => { if (hasItems) preloadMonaco() }, [hasItems])
   const dialogs = useDialogs()
   const { toasts, push, dismiss } = useToasts()
   const actions = useMemo(() => presetActions(update), [update])
 
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [selection, setSelection] = useState<Set<string>>(new Set())
@@ -96,14 +102,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       return
     }
     try {
-      const { added, skipped } = await addPaths(paths, isDesktop ? Infinity : WEB_FILE_LIMIT)
-      if (skipped > 0) {
-        push({
-          tone: "info",
-          text: `The browser version holds up to ${WEB_FILE_LIMIT} files, so ${plural(skipped, "file")} ${skipped === 1 ? "was" : "were"} left out. The free desktop app has no limit.`,
-          action: { label: "Get the app", run: () => { window.open(DOWNLOAD_URL, "_blank", "noopener") } }
-        })
-      } else if (added === 0) push({ tone: "info", text: "No new SVGs found there" })
+      const { added } = await addPaths(paths)
+      if (added === 0) push({ tone: "info", text: "No new SVGs found there" })
     } catch (e) {
       push({ tone: "error", text: errorMessage(e) })
     }
@@ -558,7 +558,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   return (
     <PreviewCssContext.Provider value={appliedCss}>
       <div className={`app${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px` } as CSSProperties}>
-        <AppBar onSettings={() => setSettingsOpen(true)} />
+        <AppBar onSettings={() => setSettingsOpen(true)} onAbout={() => setAboutOpen(true)} />
         <div className="workspace">
           <main className="workspace__main">
             {items.length === 0 ? (
@@ -688,6 +688,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
           <ReportDialog entries={reportEntries} selected={selection} rename={settings.rename} onClose={() => setReportOpen(false)} />
         )}
         {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
+        {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
         {settingsOpen && (
           <SettingsDialog
             settings={settings}

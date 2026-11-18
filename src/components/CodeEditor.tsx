@@ -9,6 +9,13 @@ type Monaco = typeof import("monaco-editor/editor")
 let monacoReady: Promise<Monaco> | null = null
 const loadMonaco = () => (monacoReady ??= import("../lib/monaco").then((m) => m.monaco))
 
+/** Warms Monaco up in the background so the first editor opens quickly */
+export function preloadMonaco() {
+  const go = () => { loadMonaco().catch(() => { monacoReady = null }) }
+  if ("requestIdleCallback" in window) requestIdleCallback(go, { timeout: 4000 })
+  else setTimeout(go, 1500)
+}
+
 interface Props {
   value: string
   onChange?: (value: string) => void
@@ -116,6 +123,11 @@ export function CodeEditor({ value, onChange, readOnly, className, label, reveal
       {!ready && (
         <textarea className="input input--mono code-editor__fallback" spellCheck={false} value={value} readOnly={readOnly}
           aria-label={label} onChange={(e) => onChange?.(e.target.value)} />
+      )}
+      {!ready && (
+        <div className="code-editor__loading" role="status">
+          <span className="spinner spinner--sm" /> Loading editor…
+        </div>
       )}
     </div>
   )

@@ -1,5 +1,5 @@
 import { IconFile, IconFolder, Logo } from "../icons"
-import { DOWNLOAD_URL, WEB_FILE_LIMIT, isDesktop } from "../lib/platform"
+import { DOWNLOAD_URL, isDesktop } from "../lib/platform"
 
 export function EmptyState({ onAddFiles, onAddFolder }: { onAddFiles: () => void, onAddFolder: () => void }) {
   return (
@@ -10,7 +10,7 @@ export function EmptyState({ onAddFiles, onAddFolder }: { onAddFiles: () => void
         ? <p className="empty__body">Folders are searched for SVGs, sub-folders included. Nothing is changed on disk until you export.</p>
         : <p className="empty__body">
             Folders are searched for SVGs, sub-folders included. Everything happens in your browser: nothing is uploaded, and exports download as a zip.
-            Up to {WEB_FILE_LIMIT} files at a time here. For bigger batches, <a href={DOWNLOAD_URL} target="_blank" rel="noopener">get the desktop app</a>.
+            Prefer exporting straight into folders? <a href={DOWNLOAD_URL} target="_blank" rel="noopener">Get the desktop app</a>.
           </p>}
       <div className="empty__actions">
         <button className="btn btn--primary" onClick={onAddFiles}><IconFile /> Choose files</button>

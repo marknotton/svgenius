@@ -17,8 +17,13 @@ export function InfoTip({ children, label = "More info" }: { children: ReactNode
     if (!open || !btn.current) return
     const r = btn.current.getBoundingClientRect()
     const w = tip.current?.offsetWidth ?? 280
+    const h = tip.current?.offsetHeight ?? 120
     const left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2))
-    setPos({ left, top: r.bottom + 8 })
+    // Below by default, above when there's no room (e.g. in the footer)
+    const below = r.bottom + 8
+    const fitsBelow = below + h + 8 <= window.innerHeight
+    const top = fitsBelow || r.top - h - 8 < 8 ? Math.min(below, window.innerHeight - h - 8) : r.top - h - 8
+    setPos({ left, top: Math.max(8, top) })
   }, [open])
 
   useEffect(() => {

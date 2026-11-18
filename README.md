@@ -30,12 +30,12 @@ Both run the same app. Nothing is uploaded either way: SVGO runs on your own mac
 | | Browser | Desktop app |
 |---|---|---|
 | Install | Nothing, or "Install app" from the address bar | Download from [Releases](https://github.com/marknotton/svgenius/releases/latest) |
-| Files at once | Up to 250 | No limit |
+| After a refresh | Your files, edits and flags come back | Reopen the files |
 | Export | One file downloads, more come as a zip | Writes straight into a folder you pick, keeping the folder structure |
 | Settings and presets | Saved in the browser | Saved in the app's settings file |
 | Works offline | Yes, after the first visit | Yes |
 
-For big batches (hundreds of icons, or a whole design system), use the desktop app. Browsers keep every file in memory, so the online version keeps batches to a sensible size.
+There is no file limit in either. The desktop app is handier for big batches because it writes straight back into folders.
 
 > The desktop app isn't signed yet. On a Mac, right-click it and choose **Open** the first time.
 

@@ -133,16 +133,13 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
 
         <section className="panel__section">
           <div className="panel__label">Settings for this file</div>
-          <Segmented label="Settings source" value={item.config ? "own" : "preset"}
-            onChange={(v) => (v === "own" ? p.onCustomise() : p.onUsePreset())}
-            options={[
-              { value: "preset", label: "Use a preset", title: "Share settings with other files" },
-              { value: "own", label: "Bespoke", title: "One-of-a-kind settings for just this file" }
-            ]} />
           {item.config ? (
             <>
               <p className="text-3 inspector__hint">This file has its own one-of-a-kind settings. Changes below only affect it.</p>
-              <button className="link inspector__save" onClick={p.onSaveAsPreset} title="Turn these settings into a preset you can use on other files">Save these as a preset…</button>
+              <div className="inspector__links">
+                <button className="link" onClick={p.onSaveAsPreset} title="Turn these settings into a preset you can use on other files">Save these as a preset…</button>
+                <button className="link" onClick={p.onUsePreset} title="Drop this file's own settings and go back to its preset">Use a preset instead</button>
+              </div>
             </>
           ) : (
             <>

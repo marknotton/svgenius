@@ -1,8 +1,9 @@
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { byteLength } from "../lib/format"
 import { CONCURRENCY, optimiseSvg, runLimited } from "../lib/optimiser"
 import { newId } from "../lib/settings"
-import { errorMessage, forgetFiles, readSvg, scanPaths } from "../lib/platform"
+import { errorMessage, forgetFiles, isDesktop, readSvg, scanPaths } from "../lib/platform"
+import { loadSession, saveSession } from "../lib/session"
 import { postProcess } from "../lib/trim"
 import type { GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "../lib/types"
 
@@ -16,6 +17,25 @@ export function useItems() {
   itemsRef.current = items
   // Latest run per item, so a slow earlier run can't overwrite a newer one
   const runs = useRef(new Map<string, number>())
+
+  // Browser: bring back the last list after a refresh, then keep it saved
+  const restored = useRef(isDesktop)
+  useEffect(() => {
+    if (isDesktop) return
+    loadSession().then((saved) => {
+      restored.current = true
+      if (saved.length === 0) return
+      setItems((list) => {
+        const known = new Set(list.map((i) => i.path))
+        return [...saved.filter((i) => !known.has(i.path)), ...list]
+      })
+    })
+  }, [])
+  useEffect(() => {
+    if (isDesktop || !restored.current) return
+    const t = setTimeout(() => saveSession(items), 600)
+    return () => clearTimeout(t)
+  }, [items])
 
   const patch = useCallback((id: string, p: Partial<SvgItem>) => {
     setItems((list) => list.map((i) => (i.id === id ? { ...i, ...p } : i)))

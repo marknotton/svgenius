@@ -1,8 +1,8 @@
 import type { MouseEvent } from "react"
-import { IconDownload, IconGear, Logo } from "../icons"
+import { IconDownload, IconGear, IconInfo, Logo } from "../icons"
 import { DOWNLOAD_URL, isDesktop, startWindowDrag } from "../lib/platform"
 
-export function AppBar({ onSettings }: { onSettings: () => void }) {
+export function AppBar({ onSettings, onAbout }: { onSettings: () => void, onAbout: () => void }) {
   const drag = (e: MouseEvent) => {
     if (e.button === 0 && e.target === e.currentTarget) startWindowDrag()
   }
@@ -17,6 +17,7 @@ export function AppBar({ onSettings }: { onSettings: () => void }) {
           <IconDownload width={12} height={12} /> Get the desktop app
         </a>
       )}
+      <button className="btn btn--icon appbar__about" title="About SVGenius" aria-label="About" onClick={onAbout}><IconInfo /></button>
       <button className="btn btn--icon appbar__settings" title="Settings (⌘,)" aria-label="Settings" onClick={onSettings}><IconGear /></button>
     </header>
   )

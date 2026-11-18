@@ -1,8 +1,10 @@
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
+import pkg from "./package.json" with { type: "json" }
 
 export default defineConfig(async () => ({
   plugins: [react()],
+  define: { __APP_VERSION__: JSON.stringify(pkg.version) },
   // GitHub Pages serves the web build from /svgenius/ (see yarn build:web)
   base: process.env.SVGENIUS_BASE ?? "/",
   clearScreen: false,

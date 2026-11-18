@@ -13,9 +13,6 @@ import type { ScannedFile } from "./types"
 
 export const isDesktop = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window
 
-/** Most files the browser version takes at once. Big batches belong in the desktop app */
-export const WEB_FILE_LIMIT = 250
-
 export const REPO_URL = "https://github.com/marknotton/svgenius"
 export const DOWNLOAD_URL = `${REPO_URL}/releases/latest`
 
