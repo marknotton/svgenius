@@ -18,7 +18,8 @@ export const HISTORY: Release[] = [
       "Select puts a box round the selection: drag its handles to scale (Shift keeps proportions, Alt scales from the centre) or the knob on top to rotate (Shift snaps to 15°). Plain paths take the change into their points, everything else gets a transform",
       "Right-click a point (or several) to convert it to a line, curve, quadratic and more, add a point after it, switch it between absolute and relative, or delete it",
       "Alt- or ⌘-click a point to flip it between corner and smooth, and Delete removes selected points rather than the whole path",
-      "Clicking an element's tag name in the code selects the whole element, ready to delete or cut"
+      "Clicking an element's tag name in the code selects the whole element, ready to delete or cut",
+      "The VectorCraft note moves under the preview, with a close button that this device remembers"
     ]
   },
   {

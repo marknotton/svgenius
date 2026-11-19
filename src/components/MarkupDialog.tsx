@@ -72,6 +72,9 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
   const selected = selection.length === 1 ? selection[0] : -1
   const setSelected = (i: number) => setSelection(i >= 0 ? [i] : [])
   const [menu, setMenu] = useState<MenuState | null>(null)
+  // The VectorCraft note, until it's dismissed on this device
+  const [nodDismissed, setNodDismissed] = useState(() => { try { return localStorage.getItem("svgenius:nod-dismissed") === "1" } catch { return false } })
+  const dismissNod = () => { setNodDismissed(true); try { localStorage.setItem("svgenius:nod-dismissed", "1") } catch { /* unavailable */ } }
   // Select (black arrow) works on whole elements, Direct select (white arrow) on a path's points
   const [tool, setToolState] = useState<"select" | "direct">(() => {
     try { return localStorage.getItem("svgenius:tool") === "select" ? "select" : "direct" } catch { return "direct" }
@@ -368,12 +371,6 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
           <h2 className="modal__title markup-dialog__title" title={item.relPath}>{item.name}</h2>
           <CodeTabs value={tab} onChange={onTab} />
           <span className="text-3 markup-dialog__tip">Select (V) moves, scales and rotates. Direct select (A) edits a path's points</span>
-          {/* Unaffiliated pointer to a free, fuller vector editor: this one tidies markup, it isn't an art tool */}
-          <a className="markup-dialog__nod" href="https://getartcraft.com/apps/vectorcraft" target="_blank" rel="noopener"
-            title="This is a basic markup editor, not an art tool. VectorCraft is a free, fuller vector editor (we're not affiliated)">
-            SVGenius has a very basic editor. For a richer, fuller one, try <img src={vectorcraftIcon} alt="" width={14} height={14} />
-            <span className="markup-dialog__nod-mark">Vector<b>Craft</b></span> for free
-          </a>
           <div className="markup-dialog__spacer" />
           <div className="btn-join" role="group" aria-label="History">
             <button className="btn btn--secondary btn--sm" onClick={() => travel(true)} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo"><IconUndo width={12} height={12} /></button>
@@ -433,6 +430,19 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               onHover={setHover} hover={hover}
               onTransform={tool === "select" && editable ? transformBy : undefined}
               path={segs && tool === "direct" ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath, onPointMenu: pointMenu } : null} />
+            {/* Unaffiliated pointer to a free, fuller vector editor: this one tidies markup, it isn't an art tool */}
+            {!nodDismissed && (
+              <p className="markup-dialog__nod">
+                <span>SVGenius has a very basic editor. For a richer, fuller one, try</span>
+                <a href="https://getartcraft.com/apps/vectorcraft" target="_blank" rel="noopener"
+                  title="VectorCraft: a free, fuller vector editor (we're not affiliated)">
+                  <img src={vectorcraftIcon} alt="" width={14} height={14} />
+                  <span className="markup-dialog__nod-mark">Vector<b>Craft</b></span>
+                </a>
+                <span>for free.</span>
+                <button className="btn btn--icon markup-dialog__nod-close" aria-label="Dismiss" title="Dismiss" onClick={dismissNod}><IconX width={10} height={10} /></button>
+              </p>
+            )}
           </div>
           <div className="markup-dialog__side">
             {layout.bottom
