@@ -487,13 +487,16 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
             {/* Unaffiliated pointer to a free, fuller vector editor: this one tidies markup, it isn't an art tool */}
             {!nodDismissed && (
               <p className="markup-dialog__nod">
-                <span>SVGenius offers a very basic SVG editor. For a richer, fuller one, use</span>
-                <a href="https://getartcraft.com/apps/vectorcraft" target="_blank" rel="noopener"
-                  title="VectorCraft: a free, fuller vector editor (we're not affiliated)">
-                  <img src={vectorcraftIcon} alt="" width={14} height={14} />
-                  <span className="markup-dialog__nod-mark">Vector<b>Craft</b></span>
-                </a>
-                <span>for free.</span>
+                {/* One run of inline text, so it wraps like a sentence rather than in blocks */}
+                <span className="markup-dialog__nod-text">
+                  SVGenius offers a very basic SVG editor. For a richer, fuller one, use{" "}
+                  <a href="https://getartcraft.com/apps/vectorcraft" target="_blank" rel="noopener"
+                    title="VectorCraft: a free, fuller vector editor (we're not affiliated)">
+                    <img src={vectorcraftIcon} alt="" width={14} height={14} />
+                    <span className="markup-dialog__nod-mark">Vector<b>Craft</b></span>
+                  </a>{" "}
+                  for free.
+                </span>
                 <button className="btn btn--icon markup-dialog__nod-close" aria-label="Dismiss" title="Dismiss" onClick={dismissNod}><IconX width={14} height={14} /></button>
               </p>
             )}

@@ -1089,11 +1089,13 @@ input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hove
 }
 
 /* Quiet link to VectorCraft in the editor's header */
-.markup-dialog__nod { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin: 0; font-size: 11px; color: var(--text-3); }
-.markup-dialog__nod a { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+.markup-dialog__nod { flex: none; display: flex; align-items: center; gap: 6px; margin: 0; font-size: 11px; line-height: 1.35; color: var(--text-3); }
+.markup-dialog__nod-text { min-width: 0; }
+.markup-dialog__nod a { text-decoration: none; white-space: nowrap; }
+.markup-dialog__nod a img { vertical-align: -3px; margin-right: 4px; }
 .markup-dialog__nod a:hover .markup-dialog__nod-mark { text-decoration: underline; }
 .markup-dialog__nod img { border-radius: 3px; }
-.markup-dialog__nod-close { width: 24px; height: 24px; margin-left: 4px; }
+.markup-dialog__nod-close { flex: none; width: 24px; height: 24px; }
 .markup-dialog__nod-mark { font-weight: 600; color: var(--text-2); }
 .markup-dialog__nod-mark b { font-weight: inherit; color: #e7573e; }
 
@@ -1109,7 +1111,11 @@ body.is-resizing-x, body.is-resizing-x * { cursor: col-resize !important; user-s
 body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-select: none; }
 
 /* Editor sizes and the bottom layout */
-.markup-dialog__body.is-inspecting { grid-template-columns: 210px minmax(0, 1fr) var(--side-w, 40%); }
+/* The code panel gives way before the preview drops under 280px */
+.markup-dialog__body.is-inspecting { grid-template-columns: 210px minmax(0, 1fr) min(var(--side-w, 40%), calc(100% - 210px - 280px - 20px)); }
+@media (max-width: 1100px) {
+  .markup-dialog__body.is-inspecting { grid-template-columns: 170px minmax(0, 1fr) min(var(--side-w, 40%), calc(100% - 170px - 280px - 20px)); }
+}
 .markup-dialog__side, .markup-dialog__tools { position: relative; }
 .markup-dialog__tools { height: var(--tools-h, 36%); }
 .markup-dialog__body.is-inspecting.is-bottom { grid-template-columns: 210px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) var(--side-h, 40%); }
