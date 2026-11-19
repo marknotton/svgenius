@@ -9,3 +9,5 @@ package-lock.json
 src-tauri/target/
 src-tauri/gen/
 src-tauri/binaries/
+t2.png
+*.tsbuildinfo

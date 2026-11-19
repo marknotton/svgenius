@@ -11,6 +11,15 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "1.0.0",
+    date: "19 November 2026",
+    notes: [
+      "First proper release: a Mac .dmg (Apple silicon and Intel) and Windows installers on GitHub Releases",
+      "The Mac app is called SVGenius everywhere, from the Dock to the menu bar",
+      "Fresh README with screenshots, install steps and credits"
+    ]
+  },
+  {
     version: "0.13.0",
     date: "19 November 2026",
     notes: [
