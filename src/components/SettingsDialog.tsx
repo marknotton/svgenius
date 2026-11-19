@@ -93,6 +93,11 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
           <Toggle label="Advanced options" hint="Show every option: viewBox and contents editing, rules, all SVGO plugins, the markup editor, import and export, and Beta tools"
             checked={settings.advanced} onChange={(v) => set("advanced", v)} />
           <div className="field-row">
+            <span>Editor tools</span>
+            <Segmented<"top" | "left"> label="Editor tools position" value={settings.editorToolbar} onChange={(v) => set("editorToolbar", v)}
+              options={[{ value: "top", label: "Top", title: "A row across the top of the editor" }, { value: "left", label: "Left", title: "A column down the left of the editor" }]} />
+          </div>
+          <div className="field-row">
             <span>Theme</span>
             <Segmented<ThemeChoice> label="App theme" value={settings.theme} onChange={(v) => set("theme", v)}
               options={[{ value: "system", label: "System", title: "Follow your computer's light or dark setting" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />

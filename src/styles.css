@@ -1218,3 +1218,45 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .inspect__guide { position: absolute; pointer-events: none; background: #ff2d87; z-index: 3; }
 .inspect__guide--v { top: 0; bottom: 0; width: 1px; margin-left: -.5px; }
 .inspect__guide--h { left: 0; right: 0; height: 1px; margin-top: -.5px; }
+
+/* ── Editor tools: full-width row on top, or a column on the left ─ */
+
+.markup-dialog__work { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.markup-dialog__work.is-left { flex-direction: row; }
+.markup-dialog__work > .markup-dialog__body { flex: 1; min-height: 0; min-width: 0; }
+.edit-toolbar--top { width: 100%; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.edit-toolbar--left { flex: none; width: 46px; flex-direction: column; flex-wrap: nowrap; align-items: center; padding-right: 8px; border-right: 1px solid var(--border); overflow: visible; }
+.edit-toolbar--left .tool-switch, .edit-toolbar--left .canvas-bg { flex-direction: column; }
+.edit-toolbar--left .canvas-bg { margin-left: 0; }
+.edit-toolbar--top .canvas-bg { margin-left: 0; }
+.edit-toolbar__sep { flex: none; width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
+.edit-toolbar--left .edit-toolbar__sep { width: 22px; height: 1px; margin: 2px 0; }
+.edit-toolbar__spacer { flex: 1; }
+.edit-toolbar__btn:disabled { opacity: .35; }
+.edit-toolbar__btn.is-on { color: var(--accent-ink, var(--accent)); background: var(--accent-soft); }
+.markup-dialog__canvas > .edit-toolbar__count { font-size: 12px; }
+
+/* ── Fill and stroke swatches ────────────────────────────────── */
+
+.paint { position: relative; display: flex; gap: 4px; }
+.paint--left { flex-direction: column; }
+.paint__swatch { position: relative; width: 28px; height: 26px; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-xs); background: var(--surface); cursor: pointer; }
+.paint__swatch:disabled { opacity: .4; cursor: default; }
+.paint__swatch.is-open { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.paint__swatch > span { display: block; width: 100%; height: 100%; border-radius: 3px; box-sizing: border-box; }
+.paint__swatch--fill > span { border: 1px solid rgba(0, 0, 0, .18); }
+.paint__swatch--stroke > span { border: 4px solid #000; background: transparent; }
+.paint__swatch.is-none > span { border: 1px solid var(--border); background: linear-gradient(to top right, transparent 44%, #e5484d 44% 56%, transparent 56%), #fff; }
+.paint__swatch.is-mixed::after { content: "?"; position: absolute; right: 1px; bottom: -1px; font-size: 9px; font-weight: 700; color: var(--text-2); }
+.paint__pop { position: absolute; z-index: 40; width: 260px; display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0, 0, 0, .18); }
+.paint__pop--top { top: calc(100% + 6px); left: 0; }
+.paint__pop--left { left: calc(100% + 10px); top: 0; }
+.paint__pop .panel__label { margin: 0; }
+.paint__pop .link { align-self: flex-start; }
+.paint__row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.paint__row > span:first-child { width: 50px; flex: none; color: var(--text-2); }
+.paint__row input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
+.paint__hex { width: 84px; font-family: var(--mono, ui-monospace, monospace); }
+.paint__num-input { width: 52px; text-align: right; }
+.paint__num { width: 38px; text-align: right; font-size: 11px; font-variant-numeric: tabular-nums; }
+.paint__hint { margin: 0; font-size: 11px; }

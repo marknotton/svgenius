@@ -84,3 +84,5 @@ export const IconUngroup = (p: P) => <Icon {...p}><rect x="2.5" y="2.5" width="5
 export const IconBreakApart = (p: P) => <Icon {...p}><path d="M2.5 4.5 5 2l2.5 2.5L5 7z" /><path d="M8.5 11.5 11 9l2.5 2.5L11 14z" /><path d="M7 9 9 7" strokeDasharray="1.2 1.2" /></Icon>
 export const IconToPath = (p: P) => <Icon {...p}><rect x="2.5" y="2.5" width="6" height="6" rx=".8" /><path d="M8.5 13.5c2.5 0 5-1 5-5" /><circle cx="8.5" cy="13.5" r="1.1" fill="currentColor" /><circle cx="13.5" cy="8.5" r="1.1" fill="currentColor" /></Icon>
 export const IconStrokeToPath = (p: P) => <Icon {...p}><path d="M3 12.5c2-6 8-6 10-9" /><path d="M3 9c2-4.5 6-5 8.5-7.5M5 14c2-4 6-5 8.5-7.5" strokeWidth="1" opacity=".6" /></Icon>
+
+export const IconMagnet = (p: P) => <Icon {...p}><path d="M3.5 2.5v5a4.5 4.5 0 0 0 9 0v-5" /><path d="M3.5 2.5h2.5v5a2 2 0 0 0 4 0v-5h2.5" /><path d="M3.5 5h2.5M10 5h2.5" /></Icon>

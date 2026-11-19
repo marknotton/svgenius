@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
+import { IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconMagnet, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
 import { Resizer } from "./Resizer"
 import { elementRanges, rangeAt } from "../lib/markupMap"
 import { moveElement, setAttr, setAttrs, translateAttrs, type DropPlace } from "../lib/markupEdit"
@@ -12,6 +12,8 @@ import type { Backdrop, SvgItem } from "../lib/types"
 import { CodeEditor } from "./CodeEditor"
 import { CanvasBackground } from "./CanvasBackground"
 import { ArrangePanel } from "./ArrangePanel"
+import { PaintTools } from "./PaintTools"
+import { applyGradient, applyPaint, readPaint, type Gradient } from "../lib/paint"
 import { InspectPreview, type ElementMove, type ElementTransform } from "./InspectPreview"
 import { LayersTree } from "./LayersTree"
 import vectorcraftIcon from "../assets/vectorcraft.png"
@@ -37,6 +39,8 @@ interface Props {
   tab: MarkupTab
   onTab: (t: MarkupTab) => void
   backdrop: Backdrop
+  /** Where the editor's tools sit: a full-width row on top, or a column down the left */
+  toolbarSide?: "top" | "left"
   onEdit: (source: string) => void
   onRevert: () => void
   onClose: () => void
@@ -74,7 +78,7 @@ const TOOLBAR_ICONS: Record<string, React.ReactNode> = {
 interface LockRef { tag: string, near: number }
 const LOCKS = new Map<string, LockRef[]>()
 
-export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onClose }: Props) {
+export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose }: Props) {
   const markup = (tab === "source" ? item.source : item.result?.output) ?? ""
   const [layout, setLayout] = useEditorLayout()
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -297,6 +301,26 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     commit(next)
   }
 
+  // ── Fill and stroke ───────────────────────────────────────────────────────
+  // For the top-level selected items; values come from the first of them
+  const painted = elements && editable ? topLevel(selection, elements).filter((i) => i > 0) : []
+  const paint = painted.length && elements ? readPaint(elements[painted[0]]) : null
+  const differs = (name: "fill" | "stroke") => !!elements && painted.some((i) => readPaint(elements[i])[name] !== paint?.[name])
+  const setPaint = (patch: Record<string, string | null>) => {
+    if (elements && painted.length) commit(applyPaint(markup, elements, painted, patch))
+  }
+  const setGradient = (g: Gradient) => {
+    if (!elements || !painted.length) return
+    const out = applyGradient(markup, elements, painted, g, paint?.gradientId ?? null)
+    commit(out.markup)
+    // Adding the gradient can renumber things; keep the same items selected
+    setSelection(out.select)
+  }
+
+  // Snapping while dragging, remembered on this device
+  const [snap, setSnapState] = useState(() => { try { return localStorage.getItem("svgenius:snap") !== "0" } catch { return true } })
+  const setSnap = (v: boolean) => { setSnapState(v); try { localStorage.setItem("svgenius:snap", v ? "1" : "0") } catch { /* unavailable */ } }
+
   // Right-click on points: change their type, add or remove points
   const pointMenu = (points: PointRef[], e: React.MouseEvent) => {
     if (!segs || !editable) return
@@ -453,6 +477,33 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
           </div>
           <button className="btn btn--icon" onClick={onClose} title="Close (Esc)" aria-label="Close"><IconX /></button>
         </div>
+        {/* Tools: a full-width row on top, or a column down the left (Settings) */}
+        <div className={`markup-dialog__work is-${toolbarSide}`}>
+        <div className={`edit-toolbar edit-toolbar--${toolbarSide}`} role="toolbar" aria-label="Editor tools" aria-orientation={toolbarSide === "left" ? "vertical" : "horizontal"}>
+          {editable && <>
+            <div className="btn-join tool-switch" role="group" aria-label="Tool">
+              <button className={`btn btn--secondary btn--sm${tool === "select" ? " is-on" : ""}`} aria-pressed={tool === "select"} onClick={() => setTool("select")}
+                title="Select (V): pick whole elements, then drag to move, or use the box's handles to scale and rotate"><IconArrowSolid width={13} height={13} /></button>
+              <button className={`btn btn--secondary btn--sm${tool === "direct" ? " is-on" : ""}`} aria-pressed={tool === "direct"} onClick={() => setTool("direct")}
+                title="Direct select (A): edit a path's points. Drag a box to pick several, right-click a point for more"><IconArrowHollow width={13} height={13} /></button>
+            </div>
+            <span className="edit-toolbar__sep" />
+            <PaintTools paint={paint} mixed={{ fill: differs("fill"), stroke: differs("stroke") }} onPaint={setPaint} onGradient={setGradient} side={toolbarSide} />
+            <span className="edit-toolbar__sep" />
+            {ACTIONS.filter((a) => a.toolbar).map((a) => (
+              <button key={a.id} className={`btn btn--secondary btn--sm edit-toolbar__btn${a.danger ? " is-danger" : ""}`} onClick={() => run(a)} aria-label={a.label}
+                disabled={!actions.includes(a)}
+                title={`${a.label}${a.shortcut ? ` (${a.shortcut})` : ""}: ${a.hint ?? ""}`.replace(/: $/, "")}>{TOOLBAR_ICONS[a.id] ?? a.label}</button>
+            ))}
+            <span className="edit-toolbar__sep" />
+            <button className={`btn btn--secondary btn--sm edit-toolbar__btn${snap ? " is-on" : ""}`} aria-pressed={snap} onClick={() => setSnap(!snap)}
+              title={snap ? "Snapping on: dragged items line up with other items and the viewBox. Hold ⌘ to drag freely" : "Snapping off. Click to snap dragged items to other items and the viewBox"}
+              aria-label="Snapping"><IconMagnet width={14} height={14} /></button>
+            {toolbarSide === "top" && <EditStatus tool={tool} count={selection.length} note={note} />}
+          </>}
+          <span className="edit-toolbar__spacer" />
+          <CanvasBackground />
+        </div>
         <div ref={bodyRef} className={`markup-dialog__body is-inspecting${layout.bottom ? " is-bottom" : ""}`}
           style={{ "--side-w": `${layout.sideW}px`, "--side-h": `${layout.sideH}px`, "--tools-h": `${layout.toolsH}px`, "--tools-w": `${layout.toolsW}px` } as React.CSSProperties}>
           <div className="markup-dialog__layers">
@@ -467,27 +518,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               : <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
           </div>
           <div className="markup-dialog__canvas">
-            <div className="edit-toolbar">
-              {editable && <>
-                <div className="btn-join tool-switch" role="group" aria-label="Tool">
-                  <button className={`btn btn--secondary btn--sm${tool === "select" ? " is-on" : ""}`} aria-pressed={tool === "select"} onClick={() => setTool("select")}
-                    title="Select (V): pick whole elements, then drag to move, or use the box's handles to scale and rotate"><IconArrowSolid width={13} height={13} /></button>
-                  <button className={`btn btn--secondary btn--sm${tool === "direct" ? " is-on" : ""}`} aria-pressed={tool === "direct"} onClick={() => setTool("direct")}
-                    title="Direct select (A): edit a path's points. Drag a box to pick several, right-click a point for more"><IconArrowHollow width={13} height={13} /></button>
-                </div>
-                <span className="text-3 edit-toolbar__count">
-                  {tool === "select" ? "Select (V)" : "Direct select (A)"}
-                  {selection.length ? ` · ${selection.length} selected` : tool === "select" ? ": click, ⌘-click or drag a box" : ": click a path, then its points"}
-                </span>
-                {actions.filter((a) => a.toolbar).map((a) => (
-                  <button key={a.id} className={`btn btn--secondary btn--sm edit-toolbar__btn${a.danger ? " is-danger" : ""}`} onClick={() => run(a)} aria-label={a.label}
-                    title={`${a.label}${a.shortcut ? ` (${a.shortcut})` : ""}: ${a.hint ?? ""}`.replace(/: $/, "")}>{TOOLBAR_ICONS[a.id] ?? a.label}</button>
-                ))}
-                {note && <span className="edit-toolbar__note">{note}</span>}
-              </>}
-              <CanvasBackground />
-            </div>
-            <InspectPreview markup={markup} backdrop={backdrop} selection={selection} locked={ownLocked}
+            {toolbarSide === "left" && editable && <EditStatus tool={tool} count={selection.length} note={note} />}
+            <InspectPreview markup={markup} backdrop={backdrop} selection={selection} locked={ownLocked} snap={snap}
               onPick={(i, add) => { (document.activeElement as HTMLElement | null)?.blur?.(); pick(i, add ? "add" : "only") }}
               onSelect={(found, add) => setSelection((s) => (add ? [...s, ...found.filter((i) => !s.includes(i))] : found))}
               onMoveBy={moveBy} onContextMenu={openMenu} readOnly={!editable}
@@ -570,6 +602,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
             </div>
           </div>
         </div>
+        </div>
         {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
         {tab === "output" && !item.result && <p className="text-3">Not optimised yet.</p>}
         {item.status === "error" && <p className="rule__error">{item.error}</p>}
@@ -587,5 +620,16 @@ export function CodeTabs({ value, onChange }: { value: MarkupTab, onChange: (t: 
       <button role="tab" aria-selected={value === "output"} className={value === "output" ? "is-active" : ""}
         title="The optimised markup that gets exported" onClick={() => onChange("output")}>After</button>
     </div>
+  )
+}
+
+/** What the tool does and how many things are selected, plus any note from the last action */
+function EditStatus({ tool, count, note }: { tool: "select" | "direct", count: number, note: string }) {
+  return (
+    <span className="text-3 edit-toolbar__count">
+      {tool === "select" ? "Select (V)" : "Direct select (A)"}
+      {count ? ` · ${count} selected` : tool === "select" ? ": click, ⌘-click or drag a box" : ": click a path, then its points"}
+      {note && <span className="edit-toolbar__note"> {note}</span>}
+    </span>
   )
 }

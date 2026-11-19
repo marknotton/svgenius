@@ -69,6 +69,7 @@ export function defaultAppSettings(): AppSettings {
     liveUpdates: true,
     theme: "system",
     advanced: false,
+    editorToolbar: "top",
     ...defaultLayout()
   }
 }
@@ -357,6 +358,7 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     backdropColour: typeof raw.backdropColour === "string" && /^#[0-9a-f]{6}$/i.test(raw.backdropColour) ? raw.backdropColour : null,
     theme: raw.theme === "light" || raw.theme === "dark" ? raw.theme : "system",
     advanced: raw.advanced === true,
+    editorToolbar: raw.editorToolbar === "left" ? "left" : "top",
     keepStructure: typeof raw.keepStructure === "boolean" ? raw.keepStructure : true,
     rename: sanitiseRename(raw.rename),
     previewCss: typeof raw.previewCss === "string" ? raw.previewCss : "",

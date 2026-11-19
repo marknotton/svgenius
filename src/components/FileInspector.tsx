@@ -40,6 +40,7 @@ interface Props {
   onLoadPlugin: () => void
   onRemovePlugin: (p: CustomPlugin) => void
   advanced: boolean
+  editorToolbar: "top" | "left"
   /** The big markup editor (double-clicking a row opens it too) */
   markupOpen: boolean
   onMarkupOpen: (open: boolean) => void
@@ -189,7 +190,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
         {!p.advanced && item.status === "error" && <section className="panel__section"><p className="rule__error">{item.error}</p></section>}
         {p.markupOpen && !isBlocked(item) && (
           <MarkupDialog item={item} tab={tab} onTab={setTab}
-            backdrop={backdrop} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => p.onMarkupOpen(false)} />
+            backdrop={backdrop} toolbarSide={p.editorToolbar} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => p.onMarkupOpen(false)} />
         )}
       </div>
     </div>

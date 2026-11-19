@@ -167,6 +167,8 @@ export interface AppSettings {
   backdropColour: string | null
   /** Show every option. Off keeps the app simple: presets and output only */
   advanced: boolean
+  /** The editor's tools: a full-width row on top, or a column down the left */
+  editorToolbar: "top" | "left"
   /** App colours: follow the system, or always light or dark */
   theme: ThemeChoice
   keepStructure: boolean

@@ -731,6 +731,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onLoadPlugin={loadPlugin}
                 onRemovePlugin={removePlugin}
                 advanced={settings.advanced}
+                editorToolbar={settings.editorToolbar}
                 markupOpen={markupOpen}
                 onMarkupOpen={setMarkupOpen}
               />
