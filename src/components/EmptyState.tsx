@@ -4,7 +4,7 @@ import { DOWNLOAD_URL, isDesktop } from "../lib/platform"
 // Phones and tablets have nothing to drag from
 const isTouch = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches
 
-export function EmptyState({ onAddFiles, onAddFolder }: { onAddFiles: () => void, onAddFolder: () => void }) {
+export function EmptyState({ onAddFiles, onAddFolder, onOpenProject }: { onAddFiles: () => void, onAddFolder: () => void, onOpenProject?: () => void }) {
   return (
     <div className="empty">
       <Logo width={44} height={44} />
@@ -19,6 +19,7 @@ export function EmptyState({ onAddFiles, onAddFolder }: { onAddFiles: () => void
         <button className="btn btn--primary" onClick={onAddFiles}><IconFile /> Choose files</button>
         <button className="btn btn--secondary" onClick={onAddFolder}><IconFolder /> Choose folder</button>
       </div>
+      {onOpenProject && <button className="link empty__project" onClick={onOpenProject}>Open a saved project (.svgenius)</button>}
     </div>
   )
 }

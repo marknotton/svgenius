@@ -314,7 +314,7 @@ const sanitiseCustomList = (raw: unknown) => Array.isArray(raw)
   ? raw.map(sanitiseCustomPlugin).filter((p): p is CustomPlugin => p !== null)
   : []
 
-function sanitiseRename(raw: unknown): RenameSettings {
+export function sanitiseRename(raw: unknown): RenameSettings {
   const d = defaultRename()
   if (!isObj(raw)) return d
   const str = (v: unknown, fallback: string) => (typeof v === "string" ? v.slice(0, 200) : fallback)

@@ -93,6 +93,13 @@ export function useItems() {
     setItems([])
   }, [])
 
+  /** Swaps the whole list for a project's files */
+  const replaceAll = useCallback((files: SvgItem[]) => {
+    forgetFiles(itemsRef.current.map((i) => i.path))
+    history.current.clear()
+    setItems(files.map((f) => ({ ...f, heavy: assessComplexity(f.source ?? "") })))
+  }, [])
+
   const setPreset = useCallback((ids: string[], presetId: string | null) => {
     const set = new Set(ids)
     setItems((list) => list.map((i) => (set.has(i.id) ? { ...i, presetId, config: undefined } : i)))
@@ -103,17 +110,48 @@ export function useItems() {
     setItems((list) => list.map((i) => (set.has(i.id) ? { ...i, flag } : i)))
   }, [])
 
+  // Per-file edit history, so undo works outside the editor too (after a
+  // Revert in the sidebar, say). Quick runs of typing are grouped
+  const history = useRef(new Map<string, { past: string[], future: string[], at: number }>())
+  const record = (id: string, before: string | undefined, grouped: boolean) => {
+    if (before === undefined) return
+    const h = history.current.get(id) ?? { past: [], future: [], at: 0 }
+    const now = Date.now()
+    if (!grouped || now - h.at > 600) h.past.push(before)
+    if (h.past.length > 200) h.past.shift()
+    h.at = grouped ? now : 0
+    h.future = []
+    history.current.set(id, h)
+  }
+  const withSource = (i: SvgItem, source: string): SvgItem =>
+    ({ ...i, source, size: byteLength(source), heavy: assessComplexity(source), rev: i.rev + 1, status: i.status === "error" ? "idle" : i.status, errorKey: undefined })
+
   /** In-app edit of the markup. Never written back to the original file */
   const editSource = useCallback((id: string, source: string) => {
-    setItems((list) => list.map((i) => (i.id === id
-      ? { ...i, source, size: byteLength(source), heavy: assessComplexity(source), rev: i.rev + 1, status: i.status === "error" ? "idle" : i.status, errorKey: undefined }
-      : i)))
+    const cur = itemsRef.current.find((i) => i.id === id)
+    if (cur && cur.source !== source) record(id, cur.source, true)
+    setItems((list) => list.map((i) => (i.id === id ? withSource(i, source) : i)))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const revertSource = useCallback((id: string) => {
-    setItems((list) => list.map((i) => (i.id === id && i.fileSource !== undefined
-      ? { ...i, source: i.fileSource, size: byteLength(i.fileSource), heavy: assessComplexity(i.fileSource), rev: i.rev + 1, errorKey: undefined }
-      : i)))
+    const cur = itemsRef.current.find((i) => i.id === id)
+    if (!cur || cur.fileSource === undefined || cur.source === cur.fileSource) return
+    record(id, cur.source, false)
+    setItems((list) => list.map((i) => (i.id === id && i.fileSource !== undefined ? withSource(i, i.fileSource) : i)))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /** Steps a file's markup back or forward. False when there's nothing to go to */
+  const travelSource = useCallback((id: string, back: boolean) => {
+    const h = history.current.get(id)
+    const cur = itemsRef.current.find((i) => i.id === id)
+    const to = back ? h?.past.pop() : h?.future.pop()
+    if (!h || !cur || to === undefined) return false
+    ;(back ? h.future : h.past).push(cur.source ?? "")
+    h.at = 0
+    setItems((list) => list.map((i) => (i.id === id ? withSource(i, to) : i)))
+    return true
   }, [])
 
   /**
@@ -178,5 +216,5 @@ export function useItems() {
     return results
   }, [patch])
 
-  return { items, ready, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk, forceRender }
+  return { items, ready, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, optimise, reloadFromDisk, forceRender }
 }

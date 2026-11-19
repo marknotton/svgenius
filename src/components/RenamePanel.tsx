@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { CASES, defaultRename, exportNames } from "../lib/rename"
 import type { RenameSettings, SvgItem } from "../lib/types"
 import { Segmented } from "./Segmented"
@@ -11,14 +11,28 @@ interface Props {
   onChange: (r: RenameSettings) => void
   /** The files that would be exported, in order, for the preview */
   items: SvgItem[]
+  /** A file to scroll to and flash (from a row's "Exports as" name). n changes each time */
+  highlight?: { id: string, n: number } | null
 }
 
-export function RenamePanel({ rename: r, onChange, items }: Props) {
+export function RenamePanel({ rename: r, onChange, items, highlight }: Props) {
+  const table = useRef<HTMLTableElement>(null)
+  useEffect(() => {
+    if (!highlight) return
+    const row = table.current?.querySelector(`[data-id="${CSS.escape(highlight.id)}"]`) as HTMLElement | null
+    if (!row) return
+    row.scrollIntoView({ block: "center", behavior: "smooth" })
+    row.classList.remove("is-flash")
+    void row.offsetWidth
+    row.classList.add("is-flash")
+  }, [highlight])
   const set = (patch: Partial<RenameSettings>) => onChange({ ...r, ...patch })
   const preview = useMemo(() => {
     const names = exportNames(items, { ...r, enabled: true })
-    return items.slice(0, 50).map((i) => ({ id: i.id, from: i.name, to: names.get(i.id) ?? i.name, dir: i.relPath.includes("/") ? i.relPath.slice(0, i.relPath.lastIndexOf("/")) : "" }))
-  }, [items, r])
+    // The first 50, plus the file a row asked to see if it's further down
+    const extra = highlight && !items.slice(0, 50).some((i) => i.id === highlight.id) ? items.filter((i) => i.id === highlight.id) : []
+    return [...items.slice(0, 50), ...extra].map((i) => ({ id: i.id, from: i.name, to: names.get(i.id) ?? i.name, dir: i.relPath.includes("/") ? i.relPath.slice(0, i.relPath.lastIndexOf("/")) : "" }))
+  }, [items, r, highlight])
 
   return (
     <div className="panel" aria-label="Export file names">
@@ -108,11 +122,11 @@ export function RenamePanel({ rename: r, onChange, items }: Props) {
             <span className="panel__label">Preview</span>
             <span className="text-3">{items.length > 50 ? `First 50 of ${items.length}` : `${items.length} files`}, in list order</span>
           </div>
-          <table className="rename__table">
+          <table className="rename__table" ref={table}>
             <thead><tr><th>Original</th><th>Exported as</th></tr></thead>
             <tbody>
               {preview.map((p) => (
-                <tr key={p.id}>
+                <tr key={p.id} data-id={p.id}>
                   <td title={p.dir ? `${p.dir}/${p.from}` : p.from}>{p.dir && <span className="text-3">{p.dir}/</span>}{p.from}</td>
                   <td className={r.enabled && p.to !== p.from ? "is-changed" : ""}>{r.enabled ? p.to : p.from}</td>
                 </tr>

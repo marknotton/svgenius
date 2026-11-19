@@ -30,11 +30,21 @@ interface Props {
   path?: PathEdit | null
   /** Locked elements: clicks and boxes go straight through them */
   locked?: Set<number>
+  /** Hidden in the editor only (the eye in the layers) */
+  hidden?: Set<number>
   /** When set, the selection gets a box with scale and rotate handles */
   onTransform?: (changes: ElementTransform[]) => void
   /** Dragged items snap to other items' edges and centres, and to the viewBox. ⌘ while dragging skips it */
   snap?: boolean
+  /** Zoom, where 1 fits the canvas in the view. ⌘ or Ctrl with the wheel (or a pinch) zooms at the pointer */
+  zoom?: number
+  onZoom?: (zoom: number) => void
+  /** The zoom that shows the artwork at its real size (100%) */
+  onActual?: (zoom: number) => void
 }
+
+export const ZOOM_MIN = 0.1, ZOOM_MAX = 64
+export const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z))
 
 /** How close (screen px) an edge or centre has to come before it snaps */
 const SNAP_PX = 6
@@ -87,7 +97,7 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked, snap = true }: Props) {
+export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked, hidden, snap = true, zoom = 1, onZoom, onActual }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
@@ -111,6 +121,100 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
     return d && d.w > 0 && d.h > 0 ? d.w / d.h : 1
   }, [markup])
 
+  // ── Zoom and pan ────────────────────────────────────────────────────────
+  // The canvas grows past the view and scrolls. Zooming keeps whatever is under
+  // the pointer (or the middle of the view) where it was
+  const canvasRef = useRef<HTMLDivElement>(null)
+  const zoomAt = useRef<{ fx: number, fy: number, cx: number, cy: number } | null>(null)
+  const zoomLive = useRef({ zoom, onZoom })
+  zoomLive.current = { zoom, onZoom }
+  const realW = useMemo(() => svgSize(markup)?.w ?? 0, [markup])
+  useEffect(() => {
+    const host = box.current
+    if (!host || !onActual) return
+    const tell = () => {
+      const fitW = Math.min(host.clientWidth, host.clientHeight * ratio)
+      if (fitW > 0 && realW > 0) onActual(realW / fitW)
+    }
+    tell()
+    const ro = new ResizeObserver(tell)
+    ro.observe(host)
+    return () => ro.disconnect()
+  }, [ratio, realW, onActual])
+  /** Remembers where to hold still, then asks for the new zoom */
+  const zoomTo = (z: number, clientX?: number, clientY?: number) => {
+    const host = box.current, c = canvasRef.current
+    const { zoom: cur, onZoom: set } = zoomLive.current
+    if (!host || !c || !set) return
+    const next = clampZoom(z)
+    if (Math.abs(next - cur) < 1e-6) return
+    const h = host.getBoundingClientRect(), r = c.getBoundingClientRect()
+    const cx = clientX ?? h.left + h.width / 2, cy = clientY ?? h.top + h.height / 2
+    zoomAt.current = { fx: (cx - r.left) / r.width, fy: (cy - r.top) / r.height, cx, cy }
+    set(next)
+  }
+  const zoomToRef = useRef(zoomTo)
+  zoomToRef.current = zoomTo
+  useLayoutEffect(() => {
+    const at = zoomAt.current, host = box.current, c = canvasRef.current
+    zoomAt.current = null
+    if (!at || !host || !c) return
+    const r = c.getBoundingClientRect()
+    host.scrollLeft += r.left + at.fx * r.width - at.cx
+    host.scrollTop += r.top + at.fy * r.height - at.cy
+  }, [zoom])
+  useEffect(() => {
+    const host = box.current
+    if (!host) return
+    const wheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || !zoomLive.current.onZoom) return
+      e.preventDefault()
+      // A pinch sends small steps, a mouse wheel big ones
+      const step = Math.max(-0.5, Math.min(0.5, -e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0025)))
+      zoomToRef.current(zoomLive.current.zoom * Math.exp(step), e.clientX, e.clientY)
+    }
+    host.addEventListener("wheel", wheel, { passive: false })
+    return () => host.removeEventListener("wheel", wheel)
+  }, [])
+  // Hold Space and drag to pan, like most design apps. The middle button pans too
+  const [panReady, setPanReady] = useState(false)
+  useEffect(() => {
+    const typing = (t: EventTarget | null) => !!(t as HTMLElement | null)?.closest?.("input, textarea, select, [contenteditable=true], .monaco-editor")
+    const down = (e: KeyboardEvent) => { if (e.code === "Space" && !typing(e.target)) { e.preventDefault(); setPanReady(true) } }
+    const up = (e: KeyboardEvent) => { if (e.code === "Space") setPanReady(false) }
+    const blur = () => setPanReady(false)
+    window.addEventListener("keydown", down)
+    window.addEventListener("keyup", up)
+    window.addEventListener("blur", blur)
+    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", blur) }
+  }, [])
+  const panLive = useRef(panReady)
+  panLive.current = panReady
+  useEffect(() => {
+    const host = box.current
+    if (!host) return
+    const down = (e: PointerEvent) => {
+      if (!(e.button === 1 || (e.button === 0 && panLive.current))) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      const x0 = e.clientX, y0 = e.clientY, sl = host.scrollLeft, st = host.scrollTop
+      host.classList.add("is-panning")
+      const move = (ev: PointerEvent) => { host.scrollLeft = sl - (ev.clientX - x0); host.scrollTop = st - (ev.clientY - y0) }
+      const end = () => {
+        host.classList.remove("is-panning")
+        swallowClick.current = true
+        setTimeout(() => { swallowClick.current = false }, 0)
+        window.removeEventListener("pointermove", move)
+        window.removeEventListener("pointerup", end)
+      }
+      window.addEventListener("pointermove", move)
+      window.addEventListener("pointerup", end)
+    }
+    // Capture, ahead of the selection and point drags
+    host.addEventListener("pointerdown", down, true)
+    return () => host.removeEventListener("pointerdown", down, true)
+  }, [])
+
   useLayoutEffect(() => {
     const el = stage.current
     if (!el) return
@@ -125,6 +229,14 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
   // Locked elements (and what's in them) ignore the pointer, so whatever is
   // underneath gets the click instead
   const lockKey = locked ? [...locked].sort().join(",") : ""
+  const hideKey = hidden ? [...hidden].sort().join(",") : ""
+  useLayoutEffect(() => {
+    const shadow = stage.current?.shadowRoot
+    if (!shadow) return
+    let style = shadow.getElementById("svgenius-hides")
+    if (!style) { style = document.createElement("style"); style.id = "svgenius-hides"; shadow.appendChild(style) }
+    style.textContent = hideKey ? hideKey.split(",").map((k) => `[${ATTR}="${k}"]`).join(",") + "{display:none!important}" : ""
+  }, [hideKey, root])
   useLayoutEffect(() => {
     const shadow = stage.current?.shadowRoot
     if (!shadow) return
@@ -386,9 +498,9 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
   }
 
   return (
-    <div ref={box} className={`inspect thumb--${backdrop}`}>
+    <div ref={box} className={`inspect thumb--${backdrop}${zoom > 1 ? " is-zoomed" : ""}${panReady ? " is-pan-ready" : ""}`}>
       {/* The SVG's own canvas, at its real shape, with nothing around it */}
-      <div className="inspect__canvas" style={{ "--r": ratio } as React.CSSProperties}>
+      <div ref={canvasRef} className="inspect__canvas" style={{ "--r": ratio, "--z": zoom } as React.CSSProperties}>
       <div ref={stage} className="inspect__stage"
         onMouseMove={(e) => { const i = Math.max(indexOf(e), 0) || -1; if (i !== hover) onHover(i) }}
         onMouseLeave={() => onHover(-1)}
@@ -601,8 +713,14 @@ function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
         if (!ends.length) return
         e.preventDefault()
         e.stopImmediatePropagation()
-        setPicked([])
-        ed.onCommit(deletePoints(cur, ends))
+        const next = deletePoints(cur, ends)
+        // The point that followed the first one deleted is picked next, so
+        // Delete can be pressed again and again until the shape is gone
+        const first = Math.min(...ends.map((p) => p.seg))
+        const ok = (i: number) => !!next[i] && !/[Zz]/.test(next[i].c)
+        const after = ok(first) ? first : ok(first - 1) ? first - 1 : -1
+        setPicked(after >= 0 ? [{ seg: after, kind: "end" }] : [])
+        ed.onCommit(next)
         return
       }
       const dir: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }

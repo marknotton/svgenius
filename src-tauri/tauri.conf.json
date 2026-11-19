@@ -50,6 +50,15 @@
         "description": "Scalable Vector Graphic",
         "role": "Viewer",
         "mimeType": "image/svg+xml"
+      },
+      {
+        "ext": [
+          "svgenius"
+        ],
+        "name": "SVGenius Project",
+        "description": "SVGenius project: files, settings and edits",
+        "role": "Editor",
+        "mimeType": "application/x-svgenius-project+json"
       }
     ]
   }

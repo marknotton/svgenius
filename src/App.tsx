@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react"
 import { CanvasBgContext, solidOf, type CanvasBg } from "./components/CanvasBackground"
+import { FastTips } from "./components/FastTips"
 import { AdvancedToggle, AppBar, BrandBar } from "./components/AppBar"
 import { ConfigPanel } from "./components/ConfigPanel"
 import { ContextMenu, type MenuState } from "./components/ContextMenu"
@@ -28,7 +29,8 @@ import { exportNames } from "./lib/rename"
 import { fileTags } from "./lib/tags"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
-import { canReveal, openInDefaultApp, errorMessage, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, pickSvgs, reveal, saveJson } from "./lib/platform"
+import { canReveal, openInDefaultApp, errorMessage, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
+import { buildProject, readProject } from "./lib/project"
 import { preloadMonaco, setEditorTheme } from "./components/CodeEditor"
 import { RenderAnywayContext } from "./components/TooComplex"
 import { isBlocked } from "./lib/complexity"
@@ -60,7 +62,7 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, ready, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk, forceRender } = useItems()
+  const { items, ready, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, optimise, reloadFromDisk, forceRender } = useItems()
   // Once there are files, get the code editor ready before anyone opens it
   const hasItems = items.length > 0
   useEffect(() => { if (hasItems) preloadMonaco() }, [hasItems])
@@ -78,12 +80,16 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     setMarkupOpen(true)
   }, [])
   const [reportOpen, setReportOpen] = useState(false)
+  // A row's "Exports as" name, shown and flashed in the File names tab
+  const [nameFlash, setNameFlash] = useState<{ id: string, n: number } | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [selection, setSelection] = useState<Set<string>>(new Set())
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(false)
   const anchor = useRef<string | null>(null)
   const [focusId, setFocusId] = useState<string | null>(() => lastView.focusId ?? null)
+  const focusIdRef = useRef(focusId)
+  focusIdRef.current = focusId
   const [sidebarTab, setSidebarTab] = useState<"preset" | "names" | "file">(() => lastView.sidebarTab ?? "preset")
   // Remember where you were, so a refresh lands back on the same file and editor
   useEffect(() => {
@@ -123,7 +129,11 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   // ── Adding files ────────────────────────────────────────────────────────────
 
-  const add = useCallback(async (paths: string[]) => {
+  const add = useCallback(async (all: string[]) => {
+    // A project dropped or opened from Finder opens as a project
+    const project = all.find((p) => p.toLowerCase().endsWith(`.${PROJECT_EXT}`))
+    if (project) { openProjectRef.current(project); return }
+    const paths = all
     if (paths.length === 0) {
       push({ tone: "info", text: "No SVGs found there" })
       return
@@ -231,7 +241,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   // Menu and keyboard commands; ⌘A on the list selects every file
   useEffect(() => listenForCommands(), [])
   useCommands((cmd) => {
-    if (cmd !== "selectAll" || textFocus() || document.querySelector(".modal")) return false
+    if (textFocus() || document.querySelector(".modal")) return false
+    // Undo and redo step the open file's markup back and forward (a Revert included)
+    if ((cmd === "undo" || cmd === "redo") && focusIdRef.current) return travelSource(focusIdRef.current, cmd === "undo")
+    if (cmd !== "selectAll") return false
     selectAll(true)
     return true
   })
@@ -489,10 +502,75 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     push({ tone: "info", text: `Removed ${plural(ids.size, "file")} from the list` })
   }, [remove, push])
 
+  // ── Projects ────────────────────────────────────────────────────────────────
+  // Save and open everything in the list as one .svgenius file. On the desktop
+  // ⌘S saves back to the project it came from
+  const [project, setProject] = useState<{ path: string | null, name: string } | null>(null)
+  const saveProject = async (as = false) => {
+    if (!items.length) { push({ tone: "info", text: "Add some SVGs first, there's nothing to save yet" }); return }
+    try {
+      const data = JSON.stringify(buildProject(settings, items, focusId), null, 2)
+      const name = project?.name ?? `${items[0].relPath.includes("/") ? items[0].relPath.split("/")[0] : "SVGenius project"}.${PROJECT_EXT}`
+      const to = await saveProjectFile(as ? null : project?.path ?? null, name, data)
+      if (!to) return
+      const savedName = to.split(/[\\/]/).pop() ?? to
+      setProject({ path: to.includes("/") || to.includes("\\") ? to : null, name: savedName })
+      push({ tone: "success", text: `Saved ${savedName}` })
+    } catch (e) {
+      push({ tone: "error", text: `Couldn't save the project: ${errorMessage(e)}` })
+    }
+  }
+  const openProject = async (path?: string) => {
+    try {
+      const file = path ? await readProjectFile(path) : await openProjectFile()
+      if (!file) return
+      const { files, focusId: fid, settings: next } = readProject(file.text, settings)
+      if (itemsRef.current.length) {
+        const ok = await dialogs.confirm({
+          title: `Open ${file.name}?`,
+          body: `It replaces the ${plural(itemsRef.current.length, "file")} in the list now. Files on disk aren't touched.`,
+          confirmLabel: "Open project"
+        })
+        if (!ok) return
+      }
+      update(() => next)
+      replaceAll(files)
+      setSelection(new Set())
+      setFocusId(fid)
+      setSidebarTab(fid ? "file" : "preset")
+      setMarkupOpen(false)
+      setProject({ path: file.path, name: file.name })
+      push({ tone: "success", text: `Opened ${file.name}: ${plural(files.length, "file")}` })
+    } catch (e) {
+      push({ tone: "error", text: `Couldn't open the project: ${errorMessage(e)}` })
+    }
+  }
+  const openProjectRef = useRef(openProject)
+  openProjectRef.current = openProject
+  const saveProjectRef = useRef(saveProject)
+  saveProjectRef.current = saveProject
+  useCommands((cmd) => {
+    if (cmd === "openProject") { openProjectRef.current(); return true }
+    if (cmd === "saveProject" || cmd === "saveProjectAs") { saveProjectRef.current(cmd === "saveProjectAs"); return true }
+    return false
+  })
+  const projectMenu = (e: MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setMenu({
+      x: r.left, y: r.bottom + 4,
+      items: [
+        { label: "Open project…    ⌘O", run: () => openProjectRef.current() },
+        "-",
+        { label: `Save project${project?.path ? "" : "…"}    ⌘S`, run: () => saveProjectRef.current(), disabled: !items.length },
+        { label: "Save project as…    ⇧⌘S", run: () => saveProjectRef.current(true), disabled: !items.length }
+      ]
+    })
+  }
+
   const removeItems = async () => {
     if (selection.size) return removeIds(selection)
     const ok = await dialogs.confirm({ title: "Clear the list?", body: "Files on disk aren't touched.", confirmLabel: "Clear" })
-    if (ok) clear()
+    if (ok) { clear(); setProject(null) }
   }
 
   // Delete / Backspace removes the selected files (not while typing)
@@ -645,7 +723,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         <div className="workspace">
           <main className="workspace__main">
             {items.length === 0 ? (
-              <EmptyState onAddFiles={addFiles} onAddFolder={addFolder} />
+              <EmptyState onAddFiles={addFiles} onAddFolder={addFolder} onOpenProject={() => openProjectRef.current()} />
             ) : (
               <FileList
                 items={shownItems}
@@ -660,6 +738,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onRowClick={rowClick}
                 // Double-click opens the editor in the advanced view only (the right-click menu always can)
                 onOpenMarkup={settings.advanced ? openMarkup : noop}
+                canOpen={settings.advanced}
+                onExportName={(id) => { setSidebarTab("names"); setNameFlash((f) => ({ id, n: (f?.n ?? 0) + 1 })) }}
                 focusId={focusId}
                 onVisible={setVisibleIds}
                 onSelectAll={selectAll}
@@ -675,6 +755,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 exportNames={previewNames}
                 onAddFiles={addFiles}
                 onAddFolder={addFolder}
+                onProjectMenu={projectMenu}
+                projectName={project?.name}
                 onRemove={removeItems}
                 viewControls={viewControls}
                 cssBar={cssBar}
@@ -707,7 +789,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
               <AdvancedToggle advanced={settings.advanced} onAdvanced={(advanced) => update((s) => ({ ...s, advanced }))} />
             </div>
             {sidebarTab === "names" ? (
-              <RenamePanel rename={settings.rename} items={targets.filter((i) => i.status !== "error")}
+              <RenamePanel rename={settings.rename} items={targets.filter((i) => i.status !== "error")} highlight={nameFlash}
                 onChange={(rename) => update((s) => ({ ...s, rename }))} />
             ) : sidebarTab === "file" && focused ? (
               <FileInspector
@@ -734,6 +816,17 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 editorToolbar={settings.editorToolbar}
                 markupOpen={markupOpen}
                 onMarkupOpen={setMarkupOpen}
+                nav={(() => {
+                  // The files as listed (filters and search applied), wrapping round at the ends
+                  const list = shownItems.some((i) => i.id === focused.id) ? shownItems : items
+                  const at = list.findIndex((i) => i.id === focused.id)
+                  return { pos: at + 1, total: list.length, go: (step: 1 | -1) => setFocusId(list[(at + step + list.length) % list.length].id) }
+                })()}
+                circle={{
+                  on: settings.circleOverlay, clip: settings.circleClip,
+                  onToggle: () => setViewPrefs({ circleOverlay: !settings.circleOverlay }),
+                  onClip: () => setViewPrefs({ circleClip: !settings.circleClip })
+                }}
               />
             ) : (
               <ConfigPanel
@@ -802,6 +895,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         {dragging && <DropOverlay />}
         {dialogs.node}
         <Toasts toasts={toasts} dismiss={dismiss} />
+        <FastTips />
       </div>
     </CanvasBgContext.Provider>
     </RenderAnywayContext.Provider>

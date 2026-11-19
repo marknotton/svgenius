@@ -5,7 +5,7 @@ import type { SvgItem } from "./types"
 // flags, own settings) is kept in IndexedDB and comes back after a refresh.
 // Optimised output isn't stored: it's quick to make again.
 
-type Saved = Pick<SvgItem, "id" | "path" | "name" | "relPath" | "size" | "source" | "fileSource" | "presetId" | "config" | "flag">
+export type Saved = Pick<SvgItem, "id" | "path" | "name" | "relPath" | "size" | "source" | "fileSource" | "presetId" | "config" | "flag">
 
 const DB = "svgenius", STORE = "session", KEY = "items"
 
@@ -40,10 +40,13 @@ export async function loadSession(): Promise<SvgItem[]> {
   }
 }
 
+/** The parts of each file worth keeping: markup, edits, flags and own settings */
+export const toSaved = (items: SvgItem[]): Saved[] => items
+  .filter((i) => typeof i.source === "string")
+  .map(({ id, path, name, relPath, size, source, fileSource, presetId, config, flag }) => ({ id, path, name, relPath, size, source, fileSource, presetId, config, flag }))
+
 export async function saveSession(items: SvgItem[]): Promise<void> {
-  const saved: Saved[] = items
-    .filter((i) => typeof i.source === "string")
-    .map(({ id, path, name, relPath, size, source, fileSource, presetId, config, flag }) => ({ id, path, name, relPath, size, source, fileSource, presetId, config, flag }))
+  const saved = toSaved(items)
   try {
     await run("readwrite", (s) => s.put(saved, KEY))
   } catch { /* private windows can refuse storage; the list just won't survive a refresh */ }

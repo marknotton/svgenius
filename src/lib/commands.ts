@@ -8,6 +8,7 @@ import { isDesktop, listenFor } from "./platform"
 // editor, say) gets first go, and text fields keep their usual behaviour.
 
 export type Command = "undo" | "redo" | "selectAll" | "duplicate" | "group" | "ungroup" | "breakApart" | "forward" | "backward"
+  | "zoomIn" | "zoomOut" | "zoomFit" | "zoomActual" | "openProject" | "saveProject" | "saveProjectAs"
 
 type Handler = (cmd: Command) => boolean
 
@@ -66,6 +67,12 @@ export function commandFor(e: KeyboardEvent): Command | null {
   if (k === "b" && e.shiftKey) return "breakApart"
   if (e.key === "]") return "forward"
   if (e.key === "[") return "backward"
+  if (k === "=" || k === "+") return "zoomIn"
+  if (k === "-" || k === "_") return "zoomOut"
+  if (k === "0") return "zoomFit"
+  if (k === "1") return "zoomActual"
+  if (k === "o" && !e.shiftKey) return "openProject"
+  if (k === "s") return e.shiftKey ? "saveProjectAs" : "saveProject"
   return null
 }
 

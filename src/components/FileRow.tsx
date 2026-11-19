@@ -3,8 +3,8 @@ import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "../lib/svgRoot"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { FileTag } from "../lib/tags"
 import { FLAGS } from "../lib/filters"
-import { IconFlag, IconOpen } from "../icons"
-import { isDesktop, openInDefaultApp } from "../lib/platform"
+import { IconFlag, IconFolder, IconPencil } from "../icons"
+import { isDesktop, openInDefaultApp, reveal } from "../lib/platform"
 import type { Backdrop, Preset, SvgItem } from "../lib/types"
 import { Thumb } from "./Thumb"
 import { TooComplex } from "./TooComplex"
@@ -28,6 +28,10 @@ interface Props {
   onRowClick: (id: string, e: MouseEvent) => void
   /** Double-click: open the big markup editor */
   onOpenMarkup: (id: string) => void
+  /** Double-click works (Advanced), so hovering hints at it */
+  canOpen?: boolean
+  /** Clicking the "Exports as" name shows it in the File names tab */
+  onExportName?: (id: string) => void
   onContextMenu: (id: string, e: MouseEvent) => void
   onFlag: (id: string, e: MouseEvent) => void
 }
@@ -71,9 +75,10 @@ export const FileRow = memo(function FileRow(p: Props) {
         <div className="file-card__head">
           <Check item={item} selected={selected} onToggle={p.onToggle} />
           <FlagButton item={item} onFlag={p.onFlag} />
-          <span className="file-card__name" title={item.path}><Name item={item} to={p.exportName} /></span>
+          <span className="file-card__name" title={item.path}><Name item={item} to={p.exportName} onShow={p.onExportName} /></span>
+          {p.canOpen && <span className="row-hint text-3">Double-click to edit</span>}
           <Stats item={item} stale={stale} />
-          <OpenButton item={item} />
+          <FileButtons item={item} />
         </div>
         <div className="file-card__panes">
           {blocked ? <TooComplex item={item} size={thumbPx} /> : <>
@@ -119,9 +124,10 @@ export const FileRow = memo(function FileRow(p: Props) {
       )}
       <div className="file-row__main">
         <div className="file-row__top">
-          <div className="file-row__name" title={item.path}><Name item={item} to={p.exportName} /></div>
+          <div className="file-row__name" title={item.path}><Name item={item} to={p.exportName} onShow={p.onExportName} /></div>
+          {p.canOpen && <span className="row-hint text-3">Double-click to edit</span>}
           <Stats item={item} stale={stale} compact />
-          <OpenButton item={item} />
+          <FileButtons item={item} />
         </div>
         <dl className="facts">
           <Fact label="Size">
@@ -178,14 +184,15 @@ function Stats({ item, stale, compact }: { item: SvgItem, stale: boolean, compac
   )
 }
 
-function Name({ item, to }: { item: SvgItem, to?: string }) {
+function Name({ item, to, onShow }: { item: SvgItem, to?: string, onShow?: (id: string) => void }) {
   if (!to || to === item.name) return <>{item.name}</>
   return (
     <span className="file-name">
       <span className="file-name__from">{item.name}</span>
-      <span className="file-name__to" title="The name this file will be exported with">
+      <button type="button" className="file-name__to" title="The name this file will be exported with. Click to see it in File names"
+        onClick={(e) => { e.stopPropagation(); onShow?.(item.id) }} onDoubleClick={(e) => e.stopPropagation()}>
         <span className="file-name__label">Exports as</span> {to}
-      </span>
+      </button>
     </span>
   )
 }
@@ -200,15 +207,22 @@ function Check({ item, selected, onToggle }: { item: SvgItem, selected: boolean,
   )
 }
 
-/** Opens the original in the user's SVG app (desktop only: the browser has no path) */
-function OpenButton({ item }: { item: SvgItem }) {
+/** Reveal in Finder, and open the original in the user's SVG app (desktop only: the browser has no path) */
+function FileButtons({ item }: { item: SvgItem }) {
   if (!isDesktop) return null
   return (
-    <button type="button" className="btn btn--icon file-open" title="Open the original file in your default SVG app"
-      aria-label={`Open ${item.name} in your default app`}
-      onClick={(e) => { e.stopPropagation(); openInDefaultApp(item.path) }}>
-      <IconOpen />
-    </button>
+    <span className="file-btns">
+      <button type="button" className="btn btn--icon file-open" title="Show the original file in Finder"
+        aria-label={`Show ${item.name} in Finder`}
+        onClick={(e) => { e.stopPropagation(); reveal(item.path) }}>
+        <IconFolder />
+      </button>
+      <button type="button" className="btn btn--icon file-open" title="Open the original file in your default SVG app"
+        aria-label={`Open ${item.name} in your default app`}
+        onClick={(e) => { e.stopPropagation(); openInDefaultApp(item.path) }}>
+        <IconPencil />
+      </button>
+    </span>
   )
 }
 

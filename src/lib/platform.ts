@@ -282,6 +282,41 @@ export async function saveJson(defaultName: string, contents: string): Promise<b
   return true
 }
 
+// ── Projects ──────────────────────────────────────────────────────────────────
+
+export const PROJECT_EXT = "svgenius"
+
+/** Picks a project and returns its text, and its path on the desktop. Null when cancelled */
+export async function openProjectFile(): Promise<{ path: string | null, name: string, text: string } | null> {
+  if (!isDesktop) {
+    const f = await pickWebText(`.${PROJECT_EXT},application/json`)
+    return f ? { path: null, name: f.fileName, text: f.text } : null
+  }
+  const path = await open({ filters: [{ name: "SVGenius project", extensions: [PROJECT_EXT] }] })
+  return typeof path === "string" ? readProjectFile(path) : null
+}
+
+export async function readProjectFile(path: string): Promise<{ path: string, name: string, text: string }> {
+  return { path, name: path.split(/[\\/]/).pop() ?? path, text: await desktop.readJsonFile(path) }
+}
+
+/**
+ * Saves a project. On the desktop it goes back to `path` when there is one,
+ * otherwise a save dialog asks; the browser downloads it. Returns where it
+ * went (the file name in the browser), or null when cancelled
+ */
+export async function saveProjectFile(path: string | null, defaultName: string, contents: string): Promise<string | null> {
+  if (!isDesktop) {
+    download(defaultName, new Blob([contents], { type: "application/json" }))
+    return defaultName
+  }
+  const to = path ?? await save({ defaultPath: defaultName, filters: [{ name: "SVGenius project", extensions: [PROJECT_EXT] }] })
+  if (!to) return null
+  const withExt = to.toLowerCase().endsWith(`.${PROJECT_EXT}`) ? to : `${to}.${PROJECT_EXT}`
+  await desktop.writeJsonFile(withExt, contents)
+  return withExt
+}
+
 export async function openPlugin(): Promise<{ fileName: string, code: string } | null> {
   if (!isDesktop) {
     const f = await pickWebText(".js,.mjs,text/javascript")

@@ -122,9 +122,9 @@ fn safe_join(base: &Path, rel: &str) -> Result<PathBuf, String> {
 fn ensure_json(path: &Path) -> Result<(), String> {
     let ok = path.extension()
         .and_then(|e| e.to_str())
-        .map(|e| e.eq_ignore_ascii_case("json"))
+        .map(|e| e.eq_ignore_ascii_case("json") || e.eq_ignore_ascii_case("svgenius"))
         .unwrap_or(false);
-    if ok { Ok(()) } else { Err("Settings files must end in .json".into()) }
+    if ok { Ok(()) } else { Err("Settings and project files must end in .json or .svgenius".into()) }
 }
 
 fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
@@ -338,6 +338,23 @@ fn build_menu(app: &App) -> tauri::Result<()> {
         .item(&cmd("backward", "Send Backward", "CmdOrCtrl+[")?)
         .build()?;
 
+    // Projects: every loaded file with its settings and edits, in one .svgenius file
+    let file_menu = SubmenuBuilder::new(app, "File")
+        .item(&cmd("openProject", "Open Project…", "CmdOrCtrl+O")?)
+        .separator()
+        .item(&cmd("saveProject", "Save Project", "CmdOrCtrl+S")?)
+        .item(&cmd("saveProjectAs", "Save Project As…", "CmdOrCtrl+Shift+S")?)
+        .build()?;
+
+    // Zoom is the editor's canvas, not the window
+    let view_menu = SubmenuBuilder::new(app, "View")
+        .item(&cmd("zoomIn", "Zoom In", "CmdOrCtrl+Equal")?)
+        .item(&cmd("zoomOut", "Zoom Out", "CmdOrCtrl+Minus")?)
+        .separator()
+        .item(&cmd("zoomFit", "Fit to Screen", "CmdOrCtrl+0")?)
+        .item(&cmd("zoomActual", "Actual Size (100%)", "CmdOrCtrl+1")?)
+        .build()?;
+
     let window_menu = SubmenuBuilder::new(app, "Window")
         .minimize()
         .maximize()
@@ -346,7 +363,7 @@ fn build_menu(app: &App) -> tauri::Result<()> {
         .build()?;
 
     let menu = MenuBuilder::new(app)
-        .items(&[&app_menu, &edit_menu, &object_menu, &window_menu])
+        .items(&[&app_menu, &file_menu, &edit_menu, &object_menu, &view_menu, &window_menu])
         .build()?;
     app.set_menu(menu)?;
 

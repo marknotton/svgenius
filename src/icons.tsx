@@ -86,3 +86,14 @@ export const IconToPath = (p: P) => <Icon {...p}><rect x="2.5" y="2.5" width="6"
 export const IconStrokeToPath = (p: P) => <Icon {...p}><path d="M3 12.5c2-6 8-6 10-9" /><path d="M3 9c2-4.5 6-5 8.5-7.5M5 14c2-4 6-5 8.5-7.5" strokeWidth="1" opacity=".6" /></Icon>
 
 export const IconMagnet = (p: P) => <Icon {...p}><path d="M3.5 2.5v5a4.5 4.5 0 0 0 9 0v-5" /><path d="M3.5 2.5h2.5v5a2 2 0 0 0 4 0v-5h2.5" /><path d="M3.5 5h2.5M10 5h2.5" /></Icon>
+
+export const IconChevronLeft = (p: P) => <Icon {...p}><path d="M10 3 5 8l5 5" /></Icon>
+export const IconChevronRight = (p: P) => <Icon {...p}><path d="m6 3 5 5-5 5" /></Icon>
+export const IconChevronDown = (p: P) => <Icon {...p}><path d="m3.5 6 4.5 4.5L12.5 6" /></Icon>
+export const IconZoomIn = (p: P) => <Icon {...p}><circle cx="7" cy="7" r="4.75" /><path d="m10.5 10.5 3.5 3.5M7 4.75v4.5M4.75 7h4.5" /></Icon>
+export const IconZoomOut = (p: P) => <Icon {...p}><circle cx="7" cy="7" r="4.75" /><path d="m10.5 10.5 3.5 3.5M4.75 7h4.5" /></Icon>
+export const IconEyeOff = (p: P) => <Icon {...p}><path d="M1.5 8S4 3.5 8 3.5c1.3 0 2.4.5 3.3 1.1M14.5 8S12 12.5 8 12.5c-1.3 0-2.4-.5-3.3-1.1" /><path d="m2.5 13.5 11-11" /></Icon>
+/** Opens the editor: a pen nib over a node */
+export const IconEditPath = (p: P) => <Icon {...p}><path d="M2.5 13.5c3-1 4.5-3 5.5-6" /><rect x="7" y="3.5" width="3" height="3" rx=".5" /><path d="m10 3.5 3.5-1v3.5L10 6.5" /><circle cx="2.5" cy="13.5" r="1" fill="currentColor" /></Icon>
+/** A project: a box of files */
+export const IconProject = (p: P) => <Icon {...p}><path d="M2.5 5.5h11v7.75a.75.75 0 0 1-.75.75H3.25a.75.75 0 0 1-.75-.75z" /><path d="M2.5 5.5 4 2.5h8l1.5 3M6.5 8.5h3" /></Icon>

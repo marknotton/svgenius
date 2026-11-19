@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconMagnet, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
+import { IconChevronDown, IconChevronLeft, IconChevronRight, IconCircle, IconClip, IconZoomIn, IconZoomOut, IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconMagnet, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
 import { Resizer } from "./Resizer"
 import { elementRanges, rangeAt } from "../lib/markupMap"
 import { moveElement, setAttr, setAttrs, translateAttrs, type DropPlace } from "../lib/markupEdit"
@@ -44,7 +44,15 @@ interface Props {
   onEdit: (source: string) => void
   onRevert: () => void
   onClose: () => void
+  /** Previous and next file in the list, and where this one sits */
+  nav?: { pos: number, total: number, go: (step: 1 | -1) => void }
+  /** The circle guide and clip, shared with the list's previews */
+  circle?: { on: boolean, clip: boolean, onToggle: () => void, onClip: () => void }
 }
+
+// Zoom steps for + and −, and the zoom menu's presets (as real-size percentages)
+const ZOOM_STEPS = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64]
+const ZOOM_PRESETS = [25, 50, 100, 200, 400, 800]
 
 // ── Editor layout ─────────────────────────────────────────────────────────────
 // Code and path tools sit on the right or along the bottom (handy for wide
@@ -77,8 +85,10 @@ const TOOLBAR_ICONS: Record<string, React.ReactNode> = {
 // Kept per file for this visit, and never written into the markup.
 interface LockRef { tag: string, near: number }
 const LOCKS = new Map<string, LockRef[]>()
+/** Layers hidden in the editor, kept the same way. The file isn't changed */
+const HIDES = new Map<string, LockRef[]>()
 
-export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose }: Props) {
+export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose, nav, circle }: Props) {
   const markup = (tab === "source" ? item.source : item.result?.output) ?? ""
   const [layout, setLayout] = useEditorLayout()
   const bodyRef = useRef<HTMLDivElement>(null)
@@ -95,6 +105,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [locks, setLocks] = useState<LockRef[]>(() => LOCKS.get(item.id) ?? [])
   useEffect(() => { LOCKS.set(item.id, locks) }, [item.id, locks])
+  const [hides, setHides] = useState<LockRef[]>(() => HIDES.get(item.id) ?? [])
+  useEffect(() => { HIDES.set(item.id, hides) }, [item.id, hides])
   // The VectorCraft note, until it's dismissed on this device
   const [nodDismissed, setNodDismissed] = useState(() => { try { return localStorage.getItem("svgenius:nod-dismissed") === "1" } catch { return false } })
   const dismissNod = () => { setNodDismissed(true); try { localStorage.setItem("svgenius:nod-dismissed", "1") } catch { /* unavailable */ } }
@@ -106,6 +118,32 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
     setToolState(t)
     try { localStorage.setItem("svgenius:tool", t) } catch { /* unavailable */ }
   }, [])
+  // Zoom: 1 fits the canvas in the view; `actual` is the zoom that shows it at its real size
+  const [zoom, setZoom] = useState(1)
+  const [actual, setActual] = useState(1)
+  const zoomRef = useRef({ zoom, actual })
+  zoomRef.current = { zoom, actual }
+  const stepZoom = (dir: 1 | -1) => {
+    const { zoom: z } = zoomRef.current
+    const next = dir > 0 ? ZOOM_STEPS.find((s) => s > z * 1.001) : [...ZOOM_STEPS].reverse().find((s) => s < z / 1.001)
+    if (next) setZoom(next)
+  }
+  // Hold C to peek at the optimised result, let go to come back
+  const [peek, setPeek] = useState(false)
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "c" || e.metaKey || e.ctrlKey || e.altKey || textFocus()) return
+      e.preventDefault()
+      if (!e.repeat) setPeek(true)
+    }
+    const up = (e: KeyboardEvent) => { if (e.key.toLowerCase() === "c") setPeek(false) }
+    const off = () => setPeek(false)
+    window.addEventListener("keydown", down)
+    window.addEventListener("keyup", up)
+    window.addEventListener("blur", off)
+    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", off) }
+  }, [])
+  const peekMarkup = peek && tab === "source" ? item.result?.output ?? null : null
   const [note, setNote] = useState("")
   useEffect(() => { if (!note) return; const t = setTimeout(() => setNote(""), 5000); return () => clearTimeout(t) }, [note])
   const [hover, setHover] = useState(-1)
@@ -189,33 +227,44 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
   const canUndo = hist.current.past.length > 0, canRedo = hist.current.future.length > 0
 
   const elements = useMemo(() => parseElements(markup), [markup])
-  // Each lock, matched to the element with the same opening tag nearest where it was
-  const lockAt = useMemo(() => locks.map((l) => {
+  // Each lock (or hide), matched to the element with the same opening tag nearest where it was
+  const matchRefs = (refs: LockRef[]) => refs.map((l) => {
     let best = -1
     ranges.forEach((r, k) => {
       if (k > 0 && markup.slice(r.start, r.tagEnd) === l.tag && (best < 0 || Math.abs(k - l.near) < Math.abs(best - l.near))) best = k
     })
     return best
-  }), [locks, ranges, markup])
-  const ownLocked = useMemo(() => new Set(lockAt.filter((k) => k > 0)), [lockAt])
-  // Locking a group locks what's in it
-  const locked = useMemo(() => {
+  })
+  // A group's lock or hide covers what's in it
+  const spread = (own: Set<number>) => {
     const out = new Set<number>()
-    if (!elements || !ownLocked.size) return out
-    const own = new Set([...ownLocked].map((k) => elements[k]))
-    elements.forEach((el, k) => { for (let p: Element | null = el; p; p = p.parentElement) if (own.has(p)) { out.add(k); break } })
+    if (!elements || !own.size) return out
+    const els = new Set([...own].map((k) => elements[k]))
+    elements.forEach((el, k) => { for (let p: Element | null = el; p; p = p.parentElement) if (els.has(p)) { out.add(k); break } })
     return out
-  }, [elements, ownLocked])
-  const toggleLock = (k: number) => {
-    const at = lockAt.indexOf(k)
-    if (at >= 0) { setLocks((l) => l.filter((_, n) => n !== at)); return }
-    const r = ranges[k]
-    if (r && k > 0) setLocks((l) => [...l, { tag: markup.slice(r.start, r.tagEnd), near: k }])
   }
-  // Locked things can't be in the selection, however they got there
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lockAt = useMemo(() => matchRefs(locks), [locks, ranges, markup])
+  const ownLocked = useMemo(() => new Set(lockAt.filter((k) => k > 0)), [lockAt])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const locked = useMemo(() => spread(ownLocked), [elements, ownLocked])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const hideAt = useMemo(() => matchRefs(hides), [hides, ranges, markup])
+  const ownHidden = useMemo(() => new Set(hideAt.filter((k) => k > 0)), [hideAt])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const hidden = useMemo(() => spread(ownHidden), [elements, ownHidden])
+  const toggleRef = (at: number[], set: React.Dispatch<React.SetStateAction<LockRef[]>>, k: number) => {
+    const n = at.indexOf(k)
+    if (n >= 0) { set((l) => l.filter((_, x) => x !== n)); return }
+    const r = ranges[k]
+    if (r && k > 0) set((l) => [...l, { tag: markup.slice(r.start, r.tagEnd), near: k }])
+  }
+  const toggleLock = (k: number) => toggleRef(lockAt, setLocks, k)
+  const toggleHide = (k: number) => toggleRef(hideAt, setHides, k)
+  // Locked and hidden things can't be in the selection, however they got there
   useEffect(() => {
-    if (selection.some((k) => locked.has(k))) setSelection((s) => s.filter((k) => !locked.has(k)))
-  }, [selection, locked])
+    if (selection.some((k) => locked.has(k) || hidden.has(k))) setSelection((s) => s.filter((k) => !locked.has(k) && !hidden.has(k)))
+  }, [selection, locked, hidden])
   const editable = tab === "source"
   const el = selected >= 0 ? elements?.[selected] : undefined
   const [active, setActive] = useState(-1)
@@ -348,11 +397,30 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
 
   const moveRef = useRef(moveBy)
   moveRef.current = moveBy
+  const stepZoomRef = useRef(stepZoom)
+  stepZoomRef.current = stepZoom
+  const zoomMenu = (e: React.MouseEvent) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    setMenu({
+      x: r.left, y: r.bottom + 4,
+      items: [
+        { label: "Zoom in    ⌘+", run: () => stepZoom(1) },
+        { label: "Zoom out    ⌘−", run: () => stepZoom(-1) },
+        "-",
+        { label: `${Math.abs(zoom - 1) < 1e-3 ? "✓ " : ""}Fit to screen    ⌘0`, run: () => setZoom(1) },
+        ...ZOOM_PRESETS.map((pc) => ({ label: `${Math.abs(zoom / actual * 100 - pc) < 0.5 ? "✓ " : ""}${pc}%${pc === 100 ? "    ⌘1" : ""}`, run: () => setZoom(actual * pc / 100) }))
+      ]
+    })
+  }
 
   // ⌘-shortcuts arrive as commands (the desktop menu sends them, the browser
   // turns key presses into them). One undo history here, even in Monaco
   useCommands((cmd) => {
     if (cmd === "undo" || cmd === "redo") { travelRef.current(cmd === "undo"); return true }
+    // Zoom is the canvas's, wherever the focus is
+    if (cmd === "zoomIn" || cmd === "zoomOut") { stepZoomRef.current(cmd === "zoomIn" ? 1 : -1); return true }
+    if (cmd === "zoomFit") { setZoom(1); return true }
+    if (cmd === "zoomActual") { setZoom(zoomRef.current.actual); return true }
     const focus = textFocus()
     if (focus) return false
     const c = runRef.current.ctx()
@@ -410,7 +478,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
       last = a.group
       items.push({ label: a.shortcut ? `${a.label}    ${a.shortcut}` : a.label, danger: a.danger, run: () => { if (c) run(a, c) } })
     }
-    if (i > 0) items.push("-", lockItem)
+    if (i > 0) items.push("-", lockItem, { label: ownHidden.has(i) ? "Show" : "Hide", run: () => toggleHide(i), disabled: !ownHidden.has(i) && hidden.has(i) })
     setMenu({ x: e.clientX, y: e.clientY, items })
   }
 
@@ -457,6 +525,13 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
           <CodeTabs value={tab} onChange={onTab} />
           <span className="text-3 markup-dialog__tip">Select (V) moves, scales and rotates. Direct select (A) edits a path's points</span>
           <div className="markup-dialog__spacer" />
+          {nav && nav.total > 1 && (
+            <div className="file-nav" role="group" aria-label="Files">
+              <button className="btn btn--secondary btn--sm" onClick={() => nav.go(-1)} title="Previous file" aria-label="Previous file"><IconChevronLeft width={14} height={14} /></button>
+              <span className="text-3 file-nav__pos">{nav.pos} of {nav.total}</span>
+              <button className="btn btn--secondary btn--sm" onClick={() => nav.go(1)} title="Next file" aria-label="Next file"><IconChevronRight width={14} height={14} /></button>
+            </div>
+          )}
           <div className="btn-join" role="group" aria-label="History">
             <button className="btn btn--secondary btn--sm" onClick={() => travel(true)} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo"><IconUndo width={12} height={12} /></button>
             <button className="btn btn--secondary btn--sm" onClick={() => travel(false)} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo"><IconRedo width={12} height={12} /></button>
@@ -502,6 +577,21 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             {toolbarSide === "top" && <EditStatus tool={tool} count={selection.length} note={note} />}
           </>}
           <span className="edit-toolbar__spacer" />
+          <div className="btn-join zoom-control" role="group" aria-label="Zoom">
+            <button className="btn btn--secondary btn--sm edit-toolbar__btn" onClick={() => stepZoom(-1)} title="Zoom out (⌘−). ⌘ and the wheel, or a pinch, zooms at the pointer" aria-label="Zoom out"><IconZoomOut width={14} height={14} /></button>
+            <button className="btn btn--secondary btn--sm zoom-control__level" onClick={zoomMenu} title="Zoom: fit to screen (⌘0), 100% (⌘1) and more. Hold Space and drag to pan" aria-label="Zoom level">
+              {Math.abs(zoom - 1) < 1e-3 ? "Fit" : `${Math.round(zoom / actual * 100)}%`}<IconChevronDown width={10} height={10} />
+            </button>
+            <button className="btn btn--secondary btn--sm edit-toolbar__btn" onClick={() => stepZoom(1)} title="Zoom in (⌘+)" aria-label="Zoom in"><IconZoomIn width={14} height={14} /></button>
+          </div>
+          {circle && (
+            <div className="btn-join" role="group" aria-label="Circle guide">
+              <button className={`btn btn--secondary btn--sm edit-toolbar__btn${circle.on ? " is-on" : ""}`} aria-pressed={circle.on} onClick={circle.onToggle}
+                title="Circle guide: shows what survives a circular crop, e.g. avatars" aria-label="Circle guide"><IconCircle width={14} height={14} /></button>
+              <button className={`btn btn--secondary btn--sm edit-toolbar__btn${circle.clip ? " is-on" : ""}`} aria-pressed={circle.clip} onClick={circle.onClip}
+                title="Clip the preview to a circle" aria-label="Clip to a circle"><IconClip width={14} height={14} /></button>
+            </div>
+          )}
           <CanvasBackground />
         </div>
         <div ref={bodyRef} className={`markup-dialog__body is-inspecting${layout.bottom ? " is-bottom" : ""}`}
@@ -514,18 +604,21 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
                   onHover={setHover} onMenu={openMenu}
                   onDelete={editable ? (i) => { const d = ACTIONS.find((a) => a.id === "delete"); const c = elements && { markup, ranges, elements, selection: [i] }; if (d && c) run(d, c) } : undefined}
                   onMove={editable ? move : undefined}
-                  locked={locked} ownLocked={ownLocked} onLock={toggleLock} />
+                  locked={locked} ownLocked={ownLocked} onLock={toggleLock}
+                  hidden={hidden} ownHidden={ownHidden} onHide={toggleHide} />
               : <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
           </div>
           <div className="markup-dialog__canvas">
             {toolbarSide === "left" && editable && <EditStatus tool={tool} count={selection.length} note={note} />}
-            <InspectPreview markup={markup} backdrop={backdrop} selection={selection} locked={ownLocked} snap={snap}
+            {peekMarkup !== null && <span className="peek-badge">After</span>}
+            <InspectPreview markup={peekMarkup ?? markup} backdrop={backdrop} selection={peekMarkup !== null ? [] : selection} locked={ownLocked} hidden={peekMarkup !== null ? undefined : ownHidden} snap={snap}
+              zoom={zoom} onZoom={setZoom} onActual={setActual}
               onPick={(i, add) => { (document.activeElement as HTMLElement | null)?.blur?.(); pick(i, add ? "add" : "only") }}
               onSelect={(found, add) => setSelection((s) => (add ? [...s, ...found.filter((i) => !s.includes(i))] : found))}
-              onMoveBy={moveBy} onContextMenu={openMenu} readOnly={!editable}
+              onMoveBy={moveBy} onContextMenu={openMenu} readOnly={!editable || peekMarkup !== null}
               onHover={setHover} hover={hover}
               onTransform={tool === "select" && editable ? transformBy : undefined}
-              path={segs && tool === "direct" ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath, onPointMenu: pointMenu } : null} />
+              path={segs && tool === "direct" && peekMarkup === null ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath, onPointMenu: pointMenu } : null} />
             {/* Unaffiliated pointer to a free, fuller vector editor: this one tidies markup, it isn't an art tool */}
             {!nodDismissed && (
               <p className="markup-dialog__nod">

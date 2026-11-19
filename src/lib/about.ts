@@ -11,6 +11,21 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.12.0",
+    date: "19 November 2026",
+    notes: [
+      "Projects: save everything in the list (files, edits, flags, settings and presets) as a .svgenius file and open it again later. ⌘S, ⇧⌘S and ⌘O, or the Project button",
+      "Editor zoom: ⌘ and the wheel or a pinch zooms at the pointer, ⌘+ and ⌘−, Fit (⌘0) and 100% (⌘1), and Space-drag pans",
+      "Previous and next file arrows in the editor, and hold C to peek at the optimised result",
+      "Layers have an eye to hide things in the editor, and the eye, lock and delete icons are always there, bigger, without shifting",
+      "Deleting a point selects the next one, so you can keep pressing Delete",
+      "Toolbar buttons are bigger, show their tips quickly, and include the circle guide and clip. The left toolbar stacks its groups properly",
+      "Rows: a double-click hint, Show in Finder next to Open in your app (new icon), a subtler selected colour, and dimensions are no longer cut off",
+      "Clicking a row's \u201cExports as\u201d name shows it in File names. The Optimise button counts how many are done, and the export arrow is bigger",
+      "Undo works after a Revert, outside the editor too"
+    ]
+  },
+  {
     version: "0.11.1",
     date: "19 November 2026",
     notes: [

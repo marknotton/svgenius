@@ -1,6 +1,6 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react"
 import { LIVE_BUFFER_PX } from "../lib/config"
-import { IconFile, IconFilter, IconFolder, IconTrash } from "../icons"
+import { IconFile, IconFilter, IconFolder, IconTrash, IconProject } from "../icons"
 import { plural } from "../lib/format"
 import type { FileTag } from "../lib/tags"
 import type { AppSettings, Preset, SvgItem } from "../lib/types"
@@ -16,6 +16,9 @@ interface Props {
   focusId: string | null
   onRowClick: (id: string, e: MouseEvent) => void
   onOpenMarkup: (id: string) => void
+  /** Double-click opens the editor (Advanced), so rows hint at it */
+  canOpen?: boolean
+  onExportName?: (id: string) => void
   onVisible: (ids: Set<string>) => void
   settings: AppSettings
   defaultPreset: Preset
@@ -36,6 +39,9 @@ interface Props {
   exportNames: Map<string, string> | null
   onAddFiles: () => void
   onAddFolder: () => void
+  /** Open and save .svgenius projects */
+  onProjectMenu?: (e: React.MouseEvent) => void
+  projectName?: string
   onRemove: () => void
   viewControls: ReactNode
   cssBar: ReactNode
@@ -99,6 +105,12 @@ export function FileList(p: Props) {
         <div className="toolbar__group">
           <button className="btn btn--ghost btn--sm" onClick={p.onAddFiles}><IconFile /> Files</button>
           <button className="btn btn--ghost btn--sm" onClick={p.onAddFolder}><IconFolder /> Folder</button>
+          {p.onProjectMenu && (
+            <button className="btn btn--ghost btn--sm" onClick={p.onProjectMenu}
+              title={p.projectName ? `Project: ${p.projectName}. Open or save projects (all files, settings and edits)` : "Open or save a project: every file, its settings and edits, in one .svgenius file"}>
+              <IconProject /> {p.projectName ? p.projectName.replace(/\.svgenius$/i, "") : "Project"}
+            </button>
+          )}
           <button className="btn btn--ghost btn--sm" onClick={p.onRemove} disabled={items.length === 0}
             title={selection.size ? "Remove selected from the list" : "Clear the list"}>
             <IconTrash /> {selection.size ? "Remove" : "Clear"}
@@ -131,6 +143,8 @@ export function FileList(p: Props) {
             focused={p.focusId === item.id}
             onRowClick={p.onRowClick}
             onOpenMarkup={p.onOpenMarkup}
+            canOpen={p.canOpen}
+            onExportName={p.onExportName}
             stale={p.isStale(item)}
             thumbPx={settings.showDetails ? settings.thumbPx : settings.galleryPx}
             compare

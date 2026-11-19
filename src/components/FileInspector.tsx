@@ -44,6 +44,9 @@ interface Props {
   /** The big markup editor (double-clicking a row opens it too) */
   markupOpen: boolean
   onMarkupOpen: (open: boolean) => void
+  /** Previous and next file, for the editor's arrows */
+  nav?: { pos: number, total: number, go: (step: 1 | -1) => void }
+  circle?: { on: boolean, clip: boolean, onToggle: () => void, onClip: () => void }
 }
 
 function viewBoxOf(svg?: string) {
@@ -189,7 +192,8 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
         </section>}
         {!p.advanced && item.status === "error" && <section className="panel__section"><p className="rule__error">{item.error}</p></section>}
         {p.markupOpen && !isBlocked(item) && (
-          <MarkupDialog item={item} tab={tab} onTab={setTab}
+          // Keyed by file: each one gets its own undo history and selection
+          <MarkupDialog key={item.id} item={item} tab={tab} onTab={setTab} nav={p.nav} circle={p.circle}
             backdrop={backdrop} toolbarSide={p.editorToolbar} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => p.onMarkupOpen(false)} />
         )}
       </div>

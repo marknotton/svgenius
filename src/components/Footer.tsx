@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react"
-import { IconDownload, IconPlay, IconReport } from "../icons"
+import { IconDownload, IconPlay, IconReport, IconChevronDown } from "../icons"
 import { ContextMenu, type MenuState } from "./ContextMenu"
 import { InfoTip } from "./InfoTip"
 import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
@@ -91,6 +91,8 @@ export function Footer(p: Props) {
         <button className={`btn run-group__btn ${outstanding > 0 ? "btn--primary" : "btn--secondary"}`} onClick={p.onOptimise} disabled={n === 0 || p.busy || outstanding === 0}
           title={outstanding === 0 ? "Everything is up to date" : "Run every file with its current settings now"}>
           {p.busy ? <span className="spinner spinner--sm" /> : <IconPlay />} {outstanding > 0 ? `Apply & optimise ${scope}${plural(n, "file")}` : "All optimised"}
+          {/* How many are done, which Live keeps climbing as you scroll */}
+          {n > 0 && <span className="run-group__count" title={`${p.ready} of ${n} optimised`}>{p.ready}/{n}</span>}
         </button>
       </div>
       <div className="split">
@@ -110,7 +112,7 @@ export function Footer(p: Props) {
                 { label: `Export and clear ${count}${dots}`, run: () => p.onExport(true) }
               ]
             })
-          }}>▾</button>
+          }}><IconChevronDown width={14} height={14} /></button>
       </div>
       {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
     </footer>
