@@ -11,10 +11,22 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.9.0",
+    date: "19 November 2026",
+    notes: [
+      "Two tools in the editor, like a vector app: Select (V) for whole elements and Direct select (A) for a path's points",
+      "Select puts a box round the selection: drag its handles to scale (Shift keeps proportions, Alt scales from the centre) or the knob on top to rotate (Shift snaps to 15°). Plain paths take the change into their points, everything else gets a transform",
+      "Right-click a point (or several) to convert it to a line, curve, quadratic and more, add a point after it, switch it between absolute and relative, or delete it",
+      "Alt- or ⌘-click a point to flip it between corner and smooth, and Delete removes selected points rather than the whole path",
+      "Clicking an element's tag name in the code selects the whole element, ready to delete or cut",
+      "The VectorCraft note moves under the preview, with a close button that this device remembers"
+    ]
+  },
+  {
     version: "0.8.0",
     date: "19 November 2026",
     notes: [
-      "The top bar is gone. The logo (click it for About), Advanced, the desktop app link and Settings now sit at the bottom left of the footer. The Mac app keeps a slim empty strip for its window buttons",
+      "The top bar is gone. The logo (click it for About), the desktop app link and Settings sit at the bottom left of the footer, and Advanced sits at the right of the sidebar's tabs. The Mac app keeps a slim empty strip for its window buttons",
       "Editor: drag to resize the code panel and the path tools, and a layout switch (top right) moves them along the bottom for wide artwork",
       "Refreshing the page brings you back to the same file, with the editor open if it was",
       "Points on H and V lines (common in Illustrator exports) can now move sideways as well as up and down",

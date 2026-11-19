@@ -29,9 +29,12 @@ export function ViewControls({ size, sizeRange, onSize, details, onDetails, back
           onDoubleClick={() => onSize(-1)} />
         <IconImageLg />
       </label>
-      <button type="button" className={`flag flag--lg${details ? " is-on" : ""}`} aria-pressed={details}
-        title="List view: compact rows with dimensions, tags of what changed and each file's preset. Off: big side-by-side before and after previews" onClick={onDetails}>
-        List view
+      {/* Names the view you're in; click to switch to the other one */}
+      <button type="button" className="flag flag--lg view-mode" onClick={onDetails}
+        title={details
+          ? "List view: compact rows with dimensions, tags of what changed and each file's preset. Click for Compare view"
+          : "Compare view: big side-by-side before and after previews. Click for List view"}>
+        {details ? "List view" : "Compare view"}
       </button>
       <Segmented
         label="Preview background"

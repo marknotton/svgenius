@@ -20,11 +20,9 @@ export function AppBar() {
 interface Props {
   onSettings: () => void
   onAbout: () => void
-  advanced: boolean
-  onAdvanced: (on: boolean) => void
 }
 
-export function BrandBar({ onSettings, onAbout, advanced, onAdvanced }: Props) {
+export function BrandBar({ onSettings, onAbout }: Props) {
   return (
     <div className="brand">
       <button className="brand__name" onClick={onAbout} title="About SVGenius: version history and credits">
@@ -36,12 +34,18 @@ export function BrandBar({ onSettings, onAbout, advanced, onAdvanced }: Props) {
           <IconDownload width={12} height={12} /> <span className="brand__label">Desktop app</span>
         </a>
       )}
-      <label className="brand__advanced" title="Show every option: viewBox and contents editing, rules, all SVGO plugins, filters, import and export, and Beta tools">
-        <input type="checkbox" className="toggle__input" checked={advanced} onChange={(e) => onAdvanced(e.target.checked)} />
-        <span className="toggle__track" aria-hidden="true"><span className="toggle__thumb" /></span>
-        <span>Advanced</span>
-      </label>
       <button className="btn btn--icon" title="Settings (⌘,)" aria-label="Settings" onClick={onSettings}><IconGear /></button>
     </div>
+  )
+}
+
+/** Shows every option. Sits at the right-hand end of the sidebar's tabs */
+export function AdvancedToggle({ advanced, onAdvanced }: { advanced: boolean, onAdvanced: (on: boolean) => void }) {
+  return (
+    <label className="advanced-toggle" title="Show every option: viewBox and contents editing, rules, all SVGO plugins, filters, import and export, and Beta tools">
+      <span>Advanced</span>
+      <input type="checkbox" className="toggle__input" checked={advanced} onChange={(e) => onAdvanced(e.target.checked)} />
+      <span className="toggle__track" aria-hidden="true"><span className="toggle__thumb" /></span>
+    </label>
   )
 }

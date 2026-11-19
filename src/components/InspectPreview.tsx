@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { Backdrop } from "../lib/types"
 import { svgSize } from "../lib/svgRoot"
 import { allAnchors, geometry, pointAt, pointKey, serialisePath, shiftPoints, type PointKind, type PointRef, type Seg } from "../lib/pathData"
+import { deletePoints, toggleCorner } from "../lib/pathPoints"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 
 // ── Inspectable preview ───────────────────────────────────────────────────────
@@ -27,9 +28,17 @@ interface Props {
   hover?: number
   /** The selected path's points, drawn as draggable handles */
   path?: PathEdit | null
+  /** When set, the selection gets a box with scale and rotate handles */
+  onTransform?: (changes: ElementTransform[]) => void
 }
 
 export interface ElementMove { index: number, dx: number, dy: number }
+/** A scale or rotate, as a matrix in the element's parent units, to go in front of its own transform */
+export interface ElementTransform { index: number, m: DOMMatrix }
+
+type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "rot"
+const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"]
+const mat = (m: DOMMatrix) => `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})`
 
 /** Shapes a selection box picks up (not groups, not things in <defs>) */
 const PICKABLE = "path, rect, circle, ellipse, line, polyline, polygon, text, image, use"
@@ -44,6 +53,8 @@ export interface PathEdit {
   onActive: (index: number) => void
   /** A drag finished */
   onCommit: (segs: Seg[]) => void
+  /** Right-click on a point: the points it applies to (the selection, if it's in it) */
+  onPointMenu?: (points: PointRef[], e: React.MouseEvent) => void
 }
 
 /** More than this and only the outline is drawn, handles would be a carpet */
@@ -69,7 +80,7 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path }: Props) {
+export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
@@ -135,6 +146,8 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
       const base = stage.current?.getBoundingClientRect()
       if (!shadow || !base) return
       const t = e.composedPath()[0] as Element | undefined
+      // The transform box's handles run their own drags
+      if (t?.closest?.(".xf")) return
       const hit = t?.closest?.(`[${ATTR}]`)
       const index = hit ? Number(hit.getAttribute(ATTR)) : -1
       const listen = (move: (ev: PointerEvent) => void, up: (ev: PointerEvent) => void) => {
@@ -211,6 +224,86 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
     return () => host.removeEventListener("pointerdown", down)
   }, [])
 
+  // ── Transform box: scale from the handles, rotate from the top one ──
+  // Shift keeps proportions (and snaps rotation to 15°), Alt scales from the centre
+  const [xf, setXf] = useState<DOMMatrix | null>(null)
+  const union = boxes.sel.length ? boxes.sel.reduce((u, b) => {
+    const l = Math.min(u.x, b.x), t = Math.min(u.y, b.y)
+    return new DOMRect(l, t, Math.max(u.right, b.right) - l, Math.max(u.bottom, b.bottom) - t)
+  }) : null
+  const startTransform = (e: React.PointerEvent, kind: Handle) => {
+    if (e.button !== 0 || !union || !onTransform) return
+    e.preventDefault()
+    e.stopPropagation()
+    const shadow = stage.current?.shadowRoot
+    const base = stage.current?.getBoundingClientRect()
+    if (!shadow || !base) return
+    const ids = selection.filter((i) => i > 0)
+    const els = ids.map((i) => shadow.querySelector(`[${ATTR}="${i}"]`) as SVGGraphicsElement | null)
+    const parents = els.map((el) => {
+      const c = (el?.parentNode as SVGGraphicsElement | null)?.getScreenCTM?.()
+      return c ? new DOMMatrix([c.a, c.b, c.c, c.d, c.e, c.f]) : null
+    })
+    const orig = els.map((el) => el?.getAttribute("transform") ?? null)
+    const L = union.x + base.x, T = union.y + base.y, R = L + union.width, B = T + union.height
+    const cx = (L + R) / 2, cy = (T + B) / 2
+    const hasX = /[ew]/.test(kind) && kind !== "rot", hasY = /[ns]/.test(kind) && kind !== "rot"
+    const hx = kind.includes("w") ? L : kind.includes("e") ? R : cx
+    const hy = kind.includes("n") ? T : kind.includes("s") ? B : cy
+    const ax = kind.includes("w") ? R : kind.includes("e") ? L : cx
+    const ay = kind.includes("n") ? B : kind.includes("s") ? T : cy
+    const a0 = Math.atan2(e.clientY - cy, e.clientX - cx)
+    let m = new DOMMatrix()
+    let moved = false
+    const inParent = (k: number) => parents[k] ? parents[k]!.inverse().multiply(m).multiply(parents[k]!) : null
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return
+      if (!moved && Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 2) return
+      moved = true
+      if (kind === "rot") {
+        let deg = (Math.atan2(ev.clientY - cy, ev.clientX - cx) - a0) * 180 / Math.PI
+        if (ev.shiftKey) deg = Math.round(deg / 15) * 15
+        m = new DOMMatrix().translate(cx, cy).rotate(deg).translate(-cx, -cy)
+      } else {
+        const [ox, oy] = ev.altKey ? [cx, cy] : [ax, ay]
+        const ratio = (p: number, h: number, o: number) => {
+          const r = Math.abs(h - o) < 1e-6 ? 1 : (p - o) / (h - o)
+          return Math.abs(r) < 0.01 ? (r < 0 ? -0.01 : 0.01) : r
+        }
+        let sx = hasX ? ratio(ev.clientX, hx, ox) : 1
+        let sy = hasY ? ratio(ev.clientY, hy, oy) : 1
+        if (ev.shiftKey) {
+          // Same scale both ways: corners follow the larger pull, edges take the other axis along
+          const u = hasX && hasY ? (Math.abs(sx) > Math.abs(sy) ? sx : sy) : hasX ? sx : sy
+          sx = hasX ? u : Math.abs(u)
+          sy = hasY ? u : Math.abs(u)
+        }
+        m = new DOMMatrix().translate(ox, oy).scale(sx, sy).translate(-ox, -oy)
+      }
+      els.forEach((el, k) => {
+        const t = inParent(k)
+        if (el && t) el.setAttribute("transform", `${mat(t)}${orig[k] ? ` ${orig[k]}` : ""}`)
+      })
+      setXf(new DOMMatrix().translate(-base.x, -base.y).multiply(m).translate(base.x, base.y))
+    }
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+      window.removeEventListener("pointercancel", up)
+      setXf(null)
+      if (!moved) return
+      swallowClick.current = true
+      setTimeout(() => { swallowClick.current = false }, 0)
+      const changes = ids.map((index, k) => ({ index, m: inParent(k) })).filter((c): c is ElementTransform => !!c.m)
+      onTransform(changes)
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+    window.addEventListener("pointercancel", up)
+  }
+  const showXf = !!onTransform && !path && !readOnly && !!union && selection.some((i) => i > 0)
+
   // Events from inside the shadow root are retargeted, so use the real target
   const indexOf = (e: { nativeEvent: Event }) => {
     const target = e.nativeEvent.composedPath()[0] as Element | undefined
@@ -234,6 +327,12 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
         onContextMenu={(e) => { if (onContextMenu) { const i = indexOf(e); onContextMenu(i > 0 ? i : -1, e) } }} />
       {boxes.hov && <div className="inspect__box inspect__box--hover" style={rect(boxes.hov)} />}
       {!path && boxes.sel.map((b, k) => <div key={k} className="inspect__box" style={rect(b)} />)}
+      {showXf && union && (
+        <div className={`xf${xf ? " is-dragging" : ""}`} style={{ ...rect(union), transform: xf ? mat(xf) : undefined, transformOrigin: `${-union.x}px ${-union.y}px` }}>
+          {HANDLES.map((h) => <span key={h} className={`xf__h xf__h--${h}`} onPointerDown={(e) => startTransform(e, h)} />)}
+          <span className="xf__rot" title="Drag to rotate. Shift snaps to 15°" onPointerDown={(e) => startTransform(e, "rot")} />
+        </div>
+      )}
       {marquee && <div className="inspect__marquee" style={{ left: Math.min(marquee.x0, marquee.x1), top: Math.min(marquee.y0, marquee.y1), width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0) }} />}
       {path && root && <PathOverlay stage={stage} box={box} root={root} edit={path} swallowClick={swallowClick} />}
       </div>
@@ -414,6 +513,16 @@ function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
       const { picked: sel, segs: cur, edit: ed } = live.current
       if (!sel.length || isTyping(e.target) || e.metaKey || e.ctrlKey) return
       if (e.key === "Escape") { e.preventDefault(); setPicked([]); return }
+      if ((e.key === "Delete" || e.key === "Backspace") && !ed.readOnly) {
+        // Points go, not the whole path
+        const ends = sel.filter((p) => p.kind === "end")
+        if (!ends.length) return
+        e.preventDefault()
+        e.stopImmediatePropagation()
+        setPicked([])
+        ed.onCommit(deletePoints(cur, ends))
+        return
+      }
       const dir: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
       const d = dir[e.key]
       if (!d || ed.readOnly) return
@@ -441,6 +550,14 @@ function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
     const ref = { seg, kind }
     const key = pointKey(ref)
     let sel = picked
+    // Alt- or ⌘-click flips a point (or the selected points) between corner and curve
+    if ((e.altKey || e.metaKey) && kind === "end" && !edit.readOnly) {
+      const pts = pickedKeys.has(key) ? picked : [ref]
+      if (!pickedKeys.has(key)) setPicked([ref])
+      swallow()
+      edit.onCommit(toggleCorner(segs, pts))
+      return
+    }
     if (e.shiftKey) {
       sel = pickedKeys.has(key) ? picked.filter((p) => pointKey(p) !== key) : [...picked, ref]
       setPicked(sel)
@@ -451,6 +568,17 @@ function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
     }
     edit.onActive(seg)
     startDrag(e, sel, pointAt(geo, ref))
+  }
+
+  // Right-click: the menu acts on the selected points if this is one of them
+  const pointMenu = (e: React.MouseEvent, seg: number) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!edit.onPointMenu || edit.readOnly) return
+    const ref: PointRef = { seg, kind: "end" }
+    const inSel = pickedKeys.has(pointKey(ref))
+    if (!inSel) setPicked([ref])
+    edit.onPointMenu(inSel ? picked.filter((p) => p.kind === "end") : [ref], e)
   }
 
   const handles: React.ReactNode[] = []
@@ -472,7 +600,7 @@ function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
       if (c === "q" && g.c1) handles.push(<line key={`${i}q2`} className="po__arm" x1={at(g.c1)[0]} y1={at(g.c1)[1]} x2={anchor[0]} y2={anchor[1]} />)
       handles.push(<rect key={`${i}e`} className={`po__anchor${on ? " is-active" : ""}${c === "m" ? " is-start" : ""}${pickedKeys.has(`${i}:end`) ? " is-picked" : ""}`}
         x={anchor[0] - 4} y={anchor[1] - 4} width={8} height={8}
-        onPointerDown={(e) => down(e, i, "end")} onPointerEnter={() => edit.onActive(i)} />)
+        onPointerDown={(e) => down(e, i, "end")} onPointerEnter={() => edit.onActive(i)} onContextMenu={(e) => pointMenu(e, i)} />)
     })
   }
   // The active segment, drawn on its own so it stands out

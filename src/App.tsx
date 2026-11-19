@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react"
-import { AppBar, BrandBar } from "./components/AppBar"
+import { AdvancedToggle, AppBar, BrandBar } from "./components/AppBar"
 import { ConfigPanel } from "./components/ConfigPanel"
 import { ContextMenu, type MenuState } from "./components/ContextMenu"
 import { useDialogs } from "./components/Dialogs"
@@ -694,6 +694,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                     onClick={() => { setFocusId(null); setSidebarTab("preset") }}><IconX width={10} height={10} /></button>
                 </div>
               ) : null}
+              <AdvancedToggle advanced={settings.advanced} onAdvanced={(advanced) => update((s) => ({ ...s, advanced }))} />
             </div>
             {sidebarTab === "names" ? (
               <RenamePanel rename={settings.rename} items={targets.filter((i) => i.status !== "error")}
@@ -767,8 +768,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
           }}
           onExport={doExport}
           onReport={() => setReportOpen(true)}
-          brand={<BrandBar onSettings={() => setSettingsOpen(true)} onAbout={() => setAboutOpen(true)}
-            advanced={settings.advanced} onAdvanced={(advanced) => update((s) => ({ ...s, advanced }))} />}
+          brand={<BrandBar onSettings={() => setSettingsOpen(true)} onAbout={() => setAboutOpen(true)} />}
         />
         {reportOpen && (
           <ReportDialog entries={reportEntries} selected={selection} rename={settings.rename} onClose={() => setReportOpen(false)} />

@@ -1044,7 +1044,6 @@ input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hove
 }
 
 @media (max-width: 759px) {
-  .markup-dialog__nod { display: none; }
 
 
   .empty { margin: 12px; padding: 16px; gap: 6px; justify-content: flex-start; overflow-y: auto; min-height: 0; }
@@ -1090,9 +1089,11 @@ input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hove
 }
 
 /* Quiet link to VectorCraft in the editor's header */
-.markup-dialog__nod { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); text-decoration: none; white-space: nowrap; opacity: .8; transition: opacity .15s; }
-.markup-dialog__nod:hover { opacity: 1; }
+.markup-dialog__nod { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin: 0; font-size: 11px; color: var(--text-3); }
+.markup-dialog__nod a { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+.markup-dialog__nod a:hover .markup-dialog__nod-mark { text-decoration: underline; }
 .markup-dialog__nod img { border-radius: 3px; }
+.markup-dialog__nod-close { width: 18px; height: 18px; margin-left: 2px; }
 .markup-dialog__nod-mark { font-weight: 600; color: var(--text-2); }
 .markup-dialog__nod-mark b { font-weight: inherit; color: #e7573e; }
 
@@ -1134,7 +1135,7 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .brand__name:hover { background: var(--surface-2); }
 .brand__link { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-2); text-decoration: none; padding: 0 4px; }
 .brand__link:hover { color: var(--accent-ink); }
-.brand__advanced { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); cursor: pointer; padding: 0 4px; }
+.advanced-toggle { margin-left: auto; align-self: center; flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); cursor: pointer; padding: 0 0 2px 8px; }
 .brand .btn--icon { width: 26px; height: 24px; }
 @media (max-width: 1250px) { .brand__link .brand__label { display: none; } }
 @media (max-width: 1000px) { .brand__name .brand__label { display: none; } }
@@ -1143,3 +1144,21 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
   .brand__name .brand__label, .brand__link .brand__label { display: inline; }
   .brand .btn--icon { margin-left: auto; }
 }
+
+/* ── Transform box (Select tool): scale handles and a rotate knob ── */
+.xf { position: absolute; border: 1px solid var(--accent); pointer-events: none; z-index: 2; }
+.xf__h { position: absolute; width: 9px; height: 9px; margin: -5px 0 0 -5px; background: #fff; border: 1px solid var(--accent); border-radius: 2px; pointer-events: auto; touch-action: none; }
+.xf__h--nw { left: 0; top: 0; cursor: nwse-resize; }
+.xf__h--n { left: 50%; top: 0; cursor: ns-resize; }
+.xf__h--ne { left: 100%; top: 0; cursor: nesw-resize; }
+.xf__h--e { left: 100%; top: 50%; cursor: ew-resize; }
+.xf__h--se { left: 100%; top: 100%; cursor: nwse-resize; }
+.xf__h--s { left: 50%; top: 100%; cursor: ns-resize; }
+.xf__h--sw { left: 0; top: 100%; cursor: nesw-resize; }
+.xf__h--w { left: 0; top: 50%; cursor: ew-resize; }
+.xf__rot { position: absolute; left: 50%; top: -26px; width: 11px; height: 11px; margin-left: -6px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--accent); pointer-events: auto; touch-action: none; cursor: grab; }
+.xf__rot::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 14px; background: var(--accent); transform: translateX(-50%); }
+.xf.is-dragging .xf__rot { cursor: grabbing; }
+/* Tools: Select (whole objects) and Direct select (points) */
+.tool-switch .btn { padding-inline: 6px; }
+.tool-switch .btn.is-on { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
