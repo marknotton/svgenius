@@ -76,7 +76,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
     // Opening "Customise this file" above pushes the markup down
     scroll.addEventListener("toggle", fit, true)
     return () => { ro.disconnect(); scroll.removeEventListener("toggle", fit, true) }
-  }, [item.id, tab])
+  }, [item.id, tab, p.advanced])
   const [copied, setCopied] = useState(false)
   const out = item.result?.output
   const before = useMemo(() => ({ size: svgSize(item.source), vb: viewBoxOf(item.source) }), [item.source])
@@ -162,7 +162,8 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
           </details>
         )}
 
-        <section ref={codeSection} className="panel__section inspector__code">
+        {/* The markup and the editor button belong to the advanced view */}
+        {p.advanced && <section ref={codeSection} className="panel__section inspector__code">
           <div className="inspector__codehead">
             <span className="panel__label">Markup</span>
             <CodeTabs value={tab} onChange={setTab} />
@@ -184,7 +185,8 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             <CodeEditor key="output" className="code" label="Optimised markup" value={out ?? ""} readOnly />
           )}
           {item.status === "error" && <p className="rule__error">{item.error}</p>}
-        </section>
+        </section>}
+        {!p.advanced && item.status === "error" && <section className="panel__section"><p className="rule__error">{item.error}</p></section>}
         {p.markupOpen && !isBlocked(item) && (
           <MarkupDialog item={item} tab={tab} onTab={setTab}
             backdrop={backdrop} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => p.onMarkupOpen(false)} />

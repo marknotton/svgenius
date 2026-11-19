@@ -90,7 +90,7 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
         <section className="settings__section">
           <h3 className="settings__title">Appearance</h3>
           <p className="settings__desc text-3">What the app shows you.</p>
-          <Toggle label="Advanced options" hint="Show every option: viewBox and contents editing, rules, all SVGO plugins, filters, import and export, and Beta tools"
+          <Toggle label="Advanced options" hint="Show every option: viewBox and contents editing, rules, all SVGO plugins, the markup editor, import and export, and Beta tools"
             checked={settings.advanced} onChange={(v) => set("advanced", v)} />
           <div className="field-row">
             <span>Theme</span>

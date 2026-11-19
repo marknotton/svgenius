@@ -43,6 +43,8 @@ const lastView: { focusId?: string | null, sidebarTab?: "preset" | "names" | "fi
   try { return JSON.parse(sessionStorage.getItem("svgenius:view") ?? "{}") } catch { return {} }
 })()
 
+const noop = () => {}
+
 export default function App() {
   const { settings, update, loadError } = useAppSettings()
   const dark = useTheme(settings?.theme)
@@ -221,8 +223,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   // ── Filters ─────────────────────────────────────────────────────────────────
   const [filters, setFilters] = useState<FilterSet>(emptyFilters)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  // Filters are an advanced tool: in the simple view they're hidden and off
-  const filterCount = settings.advanced ? activeRules(filters).length : 0
+  const filterCount = activeRules(filters).length
   const filtered = useMemo(() => (filterCount ? items.filter((i) => matchesFilters(i, filters)) : items), [items, filters, filterCount])
 
   const selectAll = (all: boolean) => setSelection(all ? new Set(shownItems.map((i) => i.id)) : new Set())
@@ -518,7 +519,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       x: e.clientX,
       y: e.clientY,
       items: [
-        { label: "Inspect", run: () => { setFocusId(id); setSidebarTab("file") } },
+        { label: "Open in editor", run: () => openMarkup(id) },
         ...(canReveal ? [
           { label: "Open in default app", run: () => openInDefaultApp(item.path) },
           { label: "Reveal in Finder", run: () => reveal(item.path) }
@@ -528,7 +529,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         ...(inSelection ? [{ label: `Remove ${plural(selection.size, "selected file")}`, danger: true, run: () => removeIds(new Set(selection)) }] : [])
       ]
     })
-  }, [itemsRef, selection, removeIds])
+  }, [itemsRef, selection, removeIds, openMarkup])
 
   // Settings: ⌘, from the menu or the keyboard
   useEffect(() => {
@@ -657,15 +658,16 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 isStale={isStale}
                 onToggle={toggle}
                 onRowClick={rowClick}
-                onOpenMarkup={openMarkup}
+                // Double-click opens the editor in the advanced view only (the right-click menu always can)
+                onOpenMarkup={settings.advanced ? openMarkup : noop}
                 focusId={focusId}
                 onVisible={setVisibleIds}
                 onSelectAll={selectAll}
                 onContextMenu={rowMenu}
                 onFlag={flagClick}
                 filterCount={filterCount}
-                filtersOpen={settings.advanced && filtersOpen}
-                showFilters={settings.advanced}
+                filtersOpen={filtersOpen}
+                showFilters
                 onClearFilters={() => setFilters(emptyFilters())}
                 onFilters={() => setFiltersOpen((o) => !o)}
                 filterBar={<FilterBar filters={filters} onChange={setFilters} shown={shownItems.length} total={items.length} />}

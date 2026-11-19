@@ -42,7 +42,7 @@ export function BrandBar({ onSettings, onAbout }: Props) {
 /** Shows every option. Sits at the right-hand end of the sidebar's tabs */
 export function AdvancedToggle({ advanced, onAdvanced }: { advanced: boolean, onAdvanced: (on: boolean) => void }) {
   return (
-    <label className="advanced-toggle" title="Show every option: viewBox and contents editing, rules, all SVGO plugins, filters, import and export, and Beta tools">
+    <label className="advanced-toggle" title="Show every option: viewBox and contents editing, rules, all SVGO plugins, the markup editor, import and export, and Beta tools">
       <span>Advanced</span>
       <input type="checkbox" className="toggle__input" checked={advanced} onChange={(e) => onAdvanced(e.target.checked)} />
       <span className="toggle__track" aria-hidden="true"><span className="toggle__thumb" /></span>
