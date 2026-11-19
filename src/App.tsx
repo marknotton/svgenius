@@ -29,7 +29,7 @@ import { exportNames } from "./lib/rename"
 import { fileTags } from "./lib/tags"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
-import { canReveal, openInDefaultApp, errorMessage, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
+import { canReveal, openInDefaultApp, errorMessage, exportSvgFile, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
 import { buildProject, readProject } from "./lib/project"
 import { preloadMonaco, setEditorTheme } from "./components/CodeEditor"
 import { RenderAnywayContext } from "./components/TooComplex"
@@ -371,6 +371,37 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     }
   }
 
+  // One file from its right-click menu: optimised with its current preset
+  // (run now if the result is stale), then saved wherever you pick
+  const exportOne = async (id: string) => {
+    const item = itemsRef.current.find((i) => i.id === id)
+    if (!item) return
+    try {
+      setBusy(true)
+      const result = (await optimise([id], resolve)).get(id)
+      if (!result) {
+        const now = itemsRef.current.find((i) => i.id === id)
+        push({ tone: "error", text: `Couldn't optimise ${item.name}${now?.error ? `: ${now.error}` : ""}` })
+        return
+      }
+      // Same name a full export would give it, renaming rules included
+      const name = exportNames(itemsRef.current, settings.rename).get(id) ?? item.name
+      const written = await exportSvgFile(name, result.output, canReveal ? item.path : undefined)
+      if (!written) return
+      push({
+        tone: "success",
+        text: written.download ? `Downloaded ${written.download}` : `Exported ${name}`,
+        action: written.reveal ? { label: "Show in Finder", run: written.reveal } : undefined
+      })
+    } catch (e) {
+      push({ tone: "error", text: `Export failed: ${errorMessage(e)}` })
+    } finally {
+      setBusy(false)
+    }
+  }
+  const exportOneRef = useRef(exportOne)
+  exportOneRef.current = exportOne
+
   // ── Preset management ───────────────────────────────────────────────────────
 
   const newPreset = async () => {
@@ -598,6 +629,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       y: e.clientY,
       items: [
         { label: "Open in editor", run: () => openMarkup(id) },
+        { label: "Export optimised SVG…", run: () => exportOneRef.current(id), disabled: item.source === undefined || isBlocked(item) },
         ...(canReveal ? [
           { label: "Open in default app", run: () => openInDefaultApp(item.path) },
           { label: "Reveal in Finder", run: () => reveal(item.path) }

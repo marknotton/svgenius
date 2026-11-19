@@ -232,6 +232,24 @@ export async function exportSvgs(
   return { count: files.length, download: "svgenius-export.zip" }
 }
 
+/**
+ * Saves one SVG under a name the user picks: a save dialog on the desktop
+ * (starting next to `nearPath` when given), a download in the browser
+ */
+export async function exportSvgFile(name: string, contents: string, nearPath?: string): Promise<ExportOutcome | null> {
+  if (!isDesktop) {
+    download(name, new Blob([contents], { type: "image/svg+xml" }))
+    return { count: 1, download: name }
+  }
+  const dir = nearPath?.match(/^(.*)[\\/]/)?.[1]
+  const picked = await save({ defaultPath: dir ? `${dir}/${name}` : name, filters: [{ name: "SVG", extensions: ["svg"] }] })
+  if (!picked) return null
+  const to = /\.svg$/i.test(picked) ? picked : `${picked}.svg`
+  const cut = Math.max(to.lastIndexOf("/"), to.lastIndexOf("\\"))
+  const written = await desktop.exportFiles(to.slice(0, cut), [{ relPath: to.slice(cut + 1), contents }])
+  return { count: written.length, reveal: written[0] ? () => { revealItemInDir(written[0]).catch(() => {}) } : undefined }
+}
+
 export const canReveal = isDesktop
 
 /** Last-modified times for files on disk. Desktop only (browser files can't change under us) */
