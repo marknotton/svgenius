@@ -32,7 +32,12 @@ interface Props {
   locked?: Set<number>
   /** When set, the selection gets a box with scale and rotate handles */
   onTransform?: (changes: ElementTransform[]) => void
+  /** Dragged items snap to other items' edges and centres, and to the viewBox. ⌘ while dragging skips it */
+  snap?: boolean
 }
+
+/** How close (screen px) an edge or centre has to come before it snaps */
+const SNAP_PX = 6
 
 export interface ElementMove { index: number, dx: number, dy: number }
 /** A scale or rotate, as a matrix in the element's parent units, to go in front of its own transform */
@@ -82,15 +87,19 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked }: Props) {
+export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked, snap = true }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
   const swallowClick = useRef(false)
   const [boxes, setBoxes] = useState<{ sel: DOMRect[], hov: DOMRect | null }>({ sel: [], hov: null })
   const [marquee, setMarquee] = useState<{ x0: number, y0: number, x1: number, y1: number } | null>(null)
-  const live = useRef({ selection, path, readOnly, onSelect, onMoveBy })
-  live.current = { selection, path, readOnly, onSelect, onMoveBy }
+  const live = useRef({ selection, path, readOnly, onSelect, onMoveBy, snap })
+  live.current = { selection, path, readOnly, onSelect, onMoveBy, snap }
+  // While items are dragged: how far they've gone on screen, so their boxes
+  // go with them, and the snap guides to draw (stage coordinates)
+  const [shift, setShift] = useState<{ x: number, y: number } | null>(null)
+  const [guides, setGuides] = useState<{ x: number[], y: number[] }>({ x: [], y: [] })
   const selKey = selection.join(",")
   const css = usePreviewCss()
   // Preview CSS goes in last, so element numbers still match the markup. In
@@ -138,6 +147,7 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
         return new DOMRect(r.x - base.x, r.y - base.y, r.width, r.height)
       }
       setBoxes({ sel: selection.map(box).filter((b): b is DOMRect => !!b), hov: !selection.includes(hover) ? box(hover) : null })
+      setShift(null)
     }
     measure()
     const ro = new ResizeObserver(measure)
@@ -189,22 +199,71 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
         })
         const orig = els.map((el) => el?.getAttribute("transform") ?? null)
         let moved = false
-        const delta = (ev: PointerEvent, k: number) => {
-          const p = new DOMPoint(ev.clientX - e.clientX, ev.clientY - e.clientY).matrixTransform(inv[k] ?? new DOMMatrix())
+
+        // Snapping: the dragged items' outer box, and every line it can snap
+        // to (other items' edges and centres, and the viewBox's)
+        const outer = (rs: DOMRect[]) => rs.length ? rs.reduce((u, r) => {
+          const l = Math.min(u.left, r.left), t = Math.min(u.top, r.top)
+          return new DOMRect(l, t, Math.max(u.right, r.right) - l, Math.max(u.bottom, r.bottom) - t)
+        }) : null
+        const moving = outer(els.filter((x): x is SVGGraphicsElement => !!x).map((x) => x.getBoundingClientRect()))
+        const lines = { x: [] as number[], y: [] as number[] }
+        if (moving) {
+          const add = (r: DOMRect) => {
+            if (r.width + r.height <= 0) return
+            lines.x.push(r.left, (r.left + r.right) / 2, r.right)
+            lines.y.push(r.top, (r.top + r.bottom) / 2, r.bottom)
+          }
+          const svg = shadow.querySelector("svg")
+          if (svg) add(svg.getBoundingClientRect())
+          for (const other of shadow.querySelectorAll(PICKABLE)) {
+            if (other.closest(UNPAINTED) || els.some((x) => x && (x === other || x.contains(other)))) continue
+            if (getComputedStyle(other).pointerEvents === "none") continue
+            add(other.getBoundingClientRect())
+          }
+        }
+        /** Screen distance moved, pulled onto the nearest line within reach */
+        const snapped = (ev: PointerEvent) => {
+          let dx = ev.clientX - e.clientX, dy = ev.clientY - e.clientY
+          const gx: number[] = [], gy: number[] = []
+          if (moving && live.current.snap && !ev.metaKey && !ev.ctrlKey) {
+            const pull = (own: number[], to: number[], d: number, hit: number[]) => {
+              let best: number | null = null
+              for (const o of own) for (const t of to) {
+                const diff = t - (o + d)
+                if (Math.abs(diff) <= SNAP_PX && (best === null || Math.abs(diff) < Math.abs(best))) best = diff
+              }
+              if (best === null) return d
+              const nd = d + best
+              for (const o of own) for (const t of to) if (Math.abs(t - (o + nd)) < 0.5 && !hit.includes(t)) hit.push(t)
+              return nd
+            }
+            dx = pull([moving.left, (moving.left + moving.right) / 2, moving.right], lines.x, dx, gx)
+            dy = pull([moving.top, (moving.top + moving.bottom) / 2, moving.bottom], lines.y, dy, gy)
+          }
+          return { dx, dy, gx: gx.map((x) => x - base.x), gy: gy.map((y) => y - base.y) }
+        }
+        const delta = (s: { dx: number, dy: number }, ev: PointerEvent, k: number) => {
+          const p = new DOMPoint(s.dx, s.dy).matrixTransform(inv[k] ?? new DOMMatrix())
           return ev.shiftKey ? { x: Math.round(p.x), y: Math.round(p.y) } : { x: p.x, y: p.y }
         }
         listen((ev) => {
           if (!moved && Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 3) return
           if (!moved && !cur.selection.includes(index)) cur.onSelect?.([index], false)
           moved = true
+          const s = snapped(ev)
           els.forEach((el, k) => {
-            const d = delta(ev, k)
+            const d = delta(s, ev, k)
             el?.setAttribute("transform", `translate(${d.x} ${d.y})${orig[k] ? ` ${orig[k]}` : ""}`)
           })
+          setShift({ x: s.dx, y: s.dy })
+          setGuides({ x: s.gx, y: s.gy })
         }, (ev) => {
+          setGuides({ x: [], y: [] })
           if (!moved) return
           swallow()
-          live.current.onMoveBy?.(ids.map((i, k) => ({ index: i, dx: delta(ev, k).x, dy: delta(ev, k).y })))
+          const s = snapped(ev)
+          live.current.onMoveBy?.(ids.map((i, k) => ({ index: i, dx: delta(s, ev, k).x, dy: delta(s, ev, k).y })))
         })
         return
       }
@@ -341,13 +400,15 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
         }}
         onContextMenu={(e) => { if (onContextMenu) { const i = indexOf(e); onContextMenu(i > 0 ? i : -1, e) } }} />
       {boxes.hov && <div className="inspect__box inspect__box--hover" style={rect(boxes.hov)} />}
-      {!path && boxes.sel.map((b, k) => <div key={k} className="inspect__box" style={rect(b)} />)}
+      {!path && boxes.sel.map((b, k) => <div key={k} className="inspect__box" style={shifted(rect(b), shift)} />)}
       {showXf && union && (
-        <div className={`xf${xf ? " is-dragging" : ""}`} style={{ ...rect(union), transform: xf ? mat(xf) : undefined, transformOrigin: `${-union.x}px ${-union.y}px` }}>
+        <div className={`xf${xf ? " is-dragging" : ""}`} style={{ ...shifted(rect(union), shift), transform: xf ? mat(xf) : undefined, transformOrigin: `${-union.x}px ${-union.y}px` }}>
           {HANDLES.map((h) => <span key={h} className={`xf__h xf__h--${h}`} onPointerDown={(e) => startTransform(e, h)} />)}
           <span className="xf__rot" title="Drag to rotate. Shift snaps to 15°" onPointerDown={(e) => startTransform(e, "rot")} />
         </div>
       )}
+      {guides.x.map((x) => <div key={`x${x}`} className="inspect__guide inspect__guide--v" style={{ left: x }} />)}
+      {guides.y.map((y) => <div key={`y${y}`} className="inspect__guide inspect__guide--h" style={{ top: y }} />)}
       {marquee && <div className="inspect__marquee" style={{ left: Math.min(marquee.x0, marquee.x1), top: Math.min(marquee.y0, marquee.y1), width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0) }} />}
       {path && root && <PathOverlay stage={stage} box={box} root={root} edit={path} swallowClick={swallowClick} />}
       </div>
@@ -357,6 +418,8 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
 }
 
 const rect = (r: DOMRect) => ({ left: r.x, top: r.y, width: Math.max(r.width, 1), height: Math.max(r.height, 1) })
+/** A box moved along with a drag in progress */
+const shifted = (r: ReturnType<typeof rect>, d: { x: number, y: number } | null) => (d ? { ...r, left: r.left + d.x, top: r.top + d.y } : r)
 
 // ── Draggable points for a path ───────────────────────────────────────────────
 // Click a point to select it (Shift adds), drag across the canvas to select

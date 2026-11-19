@@ -1211,3 +1211,10 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .layer__lock + .layer__delete { margin-left: 0; }
 .edit-toolbar__btn { padding-inline: 7px; }
 .edit-toolbar__btn.is-danger:hover { color: var(--danger, #d33); }
+.arrange__head { display: flex; align-items: center; gap: 6px; }
+.arrange__head .panel__label { margin: 0; }
+.segmented--xs .segmented__opt { height: 20px; padding: 0 7px; font-size: 10.5px; font-weight: 500; }
+.segmented__opt:disabled { opacity: .45; cursor: default; }
+.inspect__guide { position: absolute; pointer-events: none; background: #ff2d87; z-index: 3; }
+.inspect__guide--v { top: 0; bottom: 0; width: 1px; margin-left: -.5px; }
+.inspect__guide--h { left: 0; right: 0; height: 1px; margin-top: -.5px; }

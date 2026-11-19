@@ -137,14 +137,19 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
   const commit = (next: string) => {
     if (next === markup) return
     own.current = true
+    // What was selected before this edit, so undo can put it back
+    hist.current.sel = selRef.current
     onEdit(next)
   }
 
   // ── Undo and redo ─────────────────────────────────────────────────────────
   // One history for every kind of edit here: typing, dragging points,
-  // nudging, layers. Quick runs of changes (typing, arrow nudges) are grouped
+  // nudging, layers. Quick runs of changes (typing, arrow nudges) are grouped.
+  // Each step remembers what was selected, so undo and redo bring it back
+  // (after a Pathfinder or group, say, the shapes are selected again)
+  interface Step { m: string, sel: number[] }
   const source = item.source ?? ""
-  const hist = useRef({ past: [] as string[], future: [] as string[], prev: source, at: 0, restoring: false })
+  const hist = useRef({ past: [] as Step[], future: [] as Step[], prev: source, at: 0, restoring: false, sel: null as number[] | null })
   const [, setHistTick] = useState(0)
   useEffect(() => {
     const h = hist.current
@@ -152,10 +157,11 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     if (h.restoring) h.restoring = false
     else {
       const now = Date.now()
-      if (now - h.at > 600) { h.past.push(h.prev); h.at = now }
+      if (now - h.at > 600) { h.past.push({ m: h.prev, sel: h.sel ?? [] }); h.at = now }
       if (h.past.length > 300) h.past.shift()
       h.future = []
     }
+    h.sel = null
     h.prev = source
     setHistTick((n) => n + 1)
   }, [source])
@@ -163,12 +169,16 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     const h = hist.current
     const to = back ? h.past.pop() : h.future.pop()
     if (to === undefined) return
-    ;(back ? h.future : h.past).push(source)
+    ;(back ? h.future : h.past).push({ m: source, sel: selRef.current })
     h.restoring = true
     h.at = 0
-    // Same elements, same numbering: keep what's selected
-    if (tab === "source" && elementRanges(to).length === ranges.length) own.current = true
-    onEdit(to)
+    if (tab === "source") {
+      // The selection belongs to that exact markup, so it lines up
+      own.current = true
+      const count = elementRanges(to.m).length
+      setSelection(to.sel.filter((k) => k > 0 && k < count))
+    }
+    onEdit(to.m)
   }
   const travelRef = useRef(travel)
   travelRef.current = travel
