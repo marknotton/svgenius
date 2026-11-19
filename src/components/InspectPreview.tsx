@@ -421,8 +421,10 @@ function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
       const step = e.shiftKey ? 10 : e.altKey ? 0.1 : 1
       ed.onCommit(shiftPoints(cur, sel, d[0] * step, d[1] * step))
     }
-    window.addEventListener("keydown", key)
-    return () => window.removeEventListener("keydown", key)
+    // Capture phase: this overlay mounts after the dialog's own arrow handler,
+    // so it has to get in first or the whole shape moves instead of the points
+    window.addEventListener("keydown", key, true)
+    return () => window.removeEventListener("keydown", key, true)
   }, [])
 
   const geo = useMemo(() => geometry(segs), [segs])

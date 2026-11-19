@@ -1053,6 +1053,8 @@ input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hove
 }
 
 @media (max-width: 759px) {
+  .markup-dialog__nod { display: none; }
+
   .appbar { justify-content: flex-start; padding-left: 12px; }
   .appbar__link { display: none; }
   .appbar__right { right: 6px; }
@@ -1098,3 +1100,10 @@ input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hove
   .markup-dialog__side > .markup-dialog__code { height: 50vh; flex: none; }
   .markup-dialog__tools { height: auto; min-height: 0; max-height: 50vh; }
 }
+
+/* Quiet link to VectorCraft in the editor's header */
+.markup-dialog__nod { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); text-decoration: none; white-space: nowrap; opacity: .8; transition: opacity .15s; }
+.markup-dialog__nod:hover { opacity: 1; }
+.markup-dialog__nod img { border-radius: 3px; }
+.markup-dialog__nod-mark { font-weight: 600; color: var(--text-2); }
+.markup-dialog__nod-mark b { font-weight: inherit; color: #e7573e; }

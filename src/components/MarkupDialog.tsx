@@ -10,6 +10,7 @@ import type { Backdrop, SvgItem } from "../lib/types"
 import { CodeEditor } from "./CodeEditor"
 import { InspectPreview, type ElementMove } from "./InspectPreview"
 import { LayersTree } from "./LayersTree"
+import vectorcraftIcon from "../assets/vectorcraft.png"
 import { PathPanel } from "./PathPanel"
 
 /** Elements in tree order, the numbering everything here shares */
@@ -286,6 +287,12 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
           <h2 className="modal__title markup-dialog__title" title={item.relPath}>{item.name}</h2>
           <CodeTabs value={tab} onChange={onTab} />
           <span className="text-3 markup-dialog__tip">Click a shape or a layer to select it{editable ? ". Drag a path's points to reshape it" : ""}</span>
+          {/* A nod to a proper vector editor, for jobs beyond tidying markup */}
+          <a className="markup-dialog__nod" href="https://getartcraft.com/apps/vectorcraft" target="_blank" rel="noopener"
+            title="For drawing from scratch, VectorCraft is a full vector editor">
+            Need a full editor? <img src={vectorcraftIcon} alt="" width={14} height={14} />
+            <span className="markup-dialog__nod-mark">Vector<b>Craft</b></span>
+          </a>
           <div className="markup-dialog__spacer" />
           <div className="btn-join" role="group" aria-label="History">
             <button className="btn btn--secondary btn--sm" onClick={() => travel(true)} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo"><IconUndo width={12} height={12} /></button>

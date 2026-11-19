@@ -11,6 +11,14 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.7.3",
+    date: "19 November 2026",
+    notes: [
+      "Arrow keys move only the selected points on a path, not the whole shape",
+      "A small nod to VectorCraft in the editor and About, for when you need a full vector editor"
+    ]
+  },
+  {
     version: "0.7.2",
     date: "19 November 2026",
     notes: [
@@ -178,5 +186,6 @@ export const INSPIRATION: Credit[] = [
   { name: "SVG Path Editor", url: "https://github.com/Yqnn/svg-path-editor", licence: "by Yqnn · AGPL-3.0", what: "The path tools: the command list, draggable points and handles, absolute and relative switching, and Reverse." },
   { name: "Inkscape", url: "https://inkscape.org", licence: "GPL-2.0+", what: "Its XML editor and layers panel inspired the layers tree you can select, reorder and duplicate from." },
   { name: "Browser developer tools", url: "https://developer.chrome.com/docs/devtools", licence: "Chromium / Firefox", what: "The Inspect picker: hover the artwork, click a shape, land on its markup." },
+  { name: "VectorCraft", url: "https://getartcraft.com/apps/vectorcraft", licence: "by ArtCraft", what: "A full vector editor. Its selection and point editing set the bar for ours. Reach for it when you need to draw rather than tidy." },
   { name: "SVGOMG", url: "https://github.com/jakearchibald/svgomg", licence: "by Jake Archibald · MIT", what: "The original friendly face for SVGO, with live before and after previews." }
 ]
