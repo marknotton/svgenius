@@ -30,8 +30,6 @@ interface Props {
   path?: PathEdit | null
   /** Locked elements: clicks and boxes go straight through them */
   locked?: Set<number>
-  /** A plain colour instead of the checkerboard */
-  solid?: string | null
   /** When set, the selection gets a box with scale and rotate handles */
   onTransform?: (changes: ElementTransform[]) => void
 }
@@ -84,7 +82,7 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, solid, locked }: Props) {
+export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
@@ -331,7 +329,7 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
   return (
     <div ref={box} className={`inspect thumb--${backdrop}`}>
       {/* The SVG's own canvas, at its real shape, with nothing around it */}
-      <div className="inspect__canvas" style={{ "--r": ratio, ...(solid ? { backgroundImage: "none", backgroundColor: solid } : {}) } as React.CSSProperties}>
+      <div className="inspect__canvas" style={{ "--r": ratio } as React.CSSProperties}>
       <div ref={stage} className="inspect__stage"
         onMouseMove={(e) => { const i = Math.max(indexOf(e), 0) || -1; if (i !== hover) onHover(i) }}
         onMouseLeave={() => onHover(-1)}

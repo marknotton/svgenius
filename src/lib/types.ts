@@ -161,6 +161,10 @@ export interface AppSettings {
   /** Thumbnail size in the gallery (showDetails off) */
   galleryPx: number
   backdrop: Backdrop
+  /** Checkerboard behind previews. Off shows a plain colour */
+  checker: boolean
+  /** Solid colour behind previews when the checkerboard is off; null = plain light or dark */
+  backdropColour: string | null
   /** Show every option. Off keeps the app simple: presets and output only */
   advanced: boolean
   /** App colours: follow the system, or always light or dark */

@@ -1,6 +1,5 @@
-import { IconCircle, IconClip, IconMoon, IconSun } from "../icons"
-import type { Backdrop } from "../lib/types"
-import { Segmented } from "./Segmented"
+import { IconCircle, IconClip } from "../icons"
+import { CanvasBackground } from "./CanvasBackground"
 
 interface Props {
   size: number
@@ -8,8 +7,6 @@ interface Props {
   onSize: (px: number) => void
   details: boolean
   onDetails: () => void
-  backdrop: Backdrop
-  onBackdrop: (b: Backdrop) => void
   circle: boolean
   onCircle: () => void
   clip: boolean
@@ -19,7 +16,7 @@ interface Props {
   onCssToggle: () => void
 }
 
-export function ViewControls({ size, sizeRange, onSize, details, onDetails, backdrop, onBackdrop, circle, onCircle, clip, onClip, cssOpen, cssActive, onCssToggle }: Props) {
+export function ViewControls({ size, sizeRange, onSize, details, onDetails, circle, onCircle, clip, onClip, cssOpen, cssActive, onCssToggle }: Props) {
   return (
     <div className="view-controls">
       <label className="view-size" title={`Preview size: ${size}px. Double-click to reset`}>
@@ -36,15 +33,7 @@ export function ViewControls({ size, sizeRange, onSize, details, onDetails, back
           : "Compare view: big side-by-side before and after previews. Click for List view"}>
         {details ? "List view" : "Compare view"}
       </button>
-      <Segmented
-        label="Preview background"
-        value={backdrop}
-        onChange={onBackdrop}
-        options={[
-          { value: "light", label: <IconSun />, title: "Light checkerboard" },
-          { value: "dark", label: <IconMoon />, title: "Dark checkerboard" }
-        ]}
-      />
+      <CanvasBackground />
       <div className="btn-join">
         <button type="button" className={`flag flag--lg${circle ? " is-on" : ""}`} aria-pressed={circle}
           title="Circle guide: shows what survives a circular crop, e.g. avatars" onClick={onCircle}>

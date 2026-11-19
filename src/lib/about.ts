@@ -11,6 +11,14 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.10.1",
+    date: "19 November 2026",
+    notes: [
+      "One preview background for the whole app: sun, moon, a checkerboard toggle and an ink drop for a solid colour, in the list's toolbar and the editor, always in step",
+      "The editor's Duplicate, Delete, Group, Ungroup, Break apart, Convert to path and Stroke to path buttons are icons, with their names and shortcuts on hover"
+    ]
+  },
+  {
     version: "0.10.0",
     date: "19 November 2026",
     notes: [

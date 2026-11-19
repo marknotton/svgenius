@@ -75,3 +75,12 @@ export const IconExclude = (p: P) => <Icon {...p}><path d="M2.5 2.5h7v4h-3v3h-4z
 export const IconMore = (p: P) => <Icon {...p}><circle cx="3.5" cy="8" r=".9" fill="currentColor" /><circle cx="8" cy="8" r=".9" fill="currentColor" /><circle cx="12.5" cy="8" r=".9" fill="currentColor" /></Icon>
 export const IconLock = (p: P) => <Icon {...p}><rect x="3.5" y="7" width="9" height="6.5" rx="1.2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></Icon>
 export const IconUnlock = (p: P) => <Icon {...p}><rect x="3.5" y="7" width="9" height="6.5" rx="1.2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 4.9-.7" /></Icon>
+// Preview background: a checkerboard, and an ink drop for a solid colour
+export const IconChecker = (p: P) => <Icon {...p}><rect x="2.5" y="2.5" width="11" height="11" rx="1" /><path d="M2.5 8h11M8 2.5v11" strokeWidth="1" /><rect x="2.5" y="2.5" width="5.5" height="5.5" fill="currentColor" stroke="none" /><rect x="8" y="8" width="5.5" height="5.5" fill="currentColor" stroke="none" /></Icon>
+export const IconInkDrop = (p: P) => <Icon {...p}><path d="M8 2.2c2.3 2.8 4.2 5.2 4.2 7.4a4.2 4.2 0 0 1-8.4 0c0-2.2 1.9-4.6 4.2-7.4Z" /></Icon>
+// Editor toolbar
+export const IconGroup = (p: P) => <Icon {...p}><rect x="2" y="2" width="12" height="12" rx="1.5" strokeDasharray="2 1.6" /><rect x="4.5" y="4.5" width="4" height="4" rx=".6" /><circle cx="10" cy="10" r="2" /></Icon>
+export const IconUngroup = (p: P) => <Icon {...p}><rect x="2.5" y="2.5" width="5" height="5" rx=".8" /><circle cx="11" cy="11" r="2.5" /><path d="M10 3h3v3M3 10v3h3" strokeDasharray="1.4 1.2" /></Icon>
+export const IconBreakApart = (p: P) => <Icon {...p}><path d="M2.5 4.5 5 2l2.5 2.5L5 7z" /><path d="M8.5 11.5 11 9l2.5 2.5L11 14z" /><path d="M7 9 9 7" strokeDasharray="1.2 1.2" /></Icon>
+export const IconToPath = (p: P) => <Icon {...p}><rect x="2.5" y="2.5" width="6" height="6" rx=".8" /><path d="M8.5 13.5c2.5 0 5-1 5-5" /><circle cx="8.5" cy="13.5" r="1.1" fill="currentColor" /><circle cx="13.5" cy="8.5" r="1.1" fill="currentColor" /></Icon>
+export const IconStrokeToPath = (p: P) => <Icon {...p}><path d="M3 12.5c2-6 8-6 10-9" /><path d="M3 9c2-4.5 6-5 8.5-7.5M5 14c2-4 6-5 8.5-7.5" strokeWidth="1" opacity=".6" /></Icon>

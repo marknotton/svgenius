@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react"
+import { CanvasBgContext, solidOf, type CanvasBg } from "./components/CanvasBackground"
 import { AdvancedToggle, AppBar, BrandBar } from "./components/AppBar"
 import { ConfigPanel } from "./components/ConfigPanel"
 import { ContextMenu, type MenuState } from "./components/ContextMenu"
@@ -539,7 +540,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     return () => { unlisten(); window.removeEventListener("keydown", onKey) }
   }, [])
 
-  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbPx" | "galleryPx" | "inspectorPx" | "listCompare" | "showDetails" | "backdrop" | "previewCss" | "previewCssEnabled" | "circleOverlay" | "circleClip">>) =>
+  const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbPx" | "galleryPx" | "inspectorPx" | "listCompare" | "showDetails" | "backdrop" | "checker" | "backdropColour" | "previewCss" | "previewCssEnabled" | "circleOverlay" | "circleClip">>) =>
     update((s) => ({ ...s, ...patch }))
 
   // ── Layout ──────────────────────────────────────────────────────────────────
@@ -585,6 +586,14 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     return () => clearTimeout(t)
   }, [wantedCss])
 
+  // One preview background for the list and the editor
+  const canvasBg = useMemo(() => ({
+    value: { tone: settings.backdrop, checker: settings.checker, colour: settings.backdropColour } as CanvasBg,
+    set: (bg: CanvasBg) => setViewPrefs({ backdrop: bg.tone, checker: bg.checker, backdropColour: bg.colour })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [settings.backdrop, settings.checker, settings.backdropColour])
+  const solid = solidOf(canvasBg.value)
+
   const viewControls = (
     <ViewControls
       size={settings.showDetails ? settings.thumbPx : settings.galleryPx}
@@ -594,8 +603,6 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         : { galleryPx: px < 0 ? PREVIEW_PX.gallery.default : px })}
       details={settings.showDetails}
       onDetails={() => setViewPrefs({ showDetails: !settings.showDetails })}
-      backdrop={settings.backdrop}
-      onBackdrop={(backdrop) => setViewPrefs({ backdrop })}
       circle={settings.circleOverlay}
       onCircle={() => setViewPrefs({ circleOverlay: !settings.circleOverlay })}
       clip={settings.circleClip}
@@ -631,7 +638,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   return (
     <PreviewCssContext.Provider value={appliedCss}>
     <RenderAnywayContext.Provider value={forceRender}>
-      <div className={`app${narrow ? " is-narrow" : ""}${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px`, "--drawer-h": `${drawerH}px` } as CSSProperties}>
+    <CanvasBgContext.Provider value={canvasBg}>
+      <div className={`app${narrow ? " is-narrow" : ""}${solid ? " no-checker" : ""}${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px`, "--drawer-h": `${drawerH}px`, "--canvas-solid": solid ?? undefined } as CSSProperties}>
         <AppBar />
         <div className="workspace">
           <main className="workspace__main">
@@ -792,6 +800,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         {dialogs.node}
         <Toasts toasts={toasts} dismiss={dismiss} />
       </div>
+    </CanvasBgContext.Provider>
     </RenderAnywayContext.Provider>
     </PreviewCssContext.Provider>
   )

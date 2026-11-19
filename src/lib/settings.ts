@@ -104,7 +104,9 @@ export function defaultLayout() {
     listCompare: false,
     showDetails: false,
     galleryPx: PREVIEW_PX.gallery.default,
-    backdrop: "light" as const
+    backdrop: "light" as const,
+    checker: true,
+    backdropColour: null
   }
 }
 
@@ -351,6 +353,8 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     showDetails: raw.showDetails === true,
     galleryPx: clampNum(raw.galleryPx, PREVIEW_PX.gallery.min, 4000, PREVIEW_PX.gallery.default),
     backdrop: raw.backdrop === "dark" ? "dark" : "light",
+    checker: raw.checker !== false,
+    backdropColour: typeof raw.backdropColour === "string" && /^#[0-9a-f]{6}$/i.test(raw.backdropColour) ? raw.backdropColour : null,
     theme: raw.theme === "light" || raw.theme === "dark" ? raw.theme : "system",
     advanced: raw.advanced === true,
     keepStructure: typeof raw.keepStructure === "boolean" ? raw.keepStructure : true,

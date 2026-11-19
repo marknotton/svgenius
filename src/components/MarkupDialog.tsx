@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { IconArrowHollow, IconArrowSolid, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
+import { IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
 import { Resizer } from "./Resizer"
 import { elementRanges, rangeAt } from "../lib/markupMap"
 import { moveElement, setAttr, setAttrs, translateAttrs, type DropPlace } from "../lib/markupEdit"
@@ -10,7 +10,7 @@ import { ContextMenu, type MenuItem, type MenuState } from "./ContextMenu"
 import { textFocus, useCommands } from "../lib/commands"
 import type { Backdrop, SvgItem } from "../lib/types"
 import { CodeEditor } from "./CodeEditor"
-import { CanvasBackground, solidOf, useCanvasBg } from "./CanvasBackground"
+import { CanvasBackground } from "./CanvasBackground"
 import { ArrangePanel } from "./ArrangePanel"
 import { InspectPreview, type ElementMove, type ElementTransform } from "./InspectPreview"
 import { LayersTree } from "./LayersTree"
@@ -59,6 +59,14 @@ function useEditorLayout() {
   return [layout, set] as const
 }
 
+/** Icons for the editor toolbar's actions; anything without one shows its name */
+const TOOLBAR_ICONS: Record<string, React.ReactNode> = {
+  duplicate: <IconDuplicate width={14} height={14} />, delete: <IconTrash width={14} height={14} />,
+  group: <IconGroup width={14} height={14} />, ungroup: <IconUngroup width={14} height={14} />,
+  breakApart: <IconBreakApart width={14} height={14} />, toPath: <IconToPath width={14} height={14} />,
+  strokeToPath: <IconStrokeToPath width={14} height={14} />
+}
+
 // ── Layer locks ───────────────────────────────────────────────────────────────
 // A lock remembers the element's opening tag (which can't change while it's
 // locked) and roughly where it was, so it survives edits that renumber things.
@@ -81,7 +89,6 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
   const selected = selection.length === 1 ? selection[0] : -1
   const setSelected = (i: number) => setSelection(i >= 0 ? [i] : [])
   const [menu, setMenu] = useState<MenuState | null>(null)
-  const [bg, setBg] = useCanvasBg(backdrop)
   const [locks, setLocks] = useState<LockRef[]>(() => LOCKS.get(item.id) ?? [])
   useEffect(() => { LOCKS.set(item.id, locks) }, [item.id, locks])
   // The VectorCraft note, until it's dismissed on this device
@@ -463,14 +470,14 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
                   {selection.length ? ` · ${selection.length} selected` : tool === "select" ? ": click, ⌘-click or drag a box" : ": click a path, then its points"}
                 </span>
                 {actions.filter((a) => a.toolbar).map((a) => (
-                  <button key={a.id} className="btn btn--secondary btn--sm" onClick={() => run(a)}
-                    title={`${a.hint ?? a.label}${a.shortcut ? ` (${a.shortcut})` : ""}`}>{a.label}</button>
+                  <button key={a.id} className={`btn btn--secondary btn--sm edit-toolbar__btn${a.danger ? " is-danger" : ""}`} onClick={() => run(a)} aria-label={a.label}
+                    title={`${a.label}${a.shortcut ? ` (${a.shortcut})` : ""}: ${a.hint ?? ""}`.replace(/: $/, "")}>{TOOLBAR_ICONS[a.id] ?? a.label}</button>
                 ))}
                 {note && <span className="edit-toolbar__note">{note}</span>}
               </>}
-              <CanvasBackground value={bg} onChange={setBg} />
+              <CanvasBackground />
             </div>
-            <InspectPreview markup={markup} backdrop={bg.tone} solid={solidOf(bg)} selection={selection} locked={ownLocked}
+            <InspectPreview markup={markup} backdrop={backdrop} selection={selection} locked={ownLocked}
               onPick={(i, add) => { (document.activeElement as HTMLElement | null)?.blur?.(); pick(i, add ? "add" : "only") }}
               onSelect={(found, add) => setSelection((s) => (add ? [...s, ...found.filter((i) => !s.includes(i))] : found))}
               onMoveBy={moveBy} onContextMenu={openMenu} readOnly={!editable}
