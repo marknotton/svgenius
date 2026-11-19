@@ -1,7 +1,8 @@
 import { elementRanges, type TagRange } from "./markupMap"
-import { convertToPath, duplicateElement, groupElements, moveElement, removeElement, ungroupElement } from "./markupEdit"
+import { breakApart, convertToPath, duplicateElement, groupElements, moveElement, removeElement, ungroupElement } from "./markupEdit"
 import { outlineStrokes } from "./outlineStroke"
 import { SHAPES } from "./pathData"
+import type { Command } from "./commands"
 
 // ── Things you can do to the selection in the editor ──────────────────────────
 // Each action says when it applies and what it does. The toolbar, the
@@ -30,7 +31,9 @@ export interface EditorAction {
   label: string
   /** Shown in menus and tooltips, e.g. "⌘G" */
   shortcut?: string
-  /** Matches the key press that runs it */
+  /** The menu / ⌘-shortcut command that runs it */
+  command?: Command
+  /** Plain key presses that run it (not ⌘ combinations, which are commands) */
   keys?: (e: KeyboardEvent) => boolean
   /** Menus and the toolbar are split into these groups */
   group: "edit" | "arrange" | "convert"
@@ -55,7 +58,7 @@ export const ACTIONS: EditorAction[] = [
   {
     id: "duplicate", label: "Duplicate", shortcut: "⌘D", group: "edit", toolbar: true,
     hint: "Copy the selection right after itself. Copied ids get a -2 suffix",
-    keys: (e) => mod(e) && !e.shiftKey && e.key.toLowerCase() === "d",
+    command: "duplicate",
     applies: (ctx) => picked(ctx).length > 0,
     run: (ctx) => {
       let markup = ctx.markup
@@ -86,7 +89,7 @@ export const ACTIONS: EditorAction[] = [
   {
     id: "group", label: "Group", shortcut: "⌘G", group: "arrange", toolbar: true,
     hint: "Wrap the selection in a <g>, where the first of them was",
-    keys: (e) => mod(e) && !e.shiftKey && e.key.toLowerCase() === "g",
+    command: "group",
     applies: (ctx) => picked(ctx).length > 0,
     run: (ctx) => {
       const out = groupElements(ctx.markup, picked(ctx).map((i) => ctx.ranges[i]))
@@ -96,7 +99,7 @@ export const ACTIONS: EditorAction[] = [
   {
     id: "ungroup", label: "Ungroup", shortcut: "⇧⌘G", group: "arrange", toolbar: true,
     hint: "Take the children out of the group. Its transform and paint move down onto them",
-    keys: (e) => mod(e) && e.shiftKey && e.key.toLowerCase() === "g",
+    command: "ungroup",
     applies: (ctx) => picked(ctx).some((i) => tag(ctx, i) === "g"),
     run: (ctx) => {
       const groups = picked(ctx).filter((i) => tag(ctx, i) === "g").sort((a, b) => b - a)
@@ -118,9 +121,37 @@ export const ACTIONS: EditorAction[] = [
     },
   },
   {
+    id: "breakApart", label: "Break apart", shortcut: "⇧⌘B", group: "arrange", toolbar: true, command: "breakApart",
+    hint: "Split a path that draws several shapes into one path per shape, in a group. Holes become shapes of their own",
+    applies: (ctx) => picked(ctx).some((i) => tag(ctx, i) === "path" && (ctx.elements[i].getAttribute("d")?.match(/[Mm]/g)?.length ?? 0) > 1),
+    run: (ctx) => {
+      let markup = ctx.markup
+      let made = 0
+      const targets = picked(ctx).filter((i) => tag(ctx, i) === "path").sort((a, b) => b - a)
+      const groupStarts: number[] = []
+      for (const i of targets) {
+        const out = breakApart(markup, elementRanges(markup)[i], ctx.elements[i])
+        if (!out) continue
+        const grown = out.markup.length - markup.length
+        for (let k = 0; k < groupStarts.length; k++) groupStarts[k] += grown
+        groupStarts.push(out.start)
+        markup = out.markup
+        made++
+      }
+      if (!made) return { error: "Nothing to break apart: each path draws a single shape" }
+      // Select the new parts, ready to move one by one
+      const ranges = elementRanges(markup)
+      const doc = new DOMParser().parseFromString(markup, "image/svg+xml")
+      const els = [doc.documentElement, ...doc.documentElement.querySelectorAll("*")]
+      const groups = groupStarts.map((s) => ranges.findIndex((x) => x.start === s))
+      const select = groups.flatMap((g) => [...(els[g]?.children ?? [])].map((c) => els.indexOf(c)).filter((k) => k > 0 && els[k].localName === "path"))
+      return { markup, select }
+    },
+  },
+  {
     id: "forward", label: "Bring forward", shortcut: "⌘]", group: "arrange",
     hint: "Paint it after the next element, so it sits on top",
-    keys: (e) => mod(e) && e.key === "]",
+    command: "forward",
     applies: (ctx) => picked(ctx).length === 1 && !!ctx.elements[picked(ctx)[0]]?.nextElementSibling,
     run: (ctx) => {
       const i = picked(ctx)[0]
@@ -132,7 +163,7 @@ export const ACTIONS: EditorAction[] = [
   {
     id: "backward", label: "Send backward", shortcut: "⌘[", group: "arrange",
     hint: "Paint it before the previous element, so it sits underneath",
-    keys: (e) => mod(e) && e.key === "[",
+    command: "backward",
     applies: (ctx) => picked(ctx).length === 1 && !!ctx.elements[picked(ctx)[0]]?.previousElementSibling,
     run: (ctx) => {
       const i = picked(ctx)[0]

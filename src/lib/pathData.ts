@@ -387,3 +387,20 @@ export function pointAt(geo: SegGeometry[], p: PointRef): Pt | undefined {
   const g = geo[p.seg]
   return g ? (p.kind === "end" ? g.to : p.kind === "c1" ? g.c1 : g.c2) : undefined
 }
+
+// ── Break apart ───────────────────────────────────────────────────────────────
+
+/** Each subpath on its own, starting with an absolute M. Keeps relative style */
+export function splitSubpaths(segs: Seg[]): Seg[][] {
+  const abs = absolutise(segs)
+  const out: Seg[][] = []
+  let cur: number[] = []
+  const flush = () => { if (cur.length) out.push(withCase(cur.map((i) => abs[i]), (k) => k > 0 && isRel(segs[cur[k]].c))) }
+  abs.forEach((s, i) => {
+    if (s.c === "M") { flush(); cur = [] }
+    cur.push(i)
+  })
+  flush()
+  // A subpath that's only a move draws nothing
+  return out.filter((p) => p.some((s) => s.c.toLowerCase() !== "m"))
+}

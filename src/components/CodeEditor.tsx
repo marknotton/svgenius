@@ -1,3 +1,4 @@
+import { setCodeEditorCommands } from "../lib/commands"
 import { useEffect, useRef, useState } from "react"
 import type { editor as MonacoEditor } from "monaco-editor/editor"
 
@@ -22,6 +23,17 @@ export function preloadMonaco() {
   if ("requestIdleCallback" in window) requestIdleCallback(go, { timeout: 4000 })
   else setTimeout(go, 1500)
 }
+
+// Menu commands (⌘Z, ⌘A from the desktop app's menu) for the focused editor
+const editors = new Set<MonacoEditor.IStandaloneCodeEditor>()
+setCodeEditorCommands((cmd) => {
+  const editor = [...editors].find((e) => e.hasTextFocus())
+  if (!editor) return false
+  const id = cmd === "undo" ? "undo" : cmd === "redo" ? "redo" : cmd === "selectAll" ? "editor.action.selectAll" : null
+  if (!id) return false
+  editor.trigger("menu", id, null)
+  return true
+})
 
 interface Props {
   value: string
@@ -80,11 +92,13 @@ export function CodeEditor({ value, onChange, readOnly, className, label, reveal
       })
       marks.current = editor.createDecorationsCollection()
       ed.current = editor
+      editors.add(editor)
       setReady(true)
     })
     return () => {
       disposed = true
       const model = ed.current?.getModel()
+      if (ed.current) editors.delete(ed.current)
       ed.current?.dispose()
       model?.dispose()
       ed.current = null

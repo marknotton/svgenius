@@ -1,5 +1,5 @@
 import type { TagRange } from "./markupMap"
-import { SHAPE_ATTRS, allAnchors, parsePath, serialisePath, shapeToPathData, shiftPoints, fmt } from "./pathData"
+import { SHAPE_ATTRS, allAnchors, parsePath, serialisePath, shapeToPathData, shiftPoints, splitSubpaths, fmt } from "./pathData"
 
 // ── Small surgical edits to markup ────────────────────────────────────────────
 // Everything outside the touched element stays byte for byte as it was.
@@ -232,4 +232,31 @@ function cutTag(markup: string, a: number, b: number) {
   while (t < markup.length && (markup[t] === " " || markup[t] === "\t")) t++
   if ((s === 0 || markup[s - 1] === "\n") && (markup[t] === "\n" || t >= markup.length)) return markup.slice(0, s) + markup.slice(Math.min(t + 1, markup.length))
   return markup.slice(0, a) + markup.slice(b)
+}
+
+/**
+ * Splits a path with several shapes in it into one path per shape, inside a
+ * <g> that takes the original's id. Each part keeps every other attribute.
+ */
+export function breakApart(markup: string, r: TagRange, el: Element) {
+  let parts
+  try { parts = splitSubpaths(parsePath(el.getAttribute("d") ?? "")) } catch { return null }
+  if (parts.length < 2) return null
+  const tag = markup.slice(r.start, r.tagEnd)
+  const id = el.getAttribute("id")
+  const kids = markup.slice(r.tagEnd, r.end).replace(/<\/path\s*>$/, "")
+  const own = lineStarted(markup, r.start)
+  const indent = indentAt(markup, r.start)
+  const pieces = parts.map((p) => {
+    let t = tagWithAttrs(tag, { d: serialisePath(p), id: null })
+    if (!t.endsWith("/>")) t = t.replace(/>$/, "/>")
+    return t
+  })
+  const open = id ? `<g id="${escapeAttr(id)}">` : "<g>"
+  // Anything that was inside the path (a <title>, say) goes on the group
+  const inner = [kids.trim(), ...pieces].filter(Boolean)
+  const group = own
+    ? `${open}\n${inner.map((t) => `${indent}  ${t}`).join("\n")}\n${indent}</g>`
+    : `${open}${inner.join("")}</g>`
+  return { markup: markup.slice(0, r.start) + group + markup.slice(r.end), start: r.start, parts: parts.length }
 }

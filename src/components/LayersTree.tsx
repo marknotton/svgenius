@@ -15,7 +15,9 @@ interface Props {
   selection: number[]
   hover: number
   /** add: Cmd/Ctrl-click toggles, range: Shift-click extends */
-  onPick: (index: number, mode: "only" | "add" | "range") => void
+  onPick: (index: number, mode: "only" | "add") => void
+  /** Shift-click: everything shown between the last click and this one */
+  onSelectSet: (indices: number[]) => void
   onMenu?: (index: number, e: React.MouseEvent) => void
   onHover: (index: number) => void
   /** The rest only in the editable markup */
@@ -36,7 +38,7 @@ function describe(el: Element) {
   return { label: el.localName, detail }
 }
 
-export function LayersTree({ elements, selection, hover, onPick, onMenu, onHover, onDelete, onMove }: Props) {
+export function LayersTree({ elements, selection, hover, onPick, onSelectSet, onMenu, onHover, onDelete, onMove }: Props) {
   const selected = selection.length ? selection[selection.length - 1] : -1
   const chosen = useMemo(() => new Set(selection), [selection])
   const nodes = useMemo(() => {
@@ -108,11 +110,29 @@ export function LayersTree({ elements, selection, hover, onPick, onMenu, onHover
     return true
   }
 
+  // Finder rules: click selects, ⌘-click toggles, Shift-click selects the
+  // rows shown between the last click and this one (⌘⇧ adds them)
+  const anchor = useRef(-1)
+  const click = (i: number, e: { shiftKey: boolean, metaKey: boolean, ctrlKey: boolean }) => {
+    const toggle = e.metaKey || e.ctrlKey
+    if (e.shiftKey && anchor.current >= 0) {
+      const a = visible.findIndex((n) => n.i === anchor.current), b = visible.findIndex((n) => n.i === i)
+      if (a >= 0 && b >= 0) {
+        const span = visible.slice(Math.min(a, b), Math.max(a, b) + 1).map((n) => n.i).filter((k) => k > 0)
+        const rest = toggle ? selection.filter((k) => !span.includes(k)) : []
+        onSelectSet([...rest, ...span.filter((k) => k !== i), i])
+        return
+      }
+    }
+    anchor.current = i
+    onPick(i, toggle ? "add" : "only")
+  }
+
   const onKey = (e: React.KeyboardEvent) => {
     if (selected < 0) return
     const at = visible.findIndex((n) => n.i === selected)
-    if (e.key === "ArrowDown" && at < visible.length - 1) { e.preventDefault(); e.stopPropagation(); onPick(visible[at + 1].i, e.shiftKey ? "range" : "only") }
-    else if (e.key === "ArrowUp" && at > 0) { e.preventDefault(); e.stopPropagation(); onPick(visible[at - 1].i, e.shiftKey ? "range" : "only") }
+    if (e.key === "ArrowDown" && at < visible.length - 1) { e.preventDefault(); e.stopPropagation(); click(visible[at + 1].i, { shiftKey: e.shiftKey, metaKey: false, ctrlKey: false }) }
+    else if (e.key === "ArrowUp" && at > 0) { e.preventDefault(); e.stopPropagation(); click(visible[at - 1].i, { shiftKey: e.shiftKey, metaKey: false, ctrlKey: false }) }
     else if (e.key === "ArrowLeft" && nodes[selected].kids && !collapsed.has(selected)) { e.preventDefault(); toggle(selected) }
     else if (e.key === "ArrowRight" && collapsed.has(selected)) { e.preventDefault(); toggle(selected) }
   }
@@ -138,7 +158,8 @@ export function LayersTree({ elements, selection, hover, onPick, onMenu, onHover
           onDragEnd={() => setDrag(null)}
           onContextMenu={(e) => { e.preventDefault(); onMenu?.(n.i, e) }}
           onMouseEnter={() => onHover(n.i)}
-          onClick={(e) => onPick(n.i, e.shiftKey ? "range" : e.metaKey || e.ctrlKey ? "add" : "only")}>
+          onMouseDown={(e) => { if (e.shiftKey) e.preventDefault() }}
+          onClick={(e) => click(n.i, e)}>
           {n.kids > 0
             ? <button className={`layer__caret${collapsed.has(n.i) ? "" : " is-open"}`} tabIndex={-1} aria-label={collapsed.has(n.i) ? "Expand" : "Collapse"}
                 onClick={(e) => { e.stopPropagation(); toggle(n.i) }}><IconCaret /></button>

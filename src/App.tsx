@@ -33,6 +33,7 @@ import { RenderAnywayContext } from "./components/TooComplex"
 import { isBlocked } from "./lib/complexity"
 import { checkPreviewCss, type CssWarning } from "./lib/cssCheck"
 import { useTheme } from "./lib/theme"
+import { listenForCommands, textFocus, useCommands } from "./lib/commands"
 import { useFileWatch } from "./hooks/useFileWatch"
 import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "./lib/types"
 
@@ -215,6 +216,14 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const filtered = useMemo(() => (filterCount ? items.filter((i) => matchesFilters(i, filters)) : items), [items, filters, filterCount])
 
   const selectAll = (all: boolean) => setSelection(all ? new Set(shownItems.map((i) => i.id)) : new Set())
+
+  // Menu and keyboard commands; ⌘A on the list selects every file
+  useEffect(() => listenForCommands(), [])
+  useCommands((cmd) => {
+    if (cmd !== "selectAll" || textFocus() || document.querySelector(".modal")) return false
+    selectAll(true)
+    return true
+  })
 
   // Selected files, or else every file the filters let through
   const targets = useMemo(() => (selection.size ? items.filter((i) => selection.has(i.id)) : filtered), [items, selection, filtered])

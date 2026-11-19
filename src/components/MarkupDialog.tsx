@@ -5,6 +5,7 @@ import { moveElement, setAttr, setAttrs, translateAttrs, type DropPlace } from "
 import { parsePath, serialisePath, type Seg } from "../lib/pathData"
 import { ACTIONS, topLevel, type ActionContext, type EditorAction } from "../lib/editorActions"
 import { ContextMenu, type MenuItem, type MenuState } from "./ContextMenu"
+import { textFocus, useCommands } from "../lib/commands"
 import type { Backdrop, SvgItem } from "../lib/types"
 import { CodeEditor } from "./CodeEditor"
 import { InspectPreview, type ElementMove } from "./InspectPreview"
@@ -114,21 +115,6 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
   }
   const travelRef = useRef(travel)
   travelRef.current = travel
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.altKey) return
-      const k = e.key.toLowerCase()
-      const undo = k === "z" && !e.shiftKey
-      const redo = (k === "z" && e.shiftKey) || k === "y"
-      if (!undo && !redo) return
-      // Before Monaco or a field gets it, so there's only one history
-      e.preventDefault()
-      e.stopPropagation()
-      travelRef.current(undo)
-    }
-    window.addEventListener("keydown", key, true)
-    return () => window.removeEventListener("keydown", key, true)
-  }, [])
   const canUndo = hist.current.past.length > 0, canRedo = hist.current.future.length > 0
 
   const elements = useMemo(() => parseElements(markup), [markup])
@@ -198,21 +184,33 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
   const moveRef = useRef(moveBy)
   moveRef.current = moveBy
 
-  // Shortcuts for the actions, arrow keys to nudge, ⌘A to select every shape
+  // ⌘-shortcuts arrive as commands (the desktop menu sends them, the browser
+  // turns key presses into them). One undo history here, even in Monaco
+  useCommands((cmd) => {
+    if (cmd === "undo" || cmd === "redo") { travelRef.current(cmd === "undo"); return true }
+    const focus = textFocus()
+    if (focus) return false
+    const c = runRef.current.ctx()
+    if (!c) return false
+    if (cmd === "selectAll") {
+      setSelection(c.elements.map((el, i) => (i > 0 && /^(path|rect|circle|ellipse|line|polyline|polygon|text|image|use)$/.test(el.localName) && !el.closest("defs, clipPath, mask, symbol, marker, pattern") ? i : -1)).filter((i) => i > 0))
+      return true
+    }
+    const action = ACTIONS.find((a) => a.command === cmd)
+    if (action && action.applies(c)) runRef.current.run(action, c)
+    // Taken either way, so ⌘D doesn't fall through to Monaco or the page
+    return true
+  })
+
+  // Plain keys: arrows nudge, Delete removes
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.defaultPrevented) return
-      const t = e.target as HTMLElement | null
-      if (t?.closest?.("input, textarea, select, .monaco-editor, [contenteditable=true]")) return
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey) return
+      if (textFocus()) return
       const c = runRef.current.ctx()
       if (!c) return
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
-        e.preventDefault()
-        setSelection(c.elements.map((el, i) => (i > 0 && /^(path|rect|circle|ellipse|line|polyline|polygon|text|image|use)$/.test(el.localName) && !el.closest("defs, clipPath, mask, symbol, marker, pattern") ? i : -1)).filter((i) => i > 0))
-        return
-      }
       const dir: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
-      if (dir[e.key] && c.selection.length && !e.metaKey && !e.ctrlKey) {
+      if (dir[e.key] && c.selection.length) {
         e.preventDefault()
         const step = e.shiftKey ? 10 : e.altKey ? 0.1 : 1
         moveRef.current(c.selection.map((index) => ({ index, dx: dir[e.key][0] * step, dy: dir[e.key][1] * step })))
@@ -308,7 +306,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
             <div className="panel__label">Layers</div>
             {elements
               ? <LayersTree elements={elements} selection={selection} hover={hover}
-                  onPick={pick} onHover={setHover} onMenu={openMenu}
+                  onPick={pick} onSelectSet={(list) => { setSelection(list); const r = ranges[list[list.length - 1]]; if (r) setReveal((x) => ({ start: r.start, end: r.end, n: (x?.n ?? 0) + 1, focus: false })) }}
+                  onHover={setHover} onMenu={openMenu}
                   onDelete={editable ? (i) => { const d = ACTIONS.find((a) => a.id === "delete"); const c = elements && { markup, ranges, elements, selection: [i] }; if (d && c) run(d, c) } : undefined}
                   onMove={editable ? move : undefined} />
               : <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
@@ -334,14 +333,6 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               path={segs ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath } : null} />
           </div>
           <div className="markup-dialog__side">
-            {segs && <PathPanel segs={segs} readOnly={!editable} active={active} onActive={setActive} onChange={writePath} />}
-            {path && "error" in path && <p className="rule__error">This path's data doesn't parse: {path.error}</p>}
-            {el && ["rect", "circle", "ellipse", "line", "polyline", "polygon"].includes(el.localName) && (
-              <div className="path-panel path-panel--shape">
-                <span className="text-2">This is a <code>&lt;{el.localName}&gt;</code>. Convert it to a path to edit its points.</span>
-                {!editable && <span className="text-3">Switch to Before to convert it.</span>}
-              </div>
-            )}
             <CodeEditor
               key={tab}
               className="markup-dialog__code"
@@ -351,8 +342,29 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               onChange={tab === "source" ? onEdit : undefined}
               reveal={reveal}
               mark={markRange ? { start: markRange.start, end: markRange.end } : null}
-              onCursor={(offset) => setSelected(rangeAt(ranges, offset))}
+              onCursor={(offset) => {
+                // Follow the cursor into an element, but clicking between
+                // elements leaves the selection (and the path tools) alone
+                const i = rangeAt(ranges, offset)
+                if (i > 0 && !selRef.current.includes(i)) setSelected(i)
+              }}
             />
+            {/* Always here, the same height, so selecting things doesn't shuffle the code around */}
+            <div className="markup-dialog__tools">
+              {segs && <PathPanel segs={segs} readOnly={!editable} active={active} onActive={setActive} onChange={writePath} />}
+              {path && "error" in path && <p className="rule__error">This path's data doesn't parse: {path.error}</p>}
+              {el && ["rect", "circle", "ellipse", "line", "polyline", "polygon"].includes(el.localName) && (
+              <div className="path-panel path-panel--shape">
+                <span className="text-2">This is a <code>&lt;{el.localName}&gt;</code>. Convert it to a path to edit its points.</span>
+                  {!editable && <span className="text-3">Switch to Before to convert it.</span>}
+              </div>
+            )}
+              {!segs && !(path && "error" in path) && !(el && ["rect", "circle", "ellipse", "line", "polyline", "polygon"].includes(el.localName)) && (
+                <p className="text-3 markup-dialog__tools-empty">
+                  {selection.length > 1 ? `${selection.length} elements selected. Path tools show when one path is selected.` : "Select a path to see its commands and edit its points here."}
+                </p>
+              )}
+            </div>
           </div>
         </div>
         {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}

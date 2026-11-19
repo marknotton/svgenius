@@ -11,6 +11,17 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.7.1",
+    date: "19 November 2026",
+    notes: [
+      "⌘-shortcuts work in the desktop app: they now go through the app's menus, with a new Object menu for the editor's tools",
+      "⌘A selects every file in the list, or every shape in the editor",
+      "Layers select like Finder: Shift-click for a range, ⌘-click to add or remove one",
+      "Break apart (⇧⌘B) splits a path that draws several shapes into one path per shape, in a group",
+      "Path tools sit under the code at a fixed height, and clicking in the code no longer drops the selection"
+    ]
+  },
+  {
     version: "0.7.0",
     date: "18 November 2026",
     notes: [

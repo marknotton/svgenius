@@ -310,15 +310,32 @@ fn build_menu(app: &App) -> tauri::Result<()> {
         .quit()
         .build()?;
 
-    // Without an Edit menu, copy/paste shortcuts don't work in inputs on macOS
+    // Without an Edit menu, copy/paste shortcuts don't work in inputs on macOS.
+    // Undo, redo, select all and the editor's tools are our own items: on
+    // macOS the menu gets ⌘-shortcuts before the page does, so they're sent to
+    // the page as commands, which hands them to the text field or the editor
+    let cmd = |id: &str, label: &str, keys: &str| {
+        MenuItemBuilder::with_id(format!("cmd:{id}"), label).accelerator(keys).build(app)
+    };
     let edit_menu = SubmenuBuilder::new(app, "Edit")
-        .undo()
-        .redo()
+        .item(&cmd("undo", "Undo", "CmdOrCtrl+Z")?)
+        .item(&cmd("redo", "Redo", "CmdOrCtrl+Shift+Z")?)
         .separator()
         .cut()
         .copy()
         .paste()
-        .select_all()
+        .item(&cmd("selectAll", "Select All", "CmdOrCtrl+A")?)
+        .build()?;
+
+    let object_menu = SubmenuBuilder::new(app, "Object")
+        .item(&cmd("duplicate", "Duplicate", "CmdOrCtrl+D")?)
+        .separator()
+        .item(&cmd("group", "Group", "CmdOrCtrl+G")?)
+        .item(&cmd("ungroup", "Ungroup", "CmdOrCtrl+Shift+G")?)
+        .item(&cmd("breakApart", "Break Apart", "CmdOrCtrl+Shift+B")?)
+        .separator()
+        .item(&cmd("forward", "Bring Forward", "CmdOrCtrl+]")?)
+        .item(&cmd("backward", "Send Backward", "CmdOrCtrl+[")?)
         .build()?;
 
     let window_menu = SubmenuBuilder::new(app, "Window")
@@ -329,7 +346,7 @@ fn build_menu(app: &App) -> tauri::Result<()> {
         .build()?;
 
     let menu = MenuBuilder::new(app)
-        .items(&[&app_menu, &edit_menu, &window_menu])
+        .items(&[&app_menu, &edit_menu, &object_menu, &window_menu])
         .build()?;
     app.set_menu(menu)?;
 
@@ -337,6 +354,7 @@ fn build_menu(app: &App) -> tauri::Result<()> {
         match event.id().as_ref() {
             "reset-layout" => { let _ = app.emit("menu:reset-layout", ()); }
             "settings" => { let _ = app.emit("menu:settings", ()); }
+            id if id.starts_with("cmd:") => { let _ = app.emit("menu:command", id.trim_start_matches("cmd:").to_string()); }
             _ => {}
         }
     });
