@@ -22,7 +22,7 @@ export function EditViewBox({ trim, onChange }: Props) {
         <button className="link" disabled={pristine} title="Size back to 1×, trim off"
           onClick={() => onChange({ enabled: false, padding: 0, scale: 1, sizeUnit: "%" })}>Reset</button>
       </div>
-      <p className="rules__empty text-3">The SVG itself: its width, height and viewBox. New sizes flash on the rows.</p>
+      <p className="rules__empty text-3">Changes the SVG's canvas (its width, height and viewBox), not the artwork. Previews scale to fit, so the artwork may look no different. The new size shows in each file's dimensions.</p>
       {trim.sizeUnit === "%" ? (
         <SliderField label="Size" value={+(trim.scale * 100).toFixed(4)} min={10} max={400} step={5} suffix="%" accept={(n) => isScale(n / 100)}
           hint="Scales the width and height. The viewBox doesn't change, so the artwork grows with it. Click the number to type any value."
