@@ -47,16 +47,18 @@ interface Props {
   mark?: { start: number, end: number } | null
   /** Fires when the cursor moves by the user's hand */
   onCursor?: (offset: number) => void
+  /** A plain click: return a range to select instead (e.g. a whole element when its tag name is clicked) */
+  selectOnClick?: (offset: number) => { start: number, end: number } | null
 }
 
-export function CodeEditor({ value, onChange, readOnly, className, label, reveal, mark, onCursor }: Props) {
+export function CodeEditor({ value, onChange, readOnly, className, label, reveal, mark, onCursor, selectOnClick }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const ed = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null)
   const monacoRef = useRef<Monaco | null>(null)
   const marks = useRef<MonacoEditor.IEditorDecorationsCollection | null>(null)
   const [ready, setReady] = useState(false)
-  const latest = useRef({ onChange, onCursor, value })
-  latest.current = { onChange, onCursor, value }
+  const latest = useRef({ onChange, onCursor, value, selectOnClick })
+  latest.current = { onChange, onCursor, value, selectOnClick }
   const applying = useRef(false)
 
   useEffect(() => {
@@ -84,6 +86,15 @@ export function CodeEditor({ value, onChange, readOnly, className, label, reveal
       editor.onDidChangeModelContent(() => {
         if (applying.current) return
         latest.current.onChange?.(editor.getValue())
+      })
+      // After the click has landed, so Monaco's own drag-select doesn't undo it
+      editor.onMouseUp((e) => {
+        const model = editor.getModel(), sel = editor.getSelection(), pos = e.target.position
+        if (!model || !sel || !pos || !sel.isEmpty() || e.event.shiftKey || e.event.detail > 1) return
+        const r = latest.current.selectOnClick?.(model.getOffsetAt(pos))
+        if (!r) return
+        const a = model.getPositionAt(r.start), b = model.getPositionAt(r.end)
+        editor.setSelection(new monaco.Range(a.lineNumber, a.column, b.lineNumber, b.column))
       })
       editor.onDidChangeCursorPosition((e) => {
         if (e.source !== "mouse" && e.source !== "keyboard") return

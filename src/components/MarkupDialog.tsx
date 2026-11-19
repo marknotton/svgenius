@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
+import { IconArrowHollow, IconArrowSolid, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
 import { Resizer } from "./Resizer"
 import { elementRanges, rangeAt } from "../lib/markupMap"
 import { moveElement, setAttr, setAttrs, translateAttrs, type DropPlace } from "../lib/markupEdit"
-import { parsePath, serialisePath, type Seg } from "../lib/pathData"
+import { parsePath, serialisePath, type PointRef, type Seg } from "../lib/pathData"
+import { addPointAfter, convertPoints, deletePoints, SEG_TYPES, setPointsCase, toggleCorner, transformPath } from "../lib/pathPoints"
 import { ACTIONS, topLevel, type ActionContext, type EditorAction } from "../lib/editorActions"
 import { ContextMenu, type MenuItem, type MenuState } from "./ContextMenu"
 import { textFocus, useCommands } from "../lib/commands"
 import type { Backdrop, SvgItem } from "../lib/types"
 import { CodeEditor } from "./CodeEditor"
-import { InspectPreview, type ElementMove } from "./InspectPreview"
+import { InspectPreview, type ElementMove, type ElementTransform } from "./InspectPreview"
 import { LayersTree } from "./LayersTree"
 import vectorcraftIcon from "../assets/vectorcraft.png"
 import { PathPanel } from "./PathPanel"
@@ -71,6 +72,14 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
   const selected = selection.length === 1 ? selection[0] : -1
   const setSelected = (i: number) => setSelection(i >= 0 ? [i] : [])
   const [menu, setMenu] = useState<MenuState | null>(null)
+  // Select (black arrow) works on whole elements, Direct select (white arrow) on a path's points
+  const [tool, setToolState] = useState<"select" | "direct">(() => {
+    try { return localStorage.getItem("svgenius:tool") === "select" ? "select" : "direct" } catch { return "direct" }
+  })
+  const setTool = useCallback((t: "select" | "direct") => {
+    setToolState(t)
+    try { localStorage.setItem("svgenius:tool", t) } catch { /* unavailable */ }
+  }, [])
   const [note, setNote] = useState("")
   useEffect(() => { if (!note) return; const t = setTimeout(() => setNote(""), 5000); return () => clearTimeout(t) }, [note])
   const [hover, setHover] = useState(-1)
@@ -207,6 +216,51 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     }
     commit(next)
   }
+  // Scale and rotate from the transform box. A plain path takes it into its
+  // own points; anything else gets a matrix in front of its transform
+  const transformBy = (changes: ElementTransform[]) => {
+    if (!elements || !editable) return
+    const n6 = (x: number) => String(Math.round(x * 1e6) / 1e6)
+    let next = markup
+    for (const c of [...changes].sort((a, b) => b.index - a.index)) {
+      const r = elementRanges(next)[c.index], el = elements[c.index]
+      if (!r || !el || c.index === 0) continue
+      const tf = el.getAttribute("transform")
+      if (el.localName === "path" && !tf) {
+        try {
+          const baked = transformPath(parsePath(el.getAttribute("d") ?? ""), c.m)
+          if (baked) { next = setAttr(next, r, "d", serialisePath(baked)); continue }
+        } catch { /* falls through to a transform */ }
+      }
+      const m = c.m
+      next = setAttr(next, r, "transform", `matrix(${[m.a, m.b, m.c, m.d, m.e, m.f].map(n6).join(" ")})${tf ? ` ${tf.trim()}` : ""}`)
+    }
+    commit(next)
+  }
+
+  // Right-click on points: change their type, add or remove points
+  const pointMenu = (points: PointRef[], e: React.MouseEvent) => {
+    if (!segs || !editable) return
+    const n = points.length
+    const what = n > 1 ? `${n} points` : "point"
+    const run = (f: (s: Seg[]) => Seg[]) => () => writePath(f(segs))
+    const curved = points.some((p) => /[CcSsQqTt]/.test(segs[p.seg]?.c ?? "") || /[CcSsQqTt]/.test(segs[p.seg + 1]?.c ?? ""))
+    const allRel = points.every((p) => segs[p.seg] && segs[p.seg].c >= "a")
+    setMenu({
+      x: e.clientX, y: e.clientY,
+      items: [
+        { label: `${curved ? "Make corner" : "Make smooth"} (⌥-click)`, run: run((s) => toggleCorner(s, points)) },
+        "-",
+        ...SEG_TYPES.filter((t) => t.type !== "T").map((t) => ({ label: `Convert ${what} to ${t.label.toLowerCase()} (${t.type})`, run: run((s) => convertPoints(s, points, t.type)) })),
+        "-",
+        { label: "Add a point after this one", run: run((s) => addPointAfter(s, Math.max(...points.map((p) => p.seg)))), disabled: n > 1 },
+        { label: allRel ? `Make ${what} absolute` : `Make ${what} relative`, run: run((s) => setPointsCase(s, points, !allRel)) },
+        "-",
+        { label: `Delete ${what}`, danger: true, run: run((s) => deletePoints(s, points)) }
+      ]
+    })
+  }
+
   const moveRef = useRef(moveBy)
   moveRef.current = moveBy
 
@@ -233,6 +287,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     const key = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.metaKey || e.ctrlKey) return
       if (textFocus()) return
+      // V and A pick the tools, like most vector apps
+      if (!e.altKey && (e.key === "v" || e.key === "a")) { e.preventDefault(); setTool(e.key === "v" ? "select" : "direct"); return }
       const c = runRef.current.ctx()
       if (!c) return
       const dir: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
@@ -311,7 +367,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
         <div className="markup-dialog__head">
           <h2 className="modal__title markup-dialog__title" title={item.relPath}>{item.name}</h2>
           <CodeTabs value={tab} onChange={onTab} />
-          <span className="text-3 markup-dialog__tip">Click a shape or a layer to select it{editable ? ". Drag a path's points to reshape it" : ""}</span>
+          <span className="text-3 markup-dialog__tip">Select (V) moves, scales and rotates. Direct select (A) edits a path's points</span>
           {/* Unaffiliated pointer to a free, fuller vector editor: this one tidies markup, it isn't an art tool */}
           <a className="markup-dialog__nod" href="https://getartcraft.com/apps/vectorcraft" target="_blank" rel="noopener"
             title="This is a basic markup editor, not an art tool. VectorCraft is a free, fuller vector editor (we're not affiliated)">
@@ -354,8 +410,14 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
           <div className="markup-dialog__canvas">
             {editable && (
               <div className="edit-toolbar">
+                <div className="btn-join tool-switch" role="group" aria-label="Tool">
+                  <button className={`btn btn--secondary btn--sm${tool === "select" ? " is-on" : ""}`} aria-pressed={tool === "select"} onClick={() => setTool("select")}
+                    title="Select (V): pick whole elements, then drag to move, or use the box's handles to scale and rotate"><IconArrowSolid width={13} height={13} /></button>
+                  <button className={`btn btn--secondary btn--sm${tool === "direct" ? " is-on" : ""}`} aria-pressed={tool === "direct"} onClick={() => setTool("direct")}
+                    title="Direct select (A): edit a path's points. Drag a box to pick several, right-click a point for more"><IconArrowHollow width={13} height={13} /></button>
+                </div>
                 <span className="text-3 edit-toolbar__count">
-                  {selection.length ? `${selection.length} selected` : "Click, ⌘-click or drag a box to select"}
+                  {selection.length ? `${selection.length} selected` : tool === "select" ? "Click, ⌘-click or drag a box to select" : "Click a path to edit its points"}
                 </span>
                 {actions.filter((a) => a.toolbar).map((a) => (
                   <button key={a.id} className="btn btn--secondary btn--sm" onClick={() => run(a)}
@@ -369,7 +431,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               onSelect={(found, add) => setSelection((s) => (add ? [...s, ...found.filter((i) => !s.includes(i))] : found))}
               onMoveBy={moveBy} onContextMenu={openMenu} readOnly={!editable}
               onHover={setHover} hover={hover}
-              path={segs ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath } : null} />
+              onTransform={tool === "select" && editable ? transformBy : undefined}
+              path={segs && tool === "direct" ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath, onPointMenu: pointMenu } : null} />
           </div>
           <div className="markup-dialog__side">
             {layout.bottom
@@ -386,6 +449,16 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               onChange={tab === "source" ? onEdit : undefined}
               reveal={reveal}
               mark={markRange ? { start: markRange.start, end: markRange.end } : null}
+              selectOnClick={(offset) => {
+                // Clicking an element's tag name (<path, </g>) selects all of it, ready to delete or cut
+                const i = rangeAt(ranges, offset), r = ranges[i]
+                if (!r || i <= 0) return null
+                const name = markup.slice(r.start + 1).match(/^[\w:.-]+/)?.[0] ?? ""
+                const onOpen = offset >= r.start && offset <= r.start + 1 + name.length
+                const close = markup.lastIndexOf("</", r.end)
+                const onClose = close > r.tagEnd && offset >= close && offset <= r.end
+                return onOpen || onClose ? { start: r.start, end: r.end } : null
+              }}
               onCursor={(offset) => {
                 // Follow the cursor into an element, but clicking between
                 // elements leaves the selection (and the path tools) alone

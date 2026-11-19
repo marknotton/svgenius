@@ -11,6 +11,17 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.9.0",
+    date: "19 November 2026",
+    notes: [
+      "Two tools in the editor, like a vector app: Select (V) for whole elements and Direct select (A) for a path's points",
+      "Select puts a box round the selection: drag its handles to scale (Shift keeps proportions, Alt scales from the centre) or the knob on top to rotate (Shift snaps to 15°). Plain paths take the change into their points, everything else gets a transform",
+      "Right-click a point (or several) to convert it to a line, curve, quadratic and more, add a point after it, switch it between absolute and relative, or delete it",
+      "Alt- or ⌘-click a point to flip it between corner and smooth, and Delete removes selected points rather than the whole path",
+      "Clicking an element's tag name in the code selects the whole element, ready to delete or cut"
+    ]
+  },
+  {
     version: "0.8.0",
     date: "19 November 2026",
     notes: [

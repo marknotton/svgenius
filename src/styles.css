@@ -1143,3 +1143,21 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
   .brand__name .brand__label, .brand__link .brand__label { display: inline; }
   .brand .btn--icon { margin-left: auto; }
 }
+
+/* ── Transform box (Select tool): scale handles and a rotate knob ── */
+.xf { position: absolute; border: 1px solid var(--accent); pointer-events: none; z-index: 2; }
+.xf__h { position: absolute; width: 9px; height: 9px; margin: -5px 0 0 -5px; background: #fff; border: 1px solid var(--accent); border-radius: 2px; pointer-events: auto; touch-action: none; }
+.xf__h--nw { left: 0; top: 0; cursor: nwse-resize; }
+.xf__h--n { left: 50%; top: 0; cursor: ns-resize; }
+.xf__h--ne { left: 100%; top: 0; cursor: nesw-resize; }
+.xf__h--e { left: 100%; top: 50%; cursor: ew-resize; }
+.xf__h--se { left: 100%; top: 100%; cursor: nwse-resize; }
+.xf__h--s { left: 50%; top: 100%; cursor: ns-resize; }
+.xf__h--sw { left: 0; top: 100%; cursor: nesw-resize; }
+.xf__h--w { left: 0; top: 50%; cursor: ew-resize; }
+.xf__rot { position: absolute; left: 50%; top: -26px; width: 11px; height: 11px; margin-left: -6px; border-radius: 50%; background: var(--accent); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--accent); pointer-events: auto; touch-action: none; cursor: grab; }
+.xf__rot::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 14px; background: var(--accent); transform: translateX(-50%); }
+.xf.is-dragging .xf__rot { cursor: grabbing; }
+/* Tools: Select (whole objects) and Direct select (points) */
+.tool-switch .btn { padding-inline: 6px; }
+.tool-switch .btn.is-on { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }

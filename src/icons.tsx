@@ -57,3 +57,6 @@ export const IconRedo = (p: P) => <Icon {...p}><path d="m10.5 3 3 3-3 3M13.5 6h-
 // Editor layout: code panel on the right, or along the bottom
 export const IconPanelRight = (p: P) => <Icon {...p}><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M10 2.5v11" /></Icon>
 export const IconPanelBottom = (p: P) => <Icon {...p}><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M2 9.5h12" /></Icon>
+// Select tools: a solid arrow picks whole objects, a hollow one picks points
+export const IconArrowSolid = (p: P) => <Icon {...p}><path d="M4 2.5v10.5l3-3 2 4.5 1.8-.8-2-4.4H13z" fill="currentColor" /></Icon>
+export const IconArrowHollow = (p: P) => <Icon {...p}><path d="M4 2.5v10.5l3-3 2 4.5 1.8-.8-2-4.4H13z" /></Icon>
