@@ -11,6 +11,13 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.11.1",
+    date: "19 November 2026",
+    notes: [
+      "The app icon sits on the brand accent, #E1AB59, with only a hint of gradient. Every size, the web icons and the in-app logo match"
+    ]
+  },
+  {
     version: "0.11.0",
     date: "19 November 2026",
     notes: [
