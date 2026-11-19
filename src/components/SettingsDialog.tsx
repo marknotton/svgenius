@@ -36,10 +36,8 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
         </div>
 
         <section className="settings__section">
-          <div className="plugins__head">
-            <span className="panel__label">Presets</span>
-            <span className="text-3">Drag to reorder. The star marks the default</span>
-          </div>
+          <h3 className="settings__title">Presets</h3>
+          <p className="settings__desc text-3">Drag to reorder. The star marks the default.</p>
           <ul className="preset-list">
             {settings.presets.map((preset) => {
               const isDefault = preset.id === settings.defaultPresetId
@@ -81,7 +79,8 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
         </section>
 
         <section className="settings__section">
-          <div className="panel__label">Working</div>
+          <h3 className="settings__title">Working</h3>
+          <p className="settings__desc text-3">How files are run and exported.</p>
           <Toggle label="Live updates" hint="Re-run the files on screen as you change settings"
             checked={settings.liveUpdates} onChange={(v) => set("liveUpdates", v)} />
           <Toggle label="Keep folder structure on export" hint="Recreate sub-folders inside the export folder"
@@ -89,7 +88,8 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
         </section>
 
         <section className="settings__section">
-          <div className="panel__label">Appearance</div>
+          <h3 className="settings__title">Appearance</h3>
+          <p className="settings__desc text-3">What the app shows you.</p>
           <Toggle label="Advanced options" hint="Show every option: viewBox and contents editing, rules, all SVGO plugins, filters, import and export, and Beta tools"
             checked={settings.advanced} onChange={(v) => set("advanced", v)} />
           <div className="field-row">
@@ -100,7 +100,8 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
         </section>
 
         <section className="settings__section">
-          <div className="panel__label">Previews</div>
+          <h3 className="settings__title">Previews</h3>
+          <p className="settings__desc text-3">How the before and after previews look.</p>
           <div className="field-row">
             <span>Background</span>
             <Segmented<Backdrop> label="Preview background" value={settings.backdrop} onChange={(v) => set("backdrop", v)}

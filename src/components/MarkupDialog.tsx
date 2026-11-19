@@ -10,6 +10,7 @@ import { ContextMenu, type MenuItem, type MenuState } from "./ContextMenu"
 import { textFocus, useCommands } from "../lib/commands"
 import type { Backdrop, SvgItem } from "../lib/types"
 import { CodeEditor } from "./CodeEditor"
+import { CanvasBackground, solidOf, useCanvasBg } from "./CanvasBackground"
 import { InspectPreview, type ElementMove, type ElementTransform } from "./InspectPreview"
 import { LayersTree } from "./LayersTree"
 import vectorcraftIcon from "../assets/vectorcraft.png"
@@ -72,6 +73,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
   const selected = selection.length === 1 ? selection[0] : -1
   const setSelected = (i: number) => setSelection(i >= 0 ? [i] : [])
   const [menu, setMenu] = useState<MenuState | null>(null)
+  const [bg, setBg] = useCanvasBg(backdrop)
   // The VectorCraft note, until it's dismissed on this device
   const [nodDismissed, setNodDismissed] = useState(() => { try { return localStorage.getItem("svgenius:nod-dismissed") === "1" } catch { return false } })
   const dismissNod = () => { setNodDismissed(true); try { localStorage.setItem("svgenius:nod-dismissed", "1") } catch { /* unavailable */ } }
@@ -252,6 +254,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     setMenu({
       x: e.clientX, y: e.clientY,
       items: [
+        // Say how many points this will touch, so a big selection is no surprise
+        ...(n > 1 ? [{ label: `${n} points selected`, disabled: true, run: () => {} }, "-" as const] : []),
         { label: `${curved ? "Make corner" : "Make smooth"} (⌥-click)`, run: run((s) => toggleCorner(s, points)) },
         "-",
         ...SEG_TYPES.filter((t) => t.type !== "T").map((t) => ({ label: `Convert ${what} to ${t.label.toLowerCase()} (${t.type})`, run: run((s) => convertPoints(s, points, t.type)) })),
@@ -405,8 +409,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               : <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
           </div>
           <div className="markup-dialog__canvas">
-            {editable && (
-              <div className="edit-toolbar">
+            <div className="edit-toolbar">
+              {editable && <>
                 <div className="btn-join tool-switch" role="group" aria-label="Tool">
                   <button className={`btn btn--secondary btn--sm${tool === "select" ? " is-on" : ""}`} aria-pressed={tool === "select"} onClick={() => setTool("select")}
                     title="Select (V): pick whole elements, then drag to move, or use the box's handles to scale and rotate"><IconArrowSolid width={13} height={13} /></button>
@@ -414,16 +418,18 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
                     title="Direct select (A): edit a path's points. Drag a box to pick several, right-click a point for more"><IconArrowHollow width={13} height={13} /></button>
                 </div>
                 <span className="text-3 edit-toolbar__count">
-                  {selection.length ? `${selection.length} selected` : tool === "select" ? "Click, ⌘-click or drag a box to select" : "Click a path to edit its points"}
+                  {tool === "select" ? "Select (V)" : "Direct select (A)"}
+                  {selection.length ? ` · ${selection.length} selected` : tool === "select" ? ": click, ⌘-click or drag a box" : ": click a path, then its points"}
                 </span>
                 {actions.filter((a) => a.toolbar).map((a) => (
                   <button key={a.id} className="btn btn--secondary btn--sm" onClick={() => run(a)}
                     title={`${a.hint ?? a.label}${a.shortcut ? ` (${a.shortcut})` : ""}`}>{a.label}</button>
                 ))}
                 {note && <span className="edit-toolbar__note">{note}</span>}
-              </div>
-            )}
-            <InspectPreview markup={markup} backdrop={backdrop} selection={selection}
+              </>}
+              <CanvasBackground value={bg} onChange={setBg} />
+            </div>
+            <InspectPreview markup={markup} backdrop={bg.tone} solid={solidOf(bg)} selection={selection}
               onPick={(i, add) => { (document.activeElement as HTMLElement | null)?.blur?.(); pick(i, add ? "add" : "only") }}
               onSelect={(found, add) => setSelection((s) => (add ? [...s, ...found.filter((i) => !s.includes(i))] : found))}
               onMoveBy={moveBy} onContextMenu={openMenu} readOnly={!editable}
@@ -433,14 +439,14 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
             {/* Unaffiliated pointer to a free, fuller vector editor: this one tidies markup, it isn't an art tool */}
             {!nodDismissed && (
               <p className="markup-dialog__nod">
-                <span>SVGenius has a very basic editor. For a richer, fuller one, try</span>
+                <span>SVGenius offers a very basic SVG editor. For a richer, fuller one, use</span>
                 <a href="https://getartcraft.com/apps/vectorcraft" target="_blank" rel="noopener"
                   title="VectorCraft: a free, fuller vector editor (we're not affiliated)">
                   <img src={vectorcraftIcon} alt="" width={14} height={14} />
                   <span className="markup-dialog__nod-mark">Vector<b>Craft</b></span>
                 </a>
                 <span>for free.</span>
-                <button className="btn btn--icon markup-dialog__nod-close" aria-label="Dismiss" title="Dismiss" onClick={dismissNod}><IconX width={10} height={10} /></button>
+                <button className="btn btn--icon markup-dialog__nod-close" aria-label="Dismiss" title="Dismiss" onClick={dismissNod}><IconX width={14} height={14} /></button>
               </p>
             )}
           </div>

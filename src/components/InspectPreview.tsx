@@ -28,6 +28,8 @@ interface Props {
   hover?: number
   /** The selected path's points, drawn as draggable handles */
   path?: PathEdit | null
+  /** A plain colour instead of the checkerboard */
+  solid?: string | null
   /** When set, the selection gets a box with scale and rotate handles */
   onTransform?: (changes: ElementTransform[]) => void
 }
@@ -80,7 +82,7 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform }: Props) {
+export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, solid }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
@@ -314,7 +316,7 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
   return (
     <div ref={box} className={`inspect thumb--${backdrop}`}>
       {/* The SVG's own canvas, at its real shape, with nothing around it */}
-      <div className="inspect__canvas" style={{ "--r": ratio } as React.CSSProperties}>
+      <div className="inspect__canvas" style={{ "--r": ratio, ...(solid ? { backgroundImage: "none", backgroundColor: solid } : {}) } as React.CSSProperties}>
       <div ref={stage} className="inspect__stage"
         onMouseMove={(e) => { const i = Math.max(indexOf(e), 0) || -1; if (i !== hover) onHover(i) }}
         onMouseLeave={() => onHover(-1)}
@@ -408,7 +410,7 @@ function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
     return new DOMPoint(e.clientX - base.x, e.clientY - base.y).matrixTransform(m.inverse())
   }
 
-  const startDrag = (e: PointerEvent | React.PointerEvent, points: PointRef[], grab?: [number, number], whole = false) => {
+  const startDrag = (e: PointerEvent | React.PointerEvent, points: PointRef[], grab?: [number, number], whole = false, done?: () => void) => {
     const from = toUser(e)
     if (!from || live.current.edit.readOnly) return
     ;(document.activeElement as HTMLElement | null)?.blur?.()
@@ -434,6 +436,7 @@ function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
       window.removeEventListener("pointerup", up)
       window.removeEventListener("pointercancel", up)
       if (d.moved || d.whole) swallow()
+      done?.()
       if (!d.moved || !d.last) return
       live.current.edit.onCommit(d.last)
     }
@@ -455,9 +458,12 @@ function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
       const index = hit ? Number(hit.getAttribute(ATTR)) : -1
       const { edit: ed, segs: cur } = live.current
       if (index === ed.index && !ed.readOnly) {
+        // Grabbing the path moves every point, but only for this drag: the
+        // selection goes back after, so a later right-click or Delete
+        // doesn't act on the whole path by surprise
         const all = allAnchors(cur)
-        setPicked(all)
-        startDrag(e, all, undefined, true)
+        const before = live.current.picked
+        startDrag(e, all, undefined, true, () => setPicked(before))
         return
       }
       const base = stage.current?.getBoundingClientRect()

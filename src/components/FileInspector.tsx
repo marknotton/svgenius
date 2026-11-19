@@ -54,7 +54,7 @@ const dims = (s: { w: number, h: number } | null) => (s ? `${fmtNum(s.w, 2)} × 
 
 export function FileInspector({ item, presets, defaultPreset, backdrop, previewPx, ...p }: Props) {
   const [tab, setTab] = useState<MarkupTab>("source")
-  // The markup box fills whatever height the sidebar has spare (at least 260px)
+  // The markup box fills whatever height the sidebar has spare (at least 180px)
   const codeSection = useRef<HTMLElement>(null)
   useEffect(() => {
     const sec = codeSection.current
@@ -66,12 +66,16 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
       const top = box.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop
       const below = sec.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom
       const spare = scroll.clientHeight - top - below - 8
-      sec.style.setProperty("--fill-h", `${Math.max(260, Math.floor(spare))}px`)
+      sec.style.setProperty("--fill-h", `${Math.max(180, Math.floor(spare))}px`)
     }
     fit()
     const ro = new ResizeObserver(fit)
     ro.observe(scroll)
-    return () => ro.disconnect()
+    // And whatever's in this section (the hint, an error) once it renders
+    for (const k of sec.children) if (!k.classList.contains("code-editor")) ro.observe(k)
+    // Opening "Customise this file" above pushes the markup down
+    scroll.addEventListener("toggle", fit, true)
+    return () => { ro.disconnect(); scroll.removeEventListener("toggle", fit, true) }
   }, [item.id, tab])
   const [copied, setCopied] = useState(false)
   const out = item.result?.output
@@ -127,6 +131,37 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
           )}
         </section>
 
+        <section className="panel__section">
+          <div className="panel__label">Settings for this file</div>
+          {item.config ? (
+            <>
+              <p className="text-3 inspector__hint">This file has its own one-of-a-kind settings. Changes below only affect it.</p>
+              <div className="inspector__links">
+                <button className="link" onClick={p.onSaveAsPreset} title="Turn these settings into a preset you can use on other files">Save these as a preset…</button>
+                <button className="link" onClick={p.onUsePreset} title="Drop this file's own settings and go back to its preset">Use a preset instead</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <PresetSelect label={`Preset for ${item.name}`} presets={presets} defaultPreset={defaultPreset}
+                value={item.presetId} onChange={p.onPreset} onCreateNew={p.onNewPreset} newLabel="New preset for this file…" />
+              <p className="text-3 inspector__hint">Edit the preset in the Config tab (it changes every file that uses it){p.advanced ? ", or open Customise this file to give just this file its own settings" : ""}.</p>
+            </>
+          )}
+        </section>
+        {(p.advanced || item.config) && (
+          <details className="accordion" open={!!item.config}
+            onToggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open && !item.config) p.onCustomise() }}>
+            <summary className="accordion__summary">
+              <span className="panel__label">Customise this file</span>
+            </summary>
+            {item.config && (
+              <PresetEditor settings={item.config} edit={p.onConfig} customPlugins={p.customPlugins}
+                onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} advanced={p.advanced} />
+            )}
+          </details>
+        )}
+
         <section ref={codeSection} className="panel__section inspector__code">
           <div className="inspector__codehead">
             <span className="panel__label">Markup</span>
@@ -150,37 +185,6 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
           )}
           {item.status === "error" && <p className="rule__error">{item.error}</p>}
         </section>
-
-        <section className="panel__section">
-          <div className="panel__label">Settings for this file</div>
-          {item.config ? (
-            <>
-              <p className="text-3 inspector__hint">This file has its own one-of-a-kind settings. Changes below only affect it.</p>
-              <div className="inspector__links">
-                <button className="link" onClick={p.onSaveAsPreset} title="Turn these settings into a preset you can use on other files">Save these as a preset…</button>
-                <button className="link" onClick={p.onUsePreset} title="Drop this file's own settings and go back to its preset">Use a preset instead</button>
-              </div>
-            </>
-          ) : (
-            <>
-              <PresetSelect label={`Preset for ${item.name}`} presets={presets} defaultPreset={defaultPreset}
-                value={item.presetId} onChange={p.onPreset} onCreateNew={p.onNewPreset} newLabel="New preset for this file…" />
-              <p className="text-3 inspector__hint">Edit the preset in the Config tab (it changes every file that uses it){p.advanced ? ", or open Advanced customisation to give just this file its own settings" : ""}.</p>
-            </>
-          )}
-        </section>
-        {(p.advanced || item.config) && (
-          <details className="accordion" open={!!item.config}
-            onToggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open && !item.config) p.onCustomise() }}>
-            <summary className="accordion__summary">
-              <span className="panel__label">Advanced customisation</span>
-            </summary>
-            {item.config && (
-              <PresetEditor settings={item.config} edit={p.onConfig} customPlugins={p.customPlugins}
-                onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} advanced={p.advanced} />
-            )}
-          </details>
-        )}
         {p.markupOpen && !isBlocked(item) && (
           <MarkupDialog item={item} tab={tab} onTab={setTab}
             backdrop={backdrop} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => p.onMarkupOpen(false)} />

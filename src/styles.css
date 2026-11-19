@@ -1093,7 +1093,7 @@ input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hove
 .markup-dialog__nod a { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
 .markup-dialog__nod a:hover .markup-dialog__nod-mark { text-decoration: underline; }
 .markup-dialog__nod img { border-radius: 3px; }
-.markup-dialog__nod-close { width: 18px; height: 18px; margin-left: 2px; }
+.markup-dialog__nod-close { width: 24px; height: 24px; margin-left: 4px; }
 .markup-dialog__nod-mark { font-weight: 600; color: var(--text-2); }
 .markup-dialog__nod-mark b { font-weight: inherit; color: #e7573e; }
 
@@ -1162,3 +1162,27 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 /* Tools: Select (whole objects) and Direct select (points) */
 .tool-switch .btn { padding-inline: 6px; }
 .tool-switch .btn.is-on { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
+
+/* Editor canvas background control */
+.canvas-bg { position: relative; display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.canvas-bg__more { padding-inline: 7px; display: inline-flex; align-items: center; gap: 5px; }
+.canvas-bg__swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid var(--border); }
+.canvas-bg__panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; width: 260px; display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0, 0, 0, .18); }
+.canvas-bg__panel .panel__label { margin: 0; }
+.canvas-bg__row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.canvas-bg__row > span { flex: 1; }
+.canvas-bg__picker { width: 28px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-xs); background: none; cursor: pointer; }
+.canvas-bg__hex { width: 84px; font-family: var(--mono, ui-monospace, monospace); }
+.canvas-bg__hint { margin: 0; font-size: 11px; }
+.canvas-bg__panel .link { align-self: flex-start; }
+
+/* Settings: each group gets a rule above it and a proper heading */
+.settings { gap: 0; }
+.settings__section { padding: 16px 0; gap: 8px; }
+.settings__section + .settings__section { border-top: 1px solid var(--border); }
+.settings__title { margin: 0; font-size: 13px; font-weight: 600; color: var(--text); }
+.settings__desc { margin: -4px 0 4px; font-size: 11px; }
+
+/* Sidebar tabs keep their names; only an open file's tab gives way */
+.sidebar__tab { flex: none; }
+.sidebar__tab--file { flex: 0 1 auto; min-width: 48px; }

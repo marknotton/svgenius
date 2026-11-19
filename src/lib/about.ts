@@ -11,6 +11,18 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.9.1",
+    date: "19 November 2026",
+    notes: [
+      "Pressing on a path with Direct select no longer leaves every point selected afterwards, so the point menu and Delete act on the points you picked. The menu also says when it's about to change several points",
+      "The editor has its own background: light or dark, and from ▾ the checkerboard on or off, or a solid colour from the picker or a hex value",
+      "The tool label shows its shortcut, Select (V) or Direct select (A)",
+      "The VectorCraft note has new wording and a bigger close button",
+      "File sidebar: Settings for this file and Customise this file (was Advanced customisation) sit above the markup, which fills what's left without hiding anything",
+      "Settings: each group has a divider, a clearer heading and a line saying what it covers"
+    ]
+  },
+  {
     version: "0.9.0",
     date: "19 November 2026",
     notes: [
