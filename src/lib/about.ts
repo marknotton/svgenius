@@ -11,6 +11,15 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.7.2",
+    date: "19 November 2026",
+    notes: [
+      "Responsive layout: on narrow windows and phones the settings panel becomes a drawer along the bottom. Drag its handle to resize it, double-click to tuck it away",
+      "The top bar, toolbar, file cards and footer tighten up on small screens, and the footer stacks into three rows",
+      "The editor goes full screen on a phone, with the canvas, layers and code stacked"
+    ]
+  },
+  {
     version: "0.7.1",
     date: "19 November 2026",
     notes: [

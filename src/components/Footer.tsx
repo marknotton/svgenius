@@ -71,7 +71,7 @@ export function Footer(p: Props) {
 
       <button className="btn btn--secondary" onClick={p.onReport} disabled={p.items.length === 0}
         title="A copyable report of the work done, to log or send to a client">
-        <IconReport /> Report
+        <IconReport /> <span className="footer__label">Report</span>
       </button>
       {/* One place for running files: Live keeps the files on screen up to date, Optimise runs them all */}
       <div className={`run-group${p.live ? " is-live" : ""}`}>

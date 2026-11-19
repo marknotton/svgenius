@@ -1,11 +1,14 @@
 import { IconFile, IconFolder, Logo } from "../icons"
 import { DOWNLOAD_URL, isDesktop } from "../lib/platform"
 
+// Phones and tablets have nothing to drag from
+const isTouch = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches
+
 export function EmptyState({ onAddFiles, onAddFolder }: { onAddFiles: () => void, onAddFolder: () => void }) {
   return (
     <div className="empty">
       <Logo width={44} height={44} />
-      <h1 className="empty__title">Drop SVGs or folders here</h1>
+      <h1 className="empty__title">{isTouch ? "Add some SVGs" : "Drop SVGs or folders here"}</h1>
       {isDesktop
         ? <p className="empty__body">Folders are searched for SVGs, sub-folders included. Nothing is changed on disk until you export.</p>
         : <p className="empty__body">

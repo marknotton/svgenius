@@ -3,7 +3,7 @@ import { AppBar } from "./components/AppBar"
 import { ConfigPanel } from "./components/ConfigPanel"
 import { ContextMenu, type MenuState } from "./components/ContextMenu"
 import { useDialogs } from "./components/Dialogs"
-import { clampSidebar, Divider } from "./components/Divider"
+import { clampDrawer, clampSidebar, Divider, DRAWER } from "./components/Divider"
 import { DropOverlay, EmptyState } from "./components/EmptyState"
 import { FileInspector } from "./components/FileInspector"
 import { FileList } from "./components/FileList"
@@ -543,6 +543,20 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   }, [])
   const sidebarWidth = useMemo(() => clampSidebar(settings.sidebarWidth), [settings.sidebarWidth, winW])
 
+  // Phone-sized windows: the sidebar becomes a drawer along the bottom, with
+  // its own height (kept per device, it's about the screen, not the work)
+  const narrow = winW < 760
+  const [drawerH, setDrawerH] = useState(() => {
+    try { const v = Number(localStorage.getItem("svgenius:drawer")); if (v > 0) return v } catch { /* unavailable */ }
+    return Math.round(window.innerHeight * DRAWER.default)
+  })
+  useEffect(() => { try { localStorage.setItem("svgenius:drawer", String(drawerH)) } catch { /* unavailable */ } }, [drawerH])
+  useEffect(() => {
+    const onResize = () => setDrawerH((h) => clampDrawer(h))
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
+
   const resetLayout = useCallback(() => {
     update((s) => ({ ...s, ...defaultLayout(), previewCss: s.previewCss, previewCssEnabled: s.previewCssEnabled }))
     setCssOpen(false)
@@ -607,7 +621,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   return (
     <PreviewCssContext.Provider value={appliedCss}>
     <RenderAnywayContext.Provider value={forceRender}>
-      <div className={`app${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px` } as CSSProperties}>
+      <div className={`app${narrow ? " is-narrow" : ""}${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px`, "--drawer-h": `${drawerH}px` } as CSSProperties}>
         <AppBar onSettings={() => setSettingsOpen(true)} onAbout={() => setAboutOpen(true)}
           advanced={settings.advanced} onAdvanced={(advanced) => update((s) => ({ ...s, advanced }))} />
         <div className="workspace">
@@ -648,11 +662,16 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
               />
             )}
           </main>
-          <Divider
-            width={sidebarWidth}
-            onResize={(sidebarWidth) => update((s) => ({ ...s, sidebarWidth }))}
-            onReset={() => update((s) => ({ ...s, sidebarWidth: SIDEBAR.default }))}
-          />
+          {narrow ? (
+            <Divider horizontal width={drawerH} onResize={setDrawerH}
+              onReset={() => setDrawerH((h) => clampDrawer(h > DRAWER.min + 20 ? DRAWER.min : window.innerHeight * DRAWER.default))} />
+          ) : (
+            <Divider
+              width={sidebarWidth}
+              onResize={(sidebarWidth) => update((s) => ({ ...s, sidebarWidth }))}
+              onReset={() => update((s) => ({ ...s, sidebarWidth: SIDEBAR.default }))}
+            />
+          )}
           <aside className="sidebar">
             <div className="sidebar__tabs" role="tablist">
               <button role="tab" aria-selected={sidebarTab === "preset"} className={`sidebar__tab${sidebarTab === "preset" ? " is-active" : ""}`}
