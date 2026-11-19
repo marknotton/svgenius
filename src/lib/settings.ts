@@ -70,6 +70,7 @@ export function defaultAppSettings(): AppSettings {
     theme: "system",
     advanced: false,
     editorToolbar: "top",
+    circleColour: null,
     ...defaultLayout()
   }
 }
@@ -359,6 +360,7 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     theme: raw.theme === "light" || raw.theme === "dark" ? raw.theme : "system",
     advanced: raw.advanced === true,
     editorToolbar: raw.editorToolbar === "left" ? "left" : "top",
+    circleColour: typeof raw.circleColour === "string" && /^#[0-9a-f]{6}$/i.test(raw.circleColour) ? raw.circleColour : null,
     keepStructure: typeof raw.keepStructure === "boolean" ? raw.keepStructure : true,
     rename: sanitiseRename(raw.rename),
     previewCss: typeof raw.previewCss === "string" ? raw.previewCss : "",

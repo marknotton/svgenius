@@ -178,6 +178,8 @@ export interface AppSettings {
   previewCssEnabled: boolean
   sidebarWidth: number
   circleOverlay: boolean
+  /** The circle guide's colour; null uses the brand accent */
+  circleColour: string | null
   circleClip: boolean
   liveUpdates: boolean
 }

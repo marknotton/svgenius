@@ -47,7 +47,7 @@ export const ZOOM_MIN = 0.1, ZOOM_MAX = 64
 export const clampZoom = (z: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z))
 
 /** How close (screen px) an edge or centre has to come before it snaps */
-const SNAP_PX = 6
+const SNAP_PX = 8
 
 export interface ElementMove { index: number, dx: number, dy: number }
 /** A scale or rotate, as a matrix in the element's parent units, to go in front of its own transform */
@@ -60,6 +60,58 @@ const mat = (m: DOMMatrix) => `matrix(${m.a} ${m.b} ${m.c} ${m.d} ${m.e} ${m.f})
 /** Shapes a selection box picks up (not groups, not things in <defs>) */
 const PICKABLE = "path, rect, circle, ellipse, line, polyline, polygon, text, image, use"
 const UNPAINTED = "defs, clipPath, mask, symbol, marker, pattern"
+
+/** The box around several boxes */
+const outerBox = (rs: DOMRect[]) => rs.length ? rs.reduce((u, r) => {
+  const l = Math.min(u.left, r.left), t = Math.min(u.top, r.top)
+  return new DOMRect(l, t, Math.max(u.right, r.right) - l, Math.max(u.bottom, r.bottom) - t)
+}) : null
+
+/**
+ * Snapping, like a drawing app. A dragged box's edges and centre pull onto
+ * other items' edges and centres and the viewBox's, within SNAP_PX. Its own
+ * starting lines count too, so a mostly sideways drag sticks to its row (and
+ * an up-and-down one to its column) until you pull clear. Returns the snapped
+ * screen distance and the guide lines to draw, in stage pixels
+ */
+function snapper(shadow: ShadowRoot, skip: Element[], moving: DOMRect | null, base: DOMRect) {
+  const lines = { x: [] as number[], y: [] as number[] }
+  if (moving) {
+    const add = (r: DOMRect) => {
+      if (r.width + r.height <= 0 && !(r.width === 0 && r.height === 0)) return
+      lines.x.push(r.left, (r.left + r.right) / 2, r.right)
+      lines.y.push(r.top, (r.top + r.bottom) / 2, r.bottom)
+    }
+    const svg = shadow.querySelector("svg")
+    if (svg) add(svg.getBoundingClientRect())
+    for (const other of shadow.querySelectorAll(PICKABLE)) {
+      if (other.closest(UNPAINTED) || skip.some((x) => x === other || x.contains(other))) continue
+      if (getComputedStyle(other).pointerEvents === "none" || getComputedStyle(other).display === "none") continue
+      const r = other.getBoundingClientRect()
+      if (r.width + r.height > 0) add(r)
+    }
+    add(moving)
+  }
+  return (dx: number, dy: number, on: boolean) => {
+    const gx: number[] = [], gy: number[] = []
+    if (moving && on) {
+      const pull = (own: number[], to: number[], d: number, hit: number[]) => {
+        let best: number | null = null
+        for (const o of own) for (const t of to) {
+          const diff = t - (o + d)
+          if (Math.abs(diff) <= SNAP_PX && (best === null || Math.abs(diff) < Math.abs(best))) best = diff
+        }
+        if (best === null) return d
+        const nd = d + best
+        for (const o of own) for (const t of to) if (Math.abs(t - (o + nd)) < 0.5 && !hit.includes(t)) hit.push(t)
+        return nd
+      }
+      dx = pull([moving.left, (moving.left + moving.right) / 2, moving.right], lines.x, dx, gx)
+      dy = pull([moving.top, (moving.top + moving.bottom) / 2, moving.bottom], lines.y, dy, gy)
+    }
+    return { dx, dy, gx: gx.map((x) => x - base.x), gy: gy.map((y) => y - base.y) }
+  }
+}
 
 export interface PathEdit {
   index: number
@@ -312,49 +364,10 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
         const orig = els.map((el) => el?.getAttribute("transform") ?? null)
         let moved = false
 
-        // Snapping: the dragged items' outer box, and every line it can snap
-        // to (other items' edges and centres, and the viewBox's)
-        const outer = (rs: DOMRect[]) => rs.length ? rs.reduce((u, r) => {
-          const l = Math.min(u.left, r.left), t = Math.min(u.top, r.top)
-          return new DOMRect(l, t, Math.max(u.right, r.right) - l, Math.max(u.bottom, r.bottom) - t)
-        }) : null
-        const moving = outer(els.filter((x): x is SVGGraphicsElement => !!x).map((x) => x.getBoundingClientRect()))
-        const lines = { x: [] as number[], y: [] as number[] }
-        if (moving) {
-          const add = (r: DOMRect) => {
-            if (r.width + r.height <= 0) return
-            lines.x.push(r.left, (r.left + r.right) / 2, r.right)
-            lines.y.push(r.top, (r.top + r.bottom) / 2, r.bottom)
-          }
-          const svg = shadow.querySelector("svg")
-          if (svg) add(svg.getBoundingClientRect())
-          for (const other of shadow.querySelectorAll(PICKABLE)) {
-            if (other.closest(UNPAINTED) || els.some((x) => x && (x === other || x.contains(other)))) continue
-            if (getComputedStyle(other).pointerEvents === "none") continue
-            add(other.getBoundingClientRect())
-          }
-        }
-        /** Screen distance moved, pulled onto the nearest line within reach */
-        const snapped = (ev: PointerEvent) => {
-          let dx = ev.clientX - e.clientX, dy = ev.clientY - e.clientY
-          const gx: number[] = [], gy: number[] = []
-          if (moving && live.current.snap && !ev.metaKey && !ev.ctrlKey) {
-            const pull = (own: number[], to: number[], d: number, hit: number[]) => {
-              let best: number | null = null
-              for (const o of own) for (const t of to) {
-                const diff = t - (o + d)
-                if (Math.abs(diff) <= SNAP_PX && (best === null || Math.abs(diff) < Math.abs(best))) best = diff
-              }
-              if (best === null) return d
-              const nd = d + best
-              for (const o of own) for (const t of to) if (Math.abs(t - (o + nd)) < 0.5 && !hit.includes(t)) hit.push(t)
-              return nd
-            }
-            dx = pull([moving.left, (moving.left + moving.right) / 2, moving.right], lines.x, dx, gx)
-            dy = pull([moving.top, (moving.top + moving.bottom) / 2, moving.bottom], lines.y, dy, gy)
-          }
-          return { dx, dy, gx: gx.map((x) => x - base.x), gy: gy.map((y) => y - base.y) }
-        }
+        const moving = outerBox(els.filter((x): x is SVGGraphicsElement => !!x).map((x) => x.getBoundingClientRect()))
+        const snapTo = snapper(shadow, els.filter((x): x is SVGGraphicsElement => !!x), moving, base)
+        const snapped = (ev: PointerEvent) =>
+          snapTo(ev.clientX - e.clientX, ev.clientY - e.clientY, live.current.snap && !ev.metaKey && !ev.ctrlKey)
         const delta = (s: { dx: number, dy: number }, ev: PointerEvent, k: number) => {
           const p = new DOMPoint(s.dx, s.dy).matrixTransform(inv[k] ?? new DOMMatrix())
           return ev.shiftKey ? { x: Math.round(p.x), y: Math.round(p.y) } : { x: p.x, y: p.y }
@@ -522,7 +535,8 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
       {guides.x.map((x) => <div key={`x${x}`} className="inspect__guide inspect__guide--v" style={{ left: x }} />)}
       {guides.y.map((y) => <div key={`y${y}`} className="inspect__guide inspect__guide--h" style={{ top: y }} />)}
       {marquee && <div className="inspect__marquee" style={{ left: Math.min(marquee.x0, marquee.x1), top: Math.min(marquee.y0, marquee.y1), width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0) }} />}
-      {path && root && <PathOverlay stage={stage} box={box} root={root} edit={path} swallowClick={swallowClick} />}
+      {path && root && <PathOverlay stage={stage} box={box} root={root} edit={path} swallowClick={swallowClick}
+        snap={() => live.current.snap} onGuides={setGuides} />}
       </div>
       {!root && <p className="inspect__error text-3">This markup doesn't parse, so it can't be previewed.</p>}
     </div>
@@ -541,6 +555,9 @@ interface Drag { pointer: number, from: DOMPoint, base: Seg[], points: PointRef[
 interface Marquee { pointer: number, x0: number, y0: number, x1: number, y1: number, add: boolean }
 
 interface OverlayProps {
+  /** Snapping on (and not held off with ⌘), and where to draw its guides */
+  snap: () => boolean
+  onGuides: (g: { x: number[], y: number[] }) => void
   stage: React.RefObject<HTMLDivElement | null>
   box: React.RefObject<HTMLDivElement | null>
   root: Element
@@ -553,7 +570,7 @@ const isTyping = (t: EventTarget | null) => {
   return !!el?.closest?.("input, textarea, select, [contenteditable=true], .monaco-editor")
 }
 
-function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
+function PathOverlay({ stage, box, root, edit, swallowClick, snap, onGuides }: OverlayProps) {
   // Maps the path's own coordinates to the stage's pixels
   const [ctm, setCtm] = useState<DOMMatrix | null>(null)
   const [draft, setDraft] = useState<Seg[] | null>(null)
@@ -603,9 +620,24 @@ function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
     if (!from || live.current.edit.readOnly) return
     ;(document.activeElement as HTMLElement | null)?.blur?.()
     const d: Drag = { pointer: e.pointerId, from, base: live.current.segs, points, grab, moved: false, whole }
+    // What snaps: the whole path's box, or the grabbed point
+    const shadow = stage.current?.shadowRoot, stageBox = stage.current?.getBoundingClientRect()
+    const self = target()
+    const m0 = live.current.ctm
+    const pointRect = d.grab && m0 && stageBox ? (() => { const q = new DOMPoint(d.grab![0], d.grab![1]).matrixTransform(m0); return new DOMRect(q.x + stageBox.x, q.y + stageBox.y, 0, 0) })() : null
+    const snapTo = shadow && stageBox
+      ? snapper(shadow, whole && self ? [self] : [], whole ? self?.getBoundingClientRect() ?? null : pointRect, stageBox)
+      : null
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== d.pointer) return
-      const p = toUser(ev)
+      let cx = ev.clientX, cy = ev.clientY
+      if (snapTo) {
+        const sn = snapTo(ev.clientX - e.clientX, ev.clientY - e.clientY, snap() && !ev.metaKey && !ev.ctrlKey && !ev.shiftKey)
+        cx = e.clientX + sn.dx
+        cy = e.clientY + sn.dy
+        onGuides({ x: sn.gx, y: sn.gy })
+      }
+      const p = toUser({ clientX: cx, clientY: cy })
       if (!p) return
       let dx = p.x - d.from.x, dy = p.y - d.from.y
       if (!d.moved && Math.hypot(ev.clientX - (e.clientX), ev.clientY - (e.clientY)) < 2) return
@@ -620,6 +652,7 @@ function PathOverlay({ stage, box, root, edit, swallowClick }: OverlayProps) {
     }
     const up = (ev: PointerEvent) => {
       if (ev.pointerId !== d.pointer) return
+      onGuides({ x: [], y: [] })
       window.removeEventListener("pointermove", move)
       window.removeEventListener("pointerup", up)
       window.removeEventListener("pointercancel", up)

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { IconChevronDown, IconChevronLeft, IconChevronRight, IconCircle, IconClip, IconZoomIn, IconZoomOut, IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconMagnet, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
+import { IconEye, IconEyeOff, IconLock, IconUnlock, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircle, IconClip, IconZoomIn, IconZoomOut, IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconMagnet, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
 import { Resizer } from "./Resizer"
 import { elementRanges, rangeAt } from "../lib/markupMap"
-import { moveElement, setAttr, setAttrs, translateAttrs, type DropPlace } from "../lib/markupEdit"
+import { moveElement, pasteAfter, removeElement, setAttr, setAttrs, translateAttrs, type DropPlace } from "../lib/markupEdit"
 import { parsePath, serialisePath, type PointRef, type Seg } from "../lib/pathData"
 import { addPointAfter, convertPoints, deletePoints, SEG_TYPES, setPointsCase, toggleCorner, transformPath } from "../lib/pathPoints"
 import { ACTIONS, topLevel, type ActionContext, type EditorAction } from "../lib/editorActions"
@@ -58,8 +58,8 @@ const ZOOM_PRESETS = [25, 50, 100, 200, 400, 800]
 // Code and path tools sit on the right or along the bottom (handy for wide
 // artwork). Panel sizes are in pixels and kept between sessions.
 
-interface EditorLayout { bottom: boolean, sideW: number, sideH: number, toolsH: number, toolsW: number }
-const LAYOUT_DEFAULTS: EditorLayout = { bottom: false, sideW: 520, sideH: 300, toolsH: 240, toolsW: 420 }
+interface EditorLayout { bottom: boolean, sideW: number, sideH: number, toolsH: number, toolsW: number, layersW: number }
+const LAYOUT_DEFAULTS: EditorLayout = { bottom: false, sideW: 520, sideH: 300, toolsH: 240, toolsW: 420, layersW: 210 }
 const LAYOUT_KEY = "svgenius:editor-layout"
 
 function useEditorLayout() {
@@ -77,6 +77,15 @@ const TOOLBAR_ICONS: Record<string, React.ReactNode> = {
   group: <IconGroup width={14} height={14} />, ungroup: <IconUngroup width={14} height={14} />,
   breakApart: <IconBreakApart width={14} height={14} />, toPath: <IconToPath width={14} height={14} />,
   strokeToPath: <IconStrokeToPath width={14} height={14} />
+}
+
+/** Why a toolbar action is greyed out when something is selected */
+const WHY_OFF: Record<string, string> = {
+  group: "Select the items to group",
+  ungroup: "Select a group to ungroup it",
+  breakApart: "Select a path made of more than one shape",
+  toPath: "Select a rect, circle, ellipse, line, polyline or polygon",
+  strokeToPath: "Select a path or shape with a stroke"
 }
 
 // ── Layer locks ───────────────────────────────────────────────────────────────
@@ -408,7 +417,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
         { label: "Zoom out    ⌘−", run: () => stepZoom(-1) },
         "-",
         { label: `${Math.abs(zoom - 1) < 1e-3 ? "✓ " : ""}Fit to screen    ⌘0`, run: () => setZoom(1) },
-        ...ZOOM_PRESETS.map((pc) => ({ label: `${Math.abs(zoom / actual * 100 - pc) < 0.5 ? "✓ " : ""}${pc}%${pc === 100 ? "    ⌘1" : ""}`, run: () => setZoom(actual * pc / 100) }))
+        ...ZOOM_PRESETS.map((pc) => ({ label: `${Math.abs(zoom / actual * 100 - pc) < 0.5 ? "✓ " : ""}${pc}%${pc === 100 ? " (actual size)    ⌘1" : ""}`, run: () => setZoom(actual * pc / 100) }))
       ]
     })
   }
@@ -458,6 +467,67 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
     }
     window.addEventListener("keydown", key)
     return () => window.removeEventListener("keydown", key)
+  }, [])
+
+  // ── Copy, cut and paste ───────────────────────────────────────────────────
+  // The clipboard's own events, so the desktop's Edit menu and the keys both
+  // work. Copies are plain markup; pasting puts them straight after the
+  // selection (the same parent, so they land in place) and flashes them in Layers
+  const [flash, setFlash] = useState<{ indices: number[], n: number } | null>(null)
+  const clipLive = useRef({ markup, ranges, elements, selection, editable, commit })
+  clipLive.current = { markup, ranges, elements, selection, editable, commit }
+  useEffect(() => {
+    const parses = (text: string) => {
+      const t = text.trim()
+      if (!t.startsWith("<") || /^<\?xml|^<!doctype|^<svg[\s>]/i.test(t)) return false
+      const doc = new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">${t}</svg>`, "image/svg+xml")
+      return !doc.querySelector("parsererror") && doc.documentElement.children.length > 0
+    }
+    const copied = () => {
+      const c = clipLive.current
+      if (!c.elements || textFocus()) return null
+      const tops = topLevel(c.selection.filter((k) => k > 0), c.elements).sort((a, b) => a - b)
+      return tops.length ? { tops, text: tops.map((k) => c.markup.slice(c.ranges[k].start, c.ranges[k].end)).join("\n") } : null
+    }
+    const copy = (e: ClipboardEvent) => {
+      const got = copied()
+      if (!got || !e.clipboardData) return
+      e.preventDefault()
+      e.clipboardData.setData("text/plain", got.text)
+    }
+    const cut = (e: ClipboardEvent) => {
+      const c = clipLive.current
+      const got = copied()
+      if (!got || !e.clipboardData || !c.editable) return
+      e.preventDefault()
+      e.clipboardData.setData("text/plain", got.text)
+      let next = c.markup
+      for (const k of [...got.tops].sort((a, b) => b - a)) next = removeElement(next, elementRanges(next)[k])
+      c.commit(next)
+      setSelection([])
+    }
+    const paste = (e: ClipboardEvent) => {
+      const c = clipLive.current
+      if (!c.editable || textFocus() || !c.elements) return
+      const text = e.clipboardData?.getData("text/plain") ?? ""
+      if (!parses(text)) return
+      e.preventDefault()
+      const sel = c.selection.filter((k) => k > 0)
+      const after = sel.length ? Math.max(...topLevel(sel, c.elements)) : -1
+      // After the last selected element and everything inside it
+      const out = pasteAfter(c.markup, after > 0 ? c.ranges[after] : null, c.ranges[0], text)
+      c.commit(out.markup)
+      const nr = elementRanges(out.markup)
+      // The pasted top-level elements: inside the pasted span, not inside each other
+      const inside = nr.map((r, k) => (r.start >= out.start && r.end <= out.end ? k : -1)).filter((k) => k > 0)
+      const tops = inside.filter((k) => !inside.some((o) => o !== k && nr[o].start <= nr[k].start && nr[o].end >= nr[k].end))
+      setSelection(tops)
+      setFlash((f) => ({ indices: tops, n: (f?.n ?? 0) + 1 }))
+    }
+    document.addEventListener("copy", copy)
+    document.addEventListener("cut", cut)
+    document.addEventListener("paste", paste)
+    return () => { document.removeEventListener("copy", copy); document.removeEventListener("cut", cut); document.removeEventListener("paste", paste) }
   }, [])
 
   const openMenu = (i: number, e: React.MouseEvent) => {
@@ -565,22 +635,28 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             <span className="edit-toolbar__sep" />
             <PaintTools paint={paint} mixed={{ fill: differs("fill"), stroke: differs("stroke") }} onPaint={setPaint} onGradient={setGradient} side={toolbarSide} />
             <span className="edit-toolbar__sep" />
-            {ACTIONS.filter((a) => a.toolbar).map((a) => (
-              <button key={a.id} className={`btn btn--secondary btn--sm edit-toolbar__btn${a.danger ? " is-danger" : ""}`} onClick={() => run(a)} aria-label={a.label}
-                disabled={!actions.includes(a)}
-                title={`${a.label}${a.shortcut ? ` (${a.shortcut})` : ""}: ${a.hint ?? ""}`.replace(/: $/, "")}>{TOOLBAR_ICONS[a.id] ?? a.label}</button>
-            ))}
+            {/* Delete goes last. A disabled button still says what it does, and why it's off */}
+            {[...ACTIONS.filter((a) => a.toolbar && a.id !== "delete"), ...ACTIONS.filter((a) => a.toolbar && a.id === "delete")].map((a) => {
+              const on = actions.includes(a)
+              const what = `${a.label}${a.shortcut ? ` (${a.shortcut})` : ""}: ${a.hint ?? ""}`.replace(/: $/, "")
+              const why = selection.some((k) => k > 0) ? WHY_OFF[a.id] ?? "It doesn't apply to what's selected" : "Select something first"
+              return (
+                <span key={a.id} className="tip-wrap" data-tip={on ? what : `${what}. ${why}.`}>
+                  <button className={`btn btn--secondary btn--sm edit-toolbar__btn${a.danger ? " is-danger" : ""}`} onClick={() => run(a)} aria-label={a.label}
+                    disabled={!on}>{TOOLBAR_ICONS[a.id] ?? a.label}</button>
+                </span>
+              )
+            })}
             <span className="edit-toolbar__sep" />
             <button className={`btn btn--secondary btn--sm edit-toolbar__btn${snap ? " is-on" : ""}`} aria-pressed={snap} onClick={() => setSnap(!snap)}
               title={snap ? "Snapping on: dragged items line up with other items and the viewBox. Hold ⌘ to drag freely" : "Snapping off. Click to snap dragged items to other items and the viewBox"}
               aria-label="Snapping"><IconMagnet width={14} height={14} /></button>
-            {toolbarSide === "top" && <EditStatus tool={tool} count={selection.length} note={note} />}
           </>}
           <span className="edit-toolbar__spacer" />
           <div className="btn-join zoom-control" role="group" aria-label="Zoom">
             <button className="btn btn--secondary btn--sm edit-toolbar__btn" onClick={() => stepZoom(-1)} title="Zoom out (⌘−). ⌘ and the wheel, or a pinch, zooms at the pointer" aria-label="Zoom out"><IconZoomOut width={14} height={14} /></button>
-            <button className="btn btn--secondary btn--sm zoom-control__level" onClick={zoomMenu} title="Zoom: fit to screen (⌘0), 100% (⌘1) and more. Hold Space and drag to pan" aria-label="Zoom level">
-              {Math.abs(zoom - 1) < 1e-3 ? "Fit" : `${Math.round(zoom / actual * 100)}%`}<IconChevronDown width={10} height={10} />
+            <button className="btn btn--secondary btn--sm zoom-control__level" onClick={zoomMenu} title="Zoom: fit to screen (⌘0), or 100% (⌘1), which is the SVG's actual size: one unit to one screen pixel. Hold Space and drag to pan" aria-label="Zoom level">
+              {zoomLabel(zoom, actual)}<IconChevronDown width={10} height={10} />
             </button>
             <button className="btn btn--secondary btn--sm edit-toolbar__btn" onClick={() => stepZoom(1)} title="Zoom in (⌘+)" aria-label="Zoom in"><IconZoomIn width={14} height={14} /></button>
           </div>
@@ -595,9 +671,30 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
           <CanvasBackground />
         </div>
         <div ref={bodyRef} className={`markup-dialog__body is-inspecting${layout.bottom ? " is-bottom" : ""}`}
-          style={{ "--side-w": `${layout.sideW}px`, "--side-h": `${layout.sideH}px`, "--tools-h": `${layout.toolsH}px`, "--tools-w": `${layout.toolsW}px` } as React.CSSProperties}>
+          style={{ "--layers-w": `${layout.layersW}px`, "--side-w": `${layout.sideW}px`, "--side-h": `${layout.sideH}px`, "--tools-h": `${layout.toolsH}px`, "--tools-w": `${layout.toolsW}px` } as React.CSSProperties}>
           <div className="markup-dialog__layers">
-            <div className="panel__label">Layers</div>
+            <Resizer edge="right" label="Resize the layers panel" value={layout.layersW} min={160} max={520}
+              onChange={(layersW) => setLayout({ layersW })} onReset={() => setLayout({ layersW: LAYOUT_DEFAULTS.layersW })} />
+            <div className="layers-head">
+              <span className="panel__label">Layers</span>
+              {editable && elements && elements.length > 1 && (() => {
+                // Everything at the top level of the drawing: groups carry what's inside them
+                const tops = elements.map((el, k) => (k > 0 && el.parentElement === elements[0] && !/^(defs|style|title|desc|metadata|script)$/.test(el.localName) ? k : -1)).filter((k) => k > 0)
+                const anyHidden = ownHidden.size > 0, anyLocked = ownLocked.size > 0
+                return (
+                  <span className="layers-head__acts">
+                    <button className="layer__act" title={anyHidden ? "Show every layer" : "Hide every layer (in the editor only)"} aria-label={anyHidden ? "Show all" : "Hide all"}
+                      onClick={() => setHides(anyHidden ? [] : tops.map((k) => ({ tag: markup.slice(ranges[k].start, ranges[k].tagEnd), near: k })))}>
+                      {anyHidden ? <IconEyeOff width={14} height={14} /> : <IconEye width={14} height={14} />}
+                    </button>
+                    <button className="layer__act" title={anyLocked ? "Unlock every layer" : "Lock every layer"} aria-label={anyLocked ? "Unlock all" : "Lock all"}
+                      onClick={() => setLocks(anyLocked ? [] : tops.map((k) => ({ tag: markup.slice(ranges[k].start, ranges[k].tagEnd), near: k })))}>
+                      {anyLocked ? <IconLock width={14} height={14} /> : <IconUnlock width={14} height={14} />}
+                    </button>
+                  </span>
+                )
+              })()}
+            </div>
             {elements
               ? <LayersTree elements={elements} selection={selection} hover={hover}
                   onPick={pick} onSelectSet={(list) => { setSelection(list); const r = ranges[list[list.length - 1]]; if (r) setReveal((x) => ({ start: r.start, end: r.end, n: (x?.n ?? 0) + 1, focus: false })) }}
@@ -605,11 +702,12 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
                   onDelete={editable ? (i) => { const d = ACTIONS.find((a) => a.id === "delete"); const c = elements && { markup, ranges, elements, selection: [i] }; if (d && c) run(d, c) } : undefined}
                   onMove={editable ? move : undefined}
                   locked={locked} ownLocked={ownLocked} onLock={toggleLock}
-                  hidden={hidden} ownHidden={ownHidden} onHide={toggleHide} />
+                  hidden={hidden} ownHidden={ownHidden} onHide={toggleHide} flash={flash} />
               : <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
           </div>
           <div className="markup-dialog__canvas">
-            {toolbarSide === "left" && editable && <EditStatus tool={tool} count={selection.length} note={note} />}
+            {/* Floats over the canvas, so it never pushes the preview down */}
+            {editable && <EditStatus tool={tool} count={selection.length} note={note} />}
             {peekMarkup !== null && <span className="peek-badge">After</span>}
             <InspectPreview markup={peekMarkup ?? markup} backdrop={backdrop} selection={peekMarkup !== null ? [] : selection} locked={ownLocked} hidden={peekMarkup !== null ? undefined : ownHidden} snap={snap}
               zoom={zoom} onZoom={setZoom} onActual={setActual}
@@ -717,9 +815,16 @@ export function CodeTabs({ value, onChange }: { value: MarkupTab, onChange: (t: 
 }
 
 /** What the tool does and how many things are selected, plus any note from the last action */
+/** Short enough for the toolbar: 523%, then 52× past 999% */
+function zoomLabel(zoom: number, actual: number) {
+  if (Math.abs(zoom - 1) < 1e-3) return "Fit"
+  const pc = zoom / actual * 100
+  return pc >= 999.5 ? `${Math.round(pc / 100)}×` : `${Math.round(pc)}%`
+}
+
 function EditStatus({ tool, count, note }: { tool: "select" | "direct", count: number, note: string }) {
   return (
-    <span className="text-3 edit-toolbar__count">
+    <span className="edit-status" aria-live="polite">
       {tool === "select" ? "Select (V)" : "Direct select (A)"}
       {count ? ` · ${count} selected` : tool === "select" ? ": click, ⌘-click or drag a box" : ": click a path, then its points"}
       {note && <span className="edit-toolbar__note"> {note}</span>}

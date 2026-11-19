@@ -91,6 +91,26 @@ export function duplicateElement(markup: string, r: TagRange) {
   return { markup: markup.slice(0, r.end) + ins + markup.slice(r.end), start: r.end + ins.length - copy.length }
 }
 
+/**
+ * Pastes copied markup straight after element `r` (or as the root's last
+ * child), so it lands in place: the same parent, the same coordinates.
+ * Ids that already exist get a suffix. Returns where the pasted text starts and ends
+ */
+export function pasteAfter(markup: string, r: TagRange | null, root: TagRange, snippet: string) {
+  const copy = uniqueIds(snippet.trim(), markup)
+  if (r) {
+    const own = lineStarted(markup, r.start)
+    const ins = own ? `\n${indentAt(markup, r.start)}${copy}` : copy
+    const start = r.end + ins.length - copy.length
+    return { markup: markup.slice(0, r.end) + ins + markup.slice(r.end), start, end: start + copy.length }
+  }
+  // Before </svg>
+  const close = markup.lastIndexOf("</", root.end)
+  const at = close > root.tagEnd ? close : root.end
+  const ins = `${copy}\n`
+  return { markup: markup.slice(0, at) + ins + markup.slice(at), start: at, end: at + copy.length }
+}
+
 export type DropPlace = "before" | "after" | "inside"
 
 /**

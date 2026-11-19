@@ -579,7 +579,7 @@ body.is-resizing * { user-select: none !important; }
   width: var(--d); height: var(--d);
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  box-shadow: 0 0 0 999px rgba(var(--accent-rgb), .22), inset 0 0 0 1px var(--accent);
+  box-shadow: 0 0 0 999px var(--circle-tint, rgba(var(--accent-rgb), .22)), inset 0 0 0 1px var(--circle, var(--accent));
   pointer-events: none;
 }
 
@@ -823,7 +823,7 @@ body.is-resizing * { user-select: none !important; }
 .toggle-inline { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
 .markup-dialog__body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; gap: 10px; }
 .markup-dialog__body.is-inspecting { grid-template-columns: 210px minmax(0, 1fr) minmax(0, 1fr); }
-.markup-dialog__layers { display: flex; flex-direction: column; gap: 6px; }
+.markup-dialog__layers { position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .markup-dialog__side { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
 .markup-dialog__side > .markup-dialog__code { flex: 1; min-height: 120px; height: auto; }
 
@@ -1109,6 +1109,8 @@ input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hove
 .resizer:hover::after, .resizer:focus-visible::after { opacity: .6; }
 .resizer--left { left: -8px; top: 0; bottom: 0; width: 8px; cursor: col-resize; }
 .resizer--left::after { left: 3px; top: 0; bottom: 0; width: 2px; }
+.resizer--right { right: -8px; top: 0; bottom: 0; width: 8px; cursor: col-resize; }
+.resizer--right::after { right: 3px; top: 0; bottom: 0; width: 2px; }
 .resizer--top { top: -8px; left: 0; right: 0; height: 8px; cursor: row-resize; }
 .resizer--top::after { top: 3px; left: 0; right: 0; height: 2px; }
 body.is-resizing-x, body.is-resizing-x * { cursor: col-resize !important; user-select: none; }
@@ -1116,13 +1118,13 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 
 /* Editor sizes and the bottom layout */
 /* The code panel gives way before the preview drops under 280px */
-.markup-dialog__body.is-inspecting { grid-template-columns: 210px minmax(0, 1fr) min(var(--side-w, 40%), calc(100% - 210px - 280px - 20px)); }
+.markup-dialog__body.is-inspecting { grid-template-columns: var(--layers-w, 210px) minmax(0, 1fr) min(var(--side-w, 40%), calc(100% - var(--layers-w, 210px) - 280px - 20px)); }
 @media (max-width: 1100px) {
-  .markup-dialog__body.is-inspecting { grid-template-columns: 170px minmax(0, 1fr) min(var(--side-w, 40%), calc(100% - 170px - 280px - 20px)); }
+  .markup-dialog__body.is-inspecting { grid-template-columns: min(var(--layers-w, 210px), 22vw) minmax(0, 1fr) min(var(--side-w, 40%), calc(100% - min(var(--layers-w, 210px), 22vw) - 280px - 20px)); }
 }
 .markup-dialog__side, .markup-dialog__tools { position: relative; }
 .markup-dialog__tools { height: var(--tools-h, 36%); }
-.markup-dialog__body.is-inspecting.is-bottom { grid-template-columns: 210px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) var(--side-h, 40%); }
+.markup-dialog__body.is-inspecting.is-bottom { grid-template-columns: var(--layers-w, 210px) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) var(--side-h, 40%); }
 .is-bottom .markup-dialog__layers { grid-row: 1 / 3; }
 .is-bottom .markup-dialog__side { flex-direction: row; }
 .is-bottom .markup-dialog__side > .markup-dialog__code { flex: 1; min-width: 0; min-height: 0; }
@@ -1254,9 +1256,7 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .paint__swatch--stroke > span { border: 4px solid #000; background: transparent; }
 .paint__swatch.is-none > span { border: 1px solid var(--border); background: linear-gradient(to top right, transparent 44%, #e5484d 44% 56%, transparent 56%), #fff; }
 .paint__swatch.is-mixed::after { content: "?"; position: absolute; right: 1px; bottom: -1px; font-size: 9px; font-weight: 700; color: var(--text-2); }
-.paint__pop { position: absolute; z-index: 40; width: 260px; display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0, 0, 0, .18); }
-.paint__pop--top { top: calc(100% + 6px); left: 0; }
-.paint__pop--left { left: calc(100% + 10px); top: 0; }
+.paint__pop { position: fixed; z-index: 1000; width: 260px; display: flex; flex-direction: column; gap: 10px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0, 0, 0, .18); }
 .paint__pop .panel__label { margin: 0; }
 .paint__pop .link { align-self: flex-start; }
 .paint__row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
@@ -1297,7 +1297,7 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 /* Circle guide and clip in the editor: drawn inside the canvas, so nothing spills over the handles */
 .show-circle .inspect__canvas::after {
   content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 2;
-  background: radial-gradient(circle closest-side, transparent calc(100% - 1.5px), var(--accent) calc(100% - 1px), var(--accent) 100%, rgba(var(--accent-rgb), .22) calc(100% + .5px));
+  background: radial-gradient(circle closest-side, transparent calc(100% - 1.5px), var(--circle, var(--accent)) calc(100% - 1px), var(--circle, var(--accent)) 100%, var(--circle-tint, rgba(var(--accent-rgb), .22)) calc(100% + .5px));
 }
 .show-clip .inspect__stage { clip-path: circle(closest-side at 50% 50%); }
 
@@ -1317,3 +1317,25 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .run-group__count { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: rgba(0, 0, 0, .1); font-size: 11px; font-variant-numeric: tabular-nums; }
 .btn--secondary .run-group__count { background: var(--surface-2); color: var(--text-2); }
 .empty__project { margin-top: 14px; font-size: 12.5px; }
+
+/* Tool status floats over the top of the canvas */
+.edit-status { position: absolute; z-index: 4; top: 8px; left: 8px; max-width: calc(100% - 16px); padding: 3px 9px; border-radius: 999px; background: color-mix(in srgb, var(--surface) 88%, transparent); border: 1px solid var(--border); color: var(--text-2); font-size: 11.5px; pointer-events: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edit-status .edit-toolbar__note { color: var(--accent-ink); }
+.peek-badge { left: auto; right: 10px; }
+.zoom-control__level { overflow: hidden; white-space: nowrap; }
+
+/* Layers header: show/hide all, lock/unlock all */
+.layers-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 24px; }
+.layers-head .panel__label { margin: 0; }
+.layers-head__acts { display: inline-flex; gap: 1px; margin-right: 5px; }
+.layers-head__acts .layer__act { opacity: .7; }
+.layer__detail { white-space: nowrap; }
+@keyframes layer-flash { 0%, 35% { background: rgba(var(--accent-rgb), .45); } 100% { background: transparent; } }
+.layer.is-flash { animation: layer-flash 1.4s ease-out; }
+
+/* Disabled toolbar buttons pass the pointer to their wrapper, which carries the tip */
+.tip-wrap { display: inline-flex; }
+.edit-toolbar button:disabled, .paint__swatch:disabled { pointer-events: none; }
+.edit-toolbar--left .tip-wrap { display: flex; }
+.settings__colour { display: inline-flex; align-items: center; gap: 8px; }
+.settings__colour input[type=color] { width: 32px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-xs); background: none; cursor: pointer; }

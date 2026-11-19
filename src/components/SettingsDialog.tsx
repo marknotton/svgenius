@@ -115,6 +115,15 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
           <Toggle label="List view" hint="Compact rows with dimensions, tags and presets. Off shows big before/after previews"
             checked={settings.showDetails} onChange={(v) => set("showDetails", v)} />
           <Toggle label="Circle guide" checked={settings.circleOverlay} onChange={(v) => set("circleOverlay", v)} />
+          <div className="field-row">
+            <span>Circle guide colour</span>
+            <span className="settings__colour">
+              <input type="color" aria-label="Circle guide colour" value={settings.circleColour ?? "#efa94b"} onChange={(e) => set("circleColour", e.target.value)} />
+              {settings.circleColour
+                ? <button className="link" onClick={() => set("circleColour", null)} title="Back to the brand colour">Reset</button>
+                : <span className="text-3">Brand colour</span>}
+            </span>
+          </div>
           <Toggle label="Clip previews to a circle" checked={settings.circleClip} onChange={(v) => set("circleClip", v)} />
           <div className="settings__actions">
             <button className="btn btn--ghost btn--sm" onClick={p.onResetLayout} title="Sidebar width, preview sizes and toggles back to normal">Reset layout</button>

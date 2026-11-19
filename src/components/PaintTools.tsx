@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { toHex, type Gradient, type Paint } from "../lib/paint"
 import { Segmented } from "./Segmented"
 
@@ -45,7 +45,7 @@ export function PaintTools({ paint, mixed, onPaint, onGradient, side }: Props) {
       : v === "none" ? undefined : hex ?? "transparent"
 
   return (
-    <div ref={ref} className={`paint paint--${side}`}>
+    <div ref={ref} className={`paint paint--${side}`} data-tip={disabled ? "Fill and stroke: select something to colour it" : undefined}>
       <button type="button" className={`paint__swatch paint__swatch--fill${fillMode === "none" ? " is-none" : ""}${open === "fill" ? " is-open" : ""}${mixed.fill ? " is-mixed" : ""}`}
         disabled={disabled} aria-expanded={open === "fill"} aria-label="Fill"
         title={disabled ? "Fill: select something to colour it" : `Fill: ${mixed.fill ? "mixed" : paint?.gradient ? `${paint.gradient.type} gradient` : fill ?? "black (default)"}`}
@@ -131,9 +131,30 @@ export function PaintTools({ paint, mixed, onPaint, onGradient, side }: Props) {
   )
 }
 
+/**
+ * The panel floats over the page (fixed), placed beside the swatches, so a
+ * scrolling toolbar can't clip it. It stays inside the window
+ */
 function Pop({ title, side, children }: { title: string, side: "top" | "left", children: ReactNode }) {
+  const el = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ left: number, top: number } | null>(null)
+  useLayoutEffect(() => {
+    const d = el.current, anchor = d?.parentElement
+    if (!d || !anchor) return
+    const place = () => {
+      const a = anchor.getBoundingClientRect(), w = d.offsetWidth, h = d.offsetHeight
+      let left = side === "left" ? a.right + 10 : a.left
+      let top = side === "left" ? a.top : a.bottom + 6
+      left = Math.max(8, Math.min(left, window.innerWidth - w - 8))
+      top = Math.max(8, Math.min(top, window.innerHeight - h - 8))
+      setPos({ left, top })
+    }
+    place()
+    window.addEventListener("resize", place)
+    return () => window.removeEventListener("resize", place)
+  }, [side])
   return (
-    <div className={`paint__pop paint__pop--${side}`} role="dialog" aria-label={title}>
+    <div ref={el} className="paint__pop" role="dialog" aria-label={title} style={pos ?? { left: -9999, top: 0 }}>
       <div className="panel__label">{title}</div>
       {children}
     </div>

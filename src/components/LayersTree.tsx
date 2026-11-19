@@ -32,14 +32,17 @@ interface Props {
   hidden?: Set<number>
   ownHidden?: Set<number>
   onHide?: (index: number) => void
+  /** Rows to flash, like just-pasted elements. n changes each time */
+  flash?: { indices: number[], n: number } | null
 }
 
 interface Node { i: number, depth: number, parent: number, kids: number, label: string, detail: string }
 
 function describe(el: Element) {
-  const id = el.getAttribute("id")
-  const cls = el.getAttribute("class")?.trim().split(/\s+/)[0]
-  let detail = id ? `#${id}` : cls ? `.${cls}` : ""
+  // Both the id and every class, so a well-labelled file reads at a glance
+  const id = el.getAttribute("id")?.trim()
+  const cls = el.getAttribute("class")?.trim().split(/\s+/).filter(Boolean) ?? []
+  let detail = [id ? `#${id}` : "", ...cls.map((c) => `.${c}`)].filter(Boolean).join(" ")
   if (!detail && (el.localName === "text" || el.localName === "title" || el.localName === "desc")) {
     const t = el.textContent?.trim().replace(/\s+/g, " ") ?? ""
     detail = t.length > 24 ? `${t.slice(0, 24)}…` : t
@@ -47,7 +50,22 @@ function describe(el: Element) {
   return { label: el.localName, detail }
 }
 
-export function LayersTree({ elements, selection, hover, onPick, onSelectSet, onMenu, onHover, onDelete, onMove, locked, ownLocked, onLock, hidden, ownHidden, onHide }: Props) {
+export function LayersTree({ elements, selection, hover, onPick, onSelectSet, onMenu, onHover, onDelete, onMove, locked, ownLocked, onLock, hidden, ownHidden, onHide, flash }: Props) {
+  // Flash new rows once they're on screen
+  useEffect(() => {
+    if (!flash) return
+    const raf = requestAnimationFrame(() => {
+      for (const i of flash.indices) {
+        const row = list.current?.querySelector(`[data-layer="${i}"]`) as HTMLElement | null
+        if (!row) continue
+        row.classList.remove("is-flash")
+        void row.offsetWidth
+        row.classList.add("is-flash")
+        row.scrollIntoView({ block: "nearest" })
+      }
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [flash])
   const selected = selection.length ? selection[selection.length - 1] : -1
   const chosen = useMemo(() => new Set(selection), [selection])
   const nodes = useMemo(() => {
@@ -174,7 +192,7 @@ export function LayersTree({ elements, selection, hover, onPick, onSelectSet, on
                 onClick={(e) => { e.stopPropagation(); toggle(n.i) }}><IconCaret /></button>
             : <span className="layer__caret" />}
           <span className="layer__tag">{n.label}</span>
-          {n.detail && <span className="layer__detail text-3">{n.detail}</span>}
+          {n.detail && <span className="layer__detail text-3" title={n.detail}>{n.detail}</span>}
           {/* Always there, in fixed slots, so nothing shifts on hover or select */}
           {n.i > 0 && (onHide || onLock || onDelete) && (
             <span className="layer__acts">

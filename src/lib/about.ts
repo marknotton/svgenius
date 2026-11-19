@@ -11,6 +11,20 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.13.0",
+    date: "19 November 2026",
+    notes: [
+      "Export one optimised SVG from a file's right-click menu",
+      "Snapping works with both tools, for whole paths and single points too, and a drag sticks to its own row or column until you pull clear",
+      "Copy, cut and paste in the editor: pasted items land in place and flash in Layers",
+      "Layers: show or hide all and lock or unlock all, every id and class after the name, and a resizable panel",
+      "Fill and stroke panels float free of the left toolbar, and the tool status floats over the canvas instead of pushing it down",
+      "Greyed-out toolbar buttons still say what they do, and why they're off. Delete sits last",
+      "Zoom shows 52× past 999%, and 100% is labelled as actual size",
+      "Settings: a colour for the circle guide. The List/Compare button names the view it switches to"
+    ]
+  },
+  {
     version: "0.12.0",
     date: "19 November 2026",
     notes: [

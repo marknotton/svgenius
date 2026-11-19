@@ -26,12 +26,12 @@ export function ViewControls({ size, sizeRange, onSize, details, onDetails, circ
           onDoubleClick={() => onSize(-1)} />
         <IconImageLg />
       </label>
-      {/* Names the view you're in; click to switch to the other one */}
+      {/* Names the view it switches to */}
       <button type="button" className="flag flag--lg view-mode" onClick={onDetails}
         title={details
-          ? "List view: compact rows with dimensions, tags of what changed and each file's preset. Click for Compare view"
-          : "Compare view: big side-by-side before and after previews. Click for List view"}>
-        {details ? "List view" : "Compare view"}
+          ? "Switch to Compare view: big side-by-side before and after previews"
+          : "Switch to List view: compact rows with dimensions, tags of what changed and each file's preset"}>
+        {details ? "Compare view" : "List view"}
       </button>
       <CanvasBackground />
       <div className="btn-join">

@@ -7,6 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 // it's ours, so the native one doesn't show as well.
 
 const TARGETS = "button[title], label[title], a[title], [role=button][title], [data-tip]"
+// A wrapper with data-tip around enabled buttons doesn't outrank their own title
 const DELAY = 300
 /** Moving to the next button within this long shows its tip straight away */
 const WARM = 600
