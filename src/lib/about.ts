@@ -14,7 +14,7 @@ export const HISTORY: Release[] = [
     version: "0.8.0",
     date: "19 November 2026",
     notes: [
-      "The top bar is gone. The logo (click it for About), Advanced, the desktop app link and Settings now sit at the bottom left of the footer. The Mac app keeps a slim empty strip for its window buttons",
+      "The top bar is gone. The logo (click it for About), the desktop app link and Settings sit at the bottom left of the footer, and Advanced sits at the right of the sidebar's tabs. The Mac app keeps a slim empty strip for its window buttons",
       "Editor: drag to resize the code panel and the path tools, and a layout switch (top right) moves them along the bottom for wide artwork",
       "Refreshing the page brings you back to the same file, with the editor open if it was",
       "Points on H and V lines (common in Illustrator exports) can now move sideways as well as up and down",

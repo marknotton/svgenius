@@ -1134,7 +1134,7 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .brand__name:hover { background: var(--surface-2); }
 .brand__link { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-2); text-decoration: none; padding: 0 4px; }
 .brand__link:hover { color: var(--accent-ink); }
-.brand__advanced { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); cursor: pointer; padding: 0 4px; }
+.advanced-toggle { margin-left: auto; align-self: center; flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-2); cursor: pointer; padding: 0 0 2px 8px; }
 .brand .btn--icon { width: 26px; height: 24px; }
 @media (max-width: 1250px) { .brand__link .brand__label { display: none; } }
 @media (max-width: 1000px) { .brand__name .brand__label { display: none; } }
