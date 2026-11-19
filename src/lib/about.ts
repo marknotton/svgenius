@@ -11,6 +11,18 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.11.0",
+    date: "19 November 2026",
+    notes: [
+      "Editor fill and stroke tools: solid, linear and radial gradient fills, stroke colour, width, caps and corners",
+      "Moving items snaps to the edges and centres of other items and the viewBox, with guide lines. The magnet turns it off, ⌘ moves freely",
+      "The editor toolbar runs full width, and Settings can dock it on the left",
+      "Undo and redo keep what was selected; the transform box follows the item while dragging",
+      "Align to the viewBox or the selection, with a switch above the align buttons",
+      "Filters for everyone; the markup editor and double-click to open are in Advanced mode, and Open in editor is in every row's menu"
+    ]
+  },
+  {
     version: "0.10.2",
     date: "19 November 2026",
     notes: [
