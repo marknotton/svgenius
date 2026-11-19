@@ -1178,6 +1178,7 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .canvas-bg__swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid var(--border); }
 .view-controls .canvas-bg { margin-left: 0; }
 /* Checkerboard off: every preview sits on the chosen colour */
+.app.has-colour .thumb__canvas, .app.has-colour .inspect__canvas { --a: var(--canvas-solid) !important; --b: color-mix(in srgb, var(--canvas-solid) 86%, #808080) !important; background-color: var(--canvas-solid) !important; }
 .app.no-checker .thumb__canvas, .app.no-checker .inspect__canvas { background-image: none !important; background-color: var(--canvas-solid) !important; }
 
 /* Settings: each group gets a rule above it and a proper heading */

@@ -639,7 +639,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     <PreviewCssContext.Provider value={appliedCss}>
     <RenderAnywayContext.Provider value={forceRender}>
     <CanvasBgContext.Provider value={canvasBg}>
-      <div className={`app${narrow ? " is-narrow" : ""}${solid ? " no-checker" : ""}${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px`, "--drawer-h": `${drawerH}px`, "--canvas-solid": solid ?? undefined } as CSSProperties}>
+      <div className={`app${narrow ? " is-narrow" : ""}${canvasBg.value.checker ? "" : " no-checker"}${canvasBg.value.colour ? " has-colour" : ""}${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px`, "--drawer-h": `${drawerH}px`, "--canvas-solid": solid ?? undefined } as CSSProperties}>
         <AppBar />
         <div className="workspace">
           <main className="workspace__main">

@@ -12,10 +12,11 @@ export interface Release {
 export const HISTORY: Release[] = [
   {
     version: "0.10.2",
-    date: "2026-11-19",
+    date: "19 November 2026",
     notes: [
       "The VectorCraft note under the editor preview wraps like a sentence, with a tighter line height",
-      "On narrower windows the code panel gives way, so the preview never drops below 280px"
+      "On narrower windows the code panel gives way, so the preview never drops below 280px",
+      "The checkerboard button sits last and works with your own background colour too: its squares become a shade of that colour"
     ]
   },
   {
