@@ -122,7 +122,10 @@ export function LayersTree({ elements, selection, hover, onPick, onSelectSet, on
     return next
   })
 
-  const [drag, setDrag] = useState<{ from: number, over: number, place: DropPlace } | null>(null)
+  // over: the row under the pointer. target: what the drop lands next to or in,
+  // which can be one of over's parents when the pointer pulls left to step out of a group
+  const [drag, setDrag] = useState<{ from: number, over: number, place: DropPlace, target: number, depth: number } | null>(null)
+  const ROW_INDENT = 12
 
   const placeFor = (e: React.DragEvent, i: number): DropPlace => {
     const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
@@ -135,6 +138,28 @@ export function LayersTree({ elements, selection, hover, onPick, onSelectSet, on
     // Not onto itself or into its own children
     for (let p: Element | null = elements[to]; p; p = p.parentElement) if (p === elements[from]) return false
     return true
+  }
+
+  /** Dropping below the last row of a group: pull left to land after the group itself */
+  const outdent = (e: React.DragEvent, n: Node): { target: number, depth: number } => {
+    const at = visible.findIndex((v) => v.i === n.i)
+    const next = visible[at + 1]
+    const minDepth = Math.max(1, next ? next.depth : 1)
+    if (n.depth <= minDepth) return { target: n.i, depth: n.depth }
+    const left = (list.current?.getBoundingClientRect().left ?? 0) + 4
+    const want = Math.max(minDepth, Math.min(n.depth, Math.floor((e.clientX - left) / ROW_INDENT)))
+    let t = n.i
+    while (nodes[t].depth > want && nodes[t].parent > 0) t = nodes[t].parent
+    return { target: t, depth: nodes[t].depth }
+  }
+  const dropOnBlank = (e: React.DragEvent) => {
+    if (!drag || e.target !== e.currentTarget) return
+    // Below the last row: after the last top-level element
+    const last = [...nodes].reverse().find((n) => n.depth === 1)
+    if (!last || !canDrop(drag.from, last.i)) return
+    e.preventDefault()
+    const lastRow = visible[visible.length - 1]
+    if (drag.over !== lastRow.i || drag.target !== last.i || drag.place !== "after") setDrag({ ...drag, over: lastRow.i, target: last.i, place: "after", depth: 1 })
   }
 
   // Finder rules: click selects, ⌘-click toggles, Shift-click selects the
@@ -166,22 +191,27 @@ export function LayersTree({ elements, selection, hover, onPick, onSelectSet, on
 
   return (
     <div className="layers" ref={list} role="tree" aria-label="Layers" tabIndex={0} onKeyDown={onKey}
-      onMouseLeave={() => onHover(-1)}>
+      onMouseLeave={() => onHover(-1)}
+      onDragOver={dropOnBlank}
+      onDrop={(e) => { if (e.target !== e.currentTarget) return; e.preventDefault(); if (drag && drag.over >= 0) onMove?.(drag.from, drag.target, drag.place); setDrag(null) }}>
       {visible.map((n) => (
         <div key={n.i} data-layer={n.i} role="treeitem" aria-selected={chosen.has(n.i)}
           aria-expanded={n.kids ? !collapsed.has(n.i) : undefined}
           className={`layer${chosen.has(n.i) ? " is-selected" : ""}${n.i === hover ? " is-hover" : ""}${drag?.over === n.i ? ` is-drop-${drag.place}` : ""}${drag?.from === n.i ? " is-dragging" : ""}${locked?.has(n.i) ? " is-locked" : ""}${hidden?.has(n.i) ? " is-hidden" : ""}`}
-          style={{ paddingLeft: 4 + n.depth * 12 }}
+          style={{ paddingLeft: 4 + n.depth * ROW_INDENT, ...(drag?.over === n.i ? { "--drop-x": `${4 + drag.depth * ROW_INDENT}px` } : {}) } as React.CSSProperties}
           draggable={!!onMove && n.i > 0 && !locked?.has(n.i)}
-          onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(n.i)); setDrag({ from: n.i, over: -1, place: "before" }) }}
+          onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(n.i)); setDrag({ from: n.i, over: -1, place: "before", target: -1, depth: 0 }) }}
           onDragOver={(e) => {
-            if (!drag || !canDrop(drag.from, n.i)) return
-            e.preventDefault()
+            if (!drag) return
             const place = placeFor(e, n.i)
-            if (drag.over !== n.i || drag.place !== place) setDrag({ ...drag, over: n.i, place })
+            const { target, depth } = place === "after" ? outdent(e, n) : { target: n.i, depth: n.depth }
+            if (!canDrop(drag.from, target)) return
+            e.preventDefault()
+            e.stopPropagation()
+            if (drag.over !== n.i || drag.place !== place || drag.target !== target) setDrag({ ...drag, over: n.i, place, target, depth })
           }}
           onDragLeave={() => { if (drag?.over === n.i) setDrag({ ...drag, over: -1 }) }}
-          onDrop={(e) => { e.preventDefault(); if (drag && drag.over >= 0) onMove?.(drag.from, drag.over, drag.place); setDrag(null) }}
+          onDrop={(e) => { e.preventDefault(); e.stopPropagation(); if (drag && drag.over >= 0) onMove?.(drag.from, drag.target, drag.place); setDrag(null) }}
           onDragEnd={() => setDrag(null)}
           onContextMenu={(e) => { e.preventDefault(); onMenu?.(n.i, e) }}
           onMouseEnter={() => onHover(n.i)}

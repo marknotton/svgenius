@@ -273,6 +273,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   // Search by original or export name; the rest of the list is hidden
   const [query, setQuery] = useState("")
+  const usedFlags = useMemo(() => new Set(items.flatMap((i) => i.flag ? [i.flag as string] : [])), [items])
   const shownItems = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return filtered
@@ -782,7 +783,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 showFilters
                 onClearFilters={() => setFilters(emptyFilters())}
                 onFilters={() => setFiltersOpen((o) => !o)}
-                filterBar={<FilterBar filters={filters} onChange={setFilters} shown={shownItems.length} total={items.length} />}
+                filterBar={<FilterBar filters={filters} onChange={setFilters} shown={shownItems.length} total={items.length} usedFlags={usedFlags} />}
                 tagsFor={tagsFor}
                 exportNames={previewNames}
                 onAddFiles={addFiles}

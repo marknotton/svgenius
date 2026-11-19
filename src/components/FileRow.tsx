@@ -8,7 +8,7 @@ import { isDesktop, openInDefaultApp, reveal } from "../lib/platform"
 import type { Backdrop, Preset, SvgItem } from "../lib/types"
 import { Thumb } from "./Thumb"
 import { TooComplex } from "./TooComplex"
-import { isBlocked } from "../lib/complexity"
+import { countNodes, isBlocked } from "../lib/complexity"
 
 interface Props {
   item: SvgItem
@@ -50,6 +50,8 @@ export const FileRow = memo(function FileRow(p: Props) {
     return tag ? parseViewBox(getAttr(tag, "viewBox")) : null
   }, [shown])
   const vbDiffers = vb && size && (Math.abs(vb.w - size.w) > 0.005 || Math.abs(vb.h - size.h) > 0.005)
+  const nodesBefore = useMemo(() => countNodes(item.source), [item.source])
+  const nodesAfter = useMemo(() => item.result ? countNodes(item.result.output) : null, [item.result])
   const dims = size ? `${fmtNum(size.w, 2)} × ${fmtNum(size.h, 2)}` : ""
   const resized = size && original && (Math.abs(size.w - original.w) > 0.005 || Math.abs(size.h - original.h) > 0.005)
 
@@ -140,6 +142,11 @@ export const FileRow = memo(function FileRow(p: Props) {
               {resized && original && <><span className="strike text-3">{fmtNum(original.w, 2)} × {fmtNum(original.h, 2)}</span> </>}
               {dims || "–"}
             </span>
+          </Fact>
+          <Fact label="Nodes">
+            {nodesAfter !== null && nodesAfter !== nodesBefore
+              ? <><span className="strike text-3">{nodesBefore.toLocaleString("en-GB")}</span> {nodesAfter.toLocaleString("en-GB")}</>
+              : nodesBefore.toLocaleString("en-GB")}
           </Fact>
           {vbDiffers && <Fact label="viewBox">{fmtNum(vb.w, 2)} × {fmtNum(vb.h, 2)}</Fact>}
           <Fact label="Settings">{item.config ? "Own settings" : (p.presets.find((x) => x.id === item.presetId) ?? p.defaultPreset).name}</Fact>

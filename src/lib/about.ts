@@ -11,6 +11,18 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "1.0.1",
+    date: "19 November 2026",
+    notes: [
+      "List view shows each file's node count, before and after",
+      "Previews lose the faint accent outline and the box around trimmed artwork",
+      "Filters only offer flags that are in use, and hide Flag altogether when nothing is flagged",
+      "Editor: Align and Pathfinder live in the toolbar. Click to open them like Fill and Stroke, or pin them to keep them showing",
+      "Editor: double-click a selected item to switch to Direct select, drag layers out of a group (pull left as you drop), and the After tooltip mentions holding C to peek",
+      "Editor: the tool hint in the header is gone"
+    ]
+  },
+  {
     version: "1.0.0",
     date: "19 November 2026",
     notes: [

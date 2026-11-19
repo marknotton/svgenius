@@ -135,7 +135,7 @@ export function PaintTools({ paint, mixed, onPaint, onGradient, side }: Props) {
  * The panel floats over the page (fixed), placed beside the swatches, so a
  * scrolling toolbar can't clip it. It stays inside the window
  */
-function Pop({ title, side, children }: { title: string, side: "top" | "left", children: ReactNode }) {
+export function Pop({ title, side, children, extra }: { title: string, side: "top" | "left", children: ReactNode, extra?: ReactNode }) {
   const el = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ left: number, top: number } | null>(null)
   useLayoutEffect(() => {
@@ -155,7 +155,7 @@ function Pop({ title, side, children }: { title: string, side: "top" | "left", c
   }, [side])
   return (
     <div ref={el} className="paint__pop" role="dialog" aria-label={title} style={pos ?? { left: -9999, top: 0 }}>
-      <div className="panel__label">{title}</div>
+      {extra ? <div className="paint__pop-head"><span className="panel__label">{title}</span>{extra}</div> : <div className="panel__label">{title}</div>}
       {children}
     </div>
   )

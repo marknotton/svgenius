@@ -18,3 +18,9 @@ export function assessComplexity(source: string): string | undefined {
 
 /** Heavy and nobody has said "Render anyway" yet */
 export const isBlocked = (item: Pick<SvgItem, "heavy" | "forceRender">) => !!item.heavy && !item.forceRender
+
+/** How many elements (nodes) the markup has */
+export function countNodes(source: string | undefined): number {
+  if (!source) return 0
+  return source.match(/<[A-Za-z]/g)?.length ?? 0
+}

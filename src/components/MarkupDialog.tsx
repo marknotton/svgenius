@@ -11,7 +11,7 @@ import { textFocus, useCommands } from "../lib/commands"
 import type { Backdrop, SvgItem } from "../lib/types"
 import { CodeEditor } from "./CodeEditor"
 import { CanvasBackground } from "./CanvasBackground"
-import { ArrangePanel } from "./ArrangePanel"
+import { ArrangeTools } from "./ArrangePanel"
 import { PaintTools } from "./PaintTools"
 import { applyGradient, applyPaint, readPaint, type Gradient } from "../lib/paint"
 import { InspectPreview, type ElementMove, type ElementTransform } from "./InspectPreview"
@@ -592,8 +592,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
       <div className="modal markup-dialog" role="dialog" aria-modal="true" aria-label={`Markup for ${item.name}`}>
         <div className="markup-dialog__head">
           <h2 className="modal__title markup-dialog__title" title={item.relPath}>{item.name}</h2>
-          <CodeTabs value={tab} onChange={onTab} />
-          <span className="text-3 markup-dialog__tip">Select (V) moves, scales and rotates. Direct select (A) edits a path's points</span>
+          <CodeTabs value={tab} onChange={onTab} peek />
           <div className="markup-dialog__spacer" />
           {nav && nav.total > 1 && (
             <div className="file-nav" role="group" aria-label="Files">
@@ -634,6 +633,9 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             </div>
             <span className="edit-toolbar__sep" />
             <PaintTools paint={paint} mixed={{ fill: differs("fill"), stroke: differs("stroke") }} onPaint={setPaint} onGradient={setGradient} side={toolbarSide} />
+            <span className="edit-toolbar__sep" />
+            <ArrangeTools all={ACTIONS.filter((a) => a.panel)} applies={(a) => actions.includes(a)} run={(a) => run(a)}
+              count={selection.filter((i) => i > 0).length} onMenu={setMenu} side={toolbarSide} />
             <span className="edit-toolbar__sep" />
             {/* Delete goes last. A disabled button still says what it does, and why it's off */}
             {[...ACTIONS.filter((a) => a.toolbar && a.id !== "delete"), ...ACTIONS.filter((a) => a.toolbar && a.id === "delete")].map((a) => {
@@ -705,7 +707,12 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
                   hidden={hidden} ownHidden={ownHidden} onHide={toggleHide} flash={flash} />
               : <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
           </div>
-          <div className="markup-dialog__canvas">
+          {/* Double-click a selected item with Select to dive into its points */}
+          <div className="markup-dialog__canvas" onDoubleClick={(e) => {
+            if (tool !== "select" || !editable || selRef.current.length !== 1) return
+            if ((e.target as HTMLElement).closest(".zoom-control, .nod, button")) return
+            setTool("direct")
+          }}>
             {/* Floats over the canvas, so it never pushes the preview down */}
             {editable && <EditStatus tool={tool} count={selection.length} note={note} />}
             {peekMarkup !== null && <span className="peek-badge">After</span>}
@@ -768,10 +775,6 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             />
             {/* Always here, the same height, so selecting things doesn't shuffle the code around */}
             <div className="markup-dialog__tools">
-              {editable && selection.some((i) => i > 0) && (
-                <ArrangePanel all={ACTIONS.filter((a) => a.panel)} applies={(a) => actions.includes(a)} run={(a) => run(a)}
-                  count={selection.filter((i) => i > 0).length} onMenu={setMenu} />
-              )}
               {layout.bottom
                 ? <Resizer edge="left" label="Resize the path tools" value={layout.toolsW} min={240} max={room("w") - 200}
                     onChange={(toolsW) => setLayout({ toolsW })} onReset={() => setLayout({ toolsW: LAYOUT_DEFAULTS.toolsW })} />
@@ -803,13 +806,13 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
 }
 
 /** Before / After switch for the markup editors */
-export function CodeTabs({ value, onChange }: { value: MarkupTab, onChange: (t: MarkupTab) => void }) {
+export function CodeTabs({ value, onChange, peek }: { value: MarkupTab, onChange: (t: MarkupTab) => void, peek?: boolean }) {
   return (
     <div className="code-tabs" role="tablist" aria-label="Markup">
       <button role="tab" aria-selected={value === "source"} className={value === "source" ? "is-active" : ""}
         title="The file's markup. Edit it here, your original isn't touched" onClick={() => onChange("source")}>Before</button>
       <button role="tab" aria-selected={value === "output"} className={value === "output" ? "is-active" : ""}
-        title="The optimised markup that gets exported" onClick={() => onChange("output")}>After</button>
+        title={`The optimised markup that gets exported${peek ? ". Hold C while in Before to peek at it" : ""}`} onClick={() => onChange("output")}>After</button>
     </div>
   )
 }

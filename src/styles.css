@@ -306,12 +306,11 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
   --b: var(--check-light-b);
   flex: none;
   display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--border);
   border-radius: var(--radius-xs);
-  background: var(--surface-2);
+  background: transparent;
   overflow: hidden;
 }
-.thumb--dark { --a: var(--check-dark-a); --b: var(--check-dark-b); border-color: var(--check-dark-b); background: #1c1c22; }
+.thumb--dark { --a: var(--check-dark-a); --b: var(--check-dark-b); }
 /* The SVG's own canvas, at its aspect ratio */
 .thumb { container-type: size; }
 .thumb__canvas {
@@ -324,7 +323,6 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
   background-color: var(--a);
   background-image: conic-gradient(var(--b) 25%, transparent 0 50%, var(--b) 0 75%, transparent 0);
   background-size: 12px 12px;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .thumb__canvas img { width: 100%; height: 100%; object-fit: fill; display: block; }
 
@@ -839,8 +837,10 @@ body.is-resizing * { user-select: none !important; }
 .layer__tag { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .layer__detail { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .layer.is-dragging { opacity: .45; }
-.layer.is-drop-before { box-shadow: inset 0 2px 0 var(--accent); }
-.layer.is-drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.layer { position: relative; }
+.layer.is-drop-before::after, .layer.is-drop-after::after { content: ""; position: absolute; left: var(--drop-x, 0); right: 0; height: 2px; background: var(--accent); pointer-events: none; }
+.layer.is-drop-before::after { top: 0; }
+.layer.is-drop-after::after { bottom: 0; }
 .layer.is-drop-inside { background: var(--accent-soft); outline: 1px dashed var(--accent); outline-offset: -1px; }
 
 /* Path commands */
@@ -962,7 +962,6 @@ body.is-resizing * { user-select: none !important; }
 .code-tabs button { border: 0; background: none; padding: 2px 6px; border-radius: var(--radius-xs); font-size: 12px; color: var(--text-3); cursor: pointer; }
 .code-tabs button:hover { color: var(--text); }
 .code-tabs button.is-active { color: var(--accent-ink); background: var(--accent-soft); }
-.markup-dialog__tip { font-size: 11px; }
 .inspector__links { display: flex; gap: 14px; flex-wrap: wrap; }
 .accordion { border-bottom: 1px solid var(--border); }
 .accordion__summary { display: flex; align-items: center; gap: 8px; padding: 12px 14px; cursor: pointer; list-style: none; }
@@ -1082,7 +1081,6 @@ input[type="range"]:active::-webkit-slider-thumb { background: var(--accent-hove
   .modal { width: calc(100vw - 16px); max-height: calc(100vh - var(--appbar-h) - 16px); }
   .modal.markup-dialog { width: 100vw; height: calc(100vh - var(--appbar-h)); border-radius: 0; padding: 10px; overflow-y: auto; }
   .markup-dialog__head { flex-wrap: wrap; gap: 8px; }
-  .markup-dialog__tip { display: none; }
   .markup-dialog__title { max-width: 60%; }
   .markup-dialog__body.is-inspecting { display: flex; flex-direction: column; flex: none; }
   .markup-dialog__canvas { order: 1; height: 60vh; flex: none; }
@@ -1339,3 +1337,17 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .edit-toolbar--left .tip-wrap { display: flex; }
 .settings__colour { display: inline-flex; align-items: center; gap: 8px; }
 .settings__colour input[type=color] { width: 32px; height: 24px; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-xs); background: none; cursor: pointer; }
+
+/* Align and Pathfinder in the editor toolbar */
+.arrange-tools { display: flex; align-items: center; gap: 6px; }
+.arrange-tools--left { flex-direction: column; }
+.arrange__anchor { position: relative; display: inline-flex; }
+.arrange-inline { display: flex; align-items: center; gap: 2px; padding: 1px 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.arrange-inline .segmented { margin-right: 4px; }
+.arrange-tools--left .arrange-inline { flex-direction: column; padding: 2px 1px; }
+.arrange-tools--left .arrange__btn { width: 26px; }
+.arrange__pin { width: 22px; height: 22px; color: var(--text-3); }
+.arrange__pin.is-on { color: var(--accent-ink); }
+.paint__pop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.paint__pop .arrange__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.paint__pop .arrange__row { flex-wrap: wrap; }

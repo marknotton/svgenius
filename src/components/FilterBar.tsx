@@ -11,6 +11,8 @@ interface Props {
   onChange: (f: FilterSet) => void
   shown: number
   total: number
+  /** Flag colours at least one file uses. Unused ones aren't offered */
+  usedFlags: Set<string>
 }
 
 const toHex = (v: string) => {
@@ -18,7 +20,7 @@ const toHex = (v: string) => {
   return c && /^#[0-9a-f]{6}$/i.test(c) ? c : "#000000"
 }
 
-export function FilterBar({ filters, onChange, shown, total }: Props) {
+export function FilterBar({ filters, onChange, shown, total, usedFlags }: Props) {
   const rules = filters.rules
   const set = (rules: FilterRule[]) => onChange({ ...filters, rules })
   const patch = (id: string, p: Partial<FilterRule>) => set(rules.map((r) => (r.id === id ? { ...r, ...p } : r)))
@@ -54,14 +56,14 @@ export function FilterBar({ filters, onChange, shown, total }: Props) {
               const fresh = createFilterRule(field)
               patch(r.id, { field, value: fresh.value, value2: "" })
             }}>
-            {FIELDS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+            {FIELDS.filter((f) => f.value !== "flag" || usedFlags.size > 0 || r.field === "flag").map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
           <select className="select select--sm" value={r.has ? "has" : "not"} aria-label={`Rule ${i + 1} match`}
             onChange={(e) => patch(r.id, { has: e.target.value === "has" })}>
             <option value="has">{verb(r.field, true)}</option>
             <option value="not">{verb(r.field, false)}</option>
           </select>
-          <Value rule={r} index={i} patch={(p) => patch(r.id, p)} />
+          <Value rule={r} index={i} usedFlags={usedFlags} patch={(p) => patch(r.id, p)} />
           <button className="btn btn--icon" title="Duplicate rule" aria-label={`Duplicate rule ${i + 1}`} onClick={() => set(duplicateAfter(rules, r.id))}><IconDuplicate /></button>
           <button className="btn btn--icon" title="Delete rule" aria-label={`Delete rule ${i + 1}`} onClick={() => set(rules.filter((x) => x.id !== r.id))}><IconTrash /></button>
         </div>
@@ -83,7 +85,7 @@ function verb(field: FilterField, has: boolean) {
   }
 }
 
-function Value({ rule: r, index: i, patch }: { rule: FilterRule, index: number, patch: (p: Partial<FilterRule>) => void }) {
+function Value({ rule: r, index: i, usedFlags, patch }: { rule: FilterRule, index: number, usedFlags: Set<string>, patch: (p: Partial<FilterRule>) => void }) {
   const label = `Rule ${i + 1} value`
   switch (r.field) {
     case "flag":
@@ -91,7 +93,7 @@ function Value({ rule: r, index: i, patch }: { rule: FilterRule, index: number, 
         <select className="select select--sm filters__value" value={r.value} aria-label={label} onChange={(e) => patch({ value: e.target.value })}>
           <option value="any">Any flag</option>
           <option value="none">No flag</option>
-          {FLAGS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+          {FLAGS.filter((f) => usedFlags.has(f.value) || r.value === f.value).map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
         </select>
       )
     case "status":
