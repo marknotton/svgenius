@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { IconDownload, IconPlay, IconReport } from "../icons"
 import { ContextMenu, type MenuState } from "./ContextMenu"
 import { InfoTip } from "./InfoTip"
@@ -32,6 +32,8 @@ interface Props {
   onOptimise: () => void
   onExport: (clear: boolean) => void
   onReport: () => void
+  /** Logo (About), desktop link, Advanced and Settings, bottom left */
+  brand: ReactNode
 }
 
 export function Footer(p: Props) {
@@ -47,6 +49,7 @@ export function Footer(p: Props) {
 
   return (
     <footer className="footer">
+      {p.brand}
       <div className="footer__summary">
         {done.length > 0 ? (
           <>

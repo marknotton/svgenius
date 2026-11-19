@@ -30,8 +30,8 @@ export function ViewControls({ size, sizeRange, onSize, details, onDetails, back
         <IconImageLg />
       </label>
       <button type="button" className={`flag flag--lg${details ? " is-on" : ""}`} aria-pressed={details}
-        title="Inspect: compact rows with dimensions, tags of what changed and each file's preset. Off: big before/after previews" onClick={onDetails}>
-        Inspect
+        title="List view: compact rows with dimensions, tags of what changed and each file's preset. Off: big side-by-side before and after previews" onClick={onDetails}>
+        List view
       </button>
       <Segmented
         label="Preview background"
@@ -54,7 +54,7 @@ export function ViewControls({ size, sizeRange, onSize, details, onDetails, back
       </div>
       <button type="button" className={`flag flag--lg${cssOpen ? " is-on" : ""}`} aria-pressed={cssOpen}
         title="Preview CSS: style the previews, e.g. set custom properties" onClick={onCssToggle}>
-        CSS{cssActive && <span className="flag__dot" />}
+        Inject CSS{cssActive && <span className="flag__dot" />}
       </button>
     </div>
   )

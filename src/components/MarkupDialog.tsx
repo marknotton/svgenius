@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { IconCopy, IconRedo, IconReset, IconUndo, IconX } from "../icons"
+import { IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
+import { Resizer } from "./Resizer"
 import { elementRanges, rangeAt } from "../lib/markupMap"
 import { moveElement, setAttr, setAttrs, translateAttrs, type DropPlace } from "../lib/markupEdit"
 import { parsePath, serialisePath, type Seg } from "../lib/pathData"
@@ -38,8 +39,32 @@ interface Props {
   onClose: () => void
 }
 
+// ── Editor layout ─────────────────────────────────────────────────────────────
+// Code and path tools sit on the right or along the bottom (handy for wide
+// artwork). Panel sizes are in pixels and kept between sessions.
+
+interface EditorLayout { bottom: boolean, sideW: number, sideH: number, toolsH: number, toolsW: number }
+const LAYOUT_DEFAULTS: EditorLayout = { bottom: false, sideW: 520, sideH: 300, toolsH: 240, toolsW: 420 }
+const LAYOUT_KEY = "svgenius:editor-layout"
+
+function useEditorLayout() {
+  const [layout, setLayout] = useState<EditorLayout>(() => {
+    try { return { ...LAYOUT_DEFAULTS, ...JSON.parse(localStorage.getItem(LAYOUT_KEY) ?? "{}") } } catch { return LAYOUT_DEFAULTS }
+  })
+  useEffect(() => { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)) } catch { /* unavailable */ } }, [layout])
+  const set = useCallback((p: Partial<EditorLayout>) => setLayout((l) => ({ ...l, ...p })), [])
+  return [layout, set] as const
+}
+
 export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onClose }: Props) {
   const markup = (tab === "source" ? item.source : item.result?.output) ?? ""
+  const [layout, setLayout] = useEditorLayout()
+  const bodyRef = useRef<HTMLDivElement>(null)
+  // Panels can grow until the canvas is down to about a quarter of the space
+  const room = (axis: "w" | "h") => {
+    const r = bodyRef.current?.getBoundingClientRect()
+    return Math.max(240, ((axis === "w" ? r?.width : r?.height) ?? 800) * 0.75)
+  }
   const ranges = useMemo(() => elementRanges(markup), [markup])
   // Several elements can be selected; path tools show when it's just one path
   const [selection, setSelection] = useState<number[]>([])
@@ -290,8 +315,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
           {/* Unaffiliated pointer to a free, fuller vector editor: this one tidies markup, it isn't an art tool */}
           <a className="markup-dialog__nod" href="https://getartcraft.com/apps/vectorcraft" target="_blank" rel="noopener"
             title="This is a basic markup editor, not an art tool. VectorCraft is a free, fuller vector editor (we're not affiliated)">
-            A basic editor. For real artwork, try the free <img src={vectorcraftIcon} alt="" width={14} height={14} />
-            <span className="markup-dialog__nod-mark">Vector<b>Craft</b></span>
+            SVGenius has a very basic editor. For a richer, fuller one, try <img src={vectorcraftIcon} alt="" width={14} height={14} />
+            <span className="markup-dialog__nod-mark">Vector<b>Craft</b></span> for free
           </a>
           <div className="markup-dialog__spacer" />
           <div className="btn-join" role="group" aria-label="History">
@@ -306,9 +331,16 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               Apply optimisation
             </button>
           )}
+          <div className="btn-join layout-switch" role="group" aria-label="Layout">
+            <button className={`btn btn--secondary btn--sm${!layout.bottom ? " is-on" : ""}`} aria-pressed={!layout.bottom}
+              onClick={() => setLayout({ bottom: false })} title="Code and path tools on the right" aria-label="Code on the right"><IconPanelRight width={13} height={13} /></button>
+            <button className={`btn btn--secondary btn--sm${layout.bottom ? " is-on" : ""}`} aria-pressed={layout.bottom}
+              onClick={() => setLayout({ bottom: true })} title="Code and path tools along the bottom, for wide artwork" aria-label="Code along the bottom"><IconPanelBottom width={13} height={13} /></button>
+          </div>
           <button className="btn btn--icon" onClick={onClose} title="Close (Esc)" aria-label="Close"><IconX /></button>
         </div>
-        <div className="markup-dialog__body is-inspecting">
+        <div ref={bodyRef} className={`markup-dialog__body is-inspecting${layout.bottom ? " is-bottom" : ""}`}
+          style={{ "--side-w": `${layout.sideW}px`, "--side-h": `${layout.sideH}px`, "--tools-h": `${layout.toolsH}px`, "--tools-w": `${layout.toolsW}px` } as React.CSSProperties}>
           <div className="markup-dialog__layers">
             <div className="panel__label">Layers</div>
             {elements
@@ -340,6 +372,11 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               path={segs ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath } : null} />
           </div>
           <div className="markup-dialog__side">
+            {layout.bottom
+              ? <Resizer edge="top" label="Resize the code panel" value={layout.sideH} min={140} max={room("h")}
+                  onChange={(sideH) => setLayout({ sideH })} onReset={() => setLayout({ sideH: LAYOUT_DEFAULTS.sideH })} />
+              : <Resizer edge="left" label="Resize the code panel" value={layout.sideW} min={280} max={room("w")}
+                  onChange={(sideW) => setLayout({ sideW })} onReset={() => setLayout({ sideW: LAYOUT_DEFAULTS.sideW })} />}
             <CodeEditor
               key={tab}
               className="markup-dialog__code"
@@ -358,6 +395,11 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
             />
             {/* Always here, the same height, so selecting things doesn't shuffle the code around */}
             <div className="markup-dialog__tools">
+              {layout.bottom
+                ? <Resizer edge="left" label="Resize the path tools" value={layout.toolsW} min={240} max={room("w") - 200}
+                    onChange={(toolsW) => setLayout({ toolsW })} onReset={() => setLayout({ toolsW: LAYOUT_DEFAULTS.toolsW })} />
+                : <Resizer edge="top" label="Resize the path tools" value={layout.toolsH} min={120} max={room("h") - 120}
+                    onChange={(toolsH) => setLayout({ toolsH })} onReset={() => setLayout({ toolsH: LAYOUT_DEFAULTS.toolsH })} />}
               {segs && <PathPanel segs={segs} readOnly={!editable} active={active} onActive={setActive} onChange={writePath} />}
               {path && "error" in path && <p className="rule__error">This path's data doesn't parse: {path.error}</p>}
               {el && ["rect", "circle", "ellipse", "line", "polyline", "polygon"].includes(el.localName) && (

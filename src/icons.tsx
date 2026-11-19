@@ -54,3 +54,6 @@ export const IconCaret = (p: P) => <Icon width={10} height={10} {...p}><path d="
 export const IconSwap = (p: P) => <Icon {...p}><path d="M2.5 5.5h10l-2.5-2.5M13.5 10.5h-10l2.5 2.5" /></Icon>
 export const IconUndo = (p: P) => <Icon {...p}><path d="M5.5 3 2.5 6l3 3M2.5 6h7a4 4 0 0 1 0 8H7" /></Icon>
 export const IconRedo = (p: P) => <Icon {...p}><path d="m10.5 3 3 3-3 3M13.5 6h-7a4 4 0 0 0 0 8H9" /></Icon>
+// Editor layout: code panel on the right, or along the bottom
+export const IconPanelRight = (p: P) => <Icon {...p}><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M10 2.5v11" /></Icon>
+export const IconPanelBottom = (p: P) => <Icon {...p}><rect x="2" y="2.5" width="12" height="11" rx="1.5" /><path d="M2 9.5h12" /></Icon>

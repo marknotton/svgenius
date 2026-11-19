@@ -103,8 +103,10 @@ export const FileRow = memo(function FileRow(p: Props) {
       onContextMenu={(e) => p.onContextMenu(item.id, e)}
       aria-selected={selected}
     >
-      <Check item={item} selected={selected} onToggle={p.onToggle} />
-      <FlagButton item={item} onFlag={p.onFlag} />
+      <span className="file-row__marks">
+        <Check item={item} selected={selected} onToggle={p.onToggle} />
+        <FlagButton item={item} onFlag={p.onFlag} />
+      </span>
       {blocked ? (
         <TooComplex item={item} size={p.compare ? thumbPx * 2 + 4 : thumbPx} />
       ) : p.compare ? (

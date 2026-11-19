@@ -35,7 +35,6 @@ export function FilterBar({ filters, onChange, shown, total }: Props) {
           options={[{ value: "source", label: "Before", title: "The markup as loaded (or as you edited it)" }, { value: "output", label: "After", title: "The optimised markup. Files not optimised yet won't match" }]} />
         <div className="toolbar__spacer" />
         {active > 0 && <span className="text-3">{shown} of {total} shown</span>}
-        <button className="link" onClick={() => set([...rules, createFilterRule()])}><IconPlus width={11} height={11} /> Add rule</button>
         {rules.length > 0 && <button className="link" onClick={() => set([])}>Clear</button>}
       </div>
       {rules.length === 0 && (
@@ -67,6 +66,10 @@ export function FilterBar({ filters, onChange, shown, total }: Props) {
           <button className="btn btn--icon" title="Delete rule" aria-label={`Delete rule ${i + 1}`} onClick={() => set(rules.filter((x) => x.id !== r.id))}><IconTrash /></button>
         </div>
       ))}
+      {/* Under the last rule, where the next one will appear */}
+      <div className="filters__foot">
+        <button className="btn btn--secondary btn--sm" onClick={() => set([...rules, createFilterRule()])}><IconPlus width={11} height={11} /> Add rule</button>
+      </div>
     </div>
   )
 }

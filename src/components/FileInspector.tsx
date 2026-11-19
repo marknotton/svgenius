@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { CodeEditor } from "./CodeEditor"
 import { CodeTabs, MarkupDialog, type MarkupTab } from "./MarkupDialog"
 import { IconCopy, IconExpand, IconReset } from "../icons"
@@ -54,6 +54,25 @@ const dims = (s: { w: number, h: number } | null) => (s ? `${fmtNum(s.w, 2)} × 
 
 export function FileInspector({ item, presets, defaultPreset, backdrop, previewPx, ...p }: Props) {
   const [tab, setTab] = useState<MarkupTab>("source")
+  // The markup box fills whatever height the sidebar has spare (at least 260px)
+  const codeSection = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const sec = codeSection.current
+    const scroll = sec?.closest(".panel__scroll") as HTMLElement | null
+    if (!sec || !scroll) return
+    const fit = () => {
+      const box = sec.querySelector(".code-editor") as HTMLElement | null
+      if (!box) return
+      const top = box.getBoundingClientRect().top - scroll.getBoundingClientRect().top + scroll.scrollTop
+      const below = sec.getBoundingClientRect().bottom - box.getBoundingClientRect().bottom
+      const spare = scroll.clientHeight - top - below - 8
+      sec.style.setProperty("--fill-h", `${Math.max(260, Math.floor(spare))}px`)
+    }
+    fit()
+    const ro = new ResizeObserver(fit)
+    ro.observe(scroll)
+    return () => ro.disconnect()
+  }, [item.id, tab])
   const [copied, setCopied] = useState(false)
   const out = item.result?.output
   const before = useMemo(() => ({ size: svgSize(item.source), vb: viewBoxOf(item.source) }), [item.source])
@@ -108,14 +127,14 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
           )}
         </section>
 
-        <section className="panel__section inspector__code">
+        <section ref={codeSection} className="panel__section inspector__code">
           <div className="inspector__codehead">
             <span className="panel__label">Markup</span>
             <CodeTabs value={tab} onChange={setTab} />
             <div className="toolbar__spacer" />
             {tab === "source" && edited && <button className="link" onClick={p.onRevert} title="Throw away edits and reload the file's markup"><IconReset width={11} height={11} /> Revert</button>}
             {tab === "output" && <button className="link" onClick={copy} disabled={!out}><IconCopy width={11} height={11} /> {copied ? "Copied" : "Copy"}</button>}
-            <button className="link" onClick={() => p.onMarkupOpen(true)} title="A big editor with a preview you can click to find shapes in the markup"><IconExpand width={11} height={11} /> Expand</button>
+            <button className="btn btn--secondary btn--sm" onClick={() => p.onMarkupOpen(true)} title="Open the full editor: layers, a preview you can click and drag, and path tools"><IconExpand width={11} height={11} /> Open editor</button>
           </div>
           {isBlocked(item) ? (
             <p className="text-3 inspector__hint">The markup editor opens once you choose Render anyway.</p>

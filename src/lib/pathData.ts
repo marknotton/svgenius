@@ -183,10 +183,25 @@ export function geometry(segs: Seg[]): SegGeometry[] {
  * point drags its handles along, like a vector editor. Relative segments
  * after it are adjusted so the rest of the path stays put.
  */
+/** H and V can only travel along one axis: turn them into L where a move needs both */
+function freeAxes(abs: Seg[], geo: SegGeometry[], i: number, dx: number, dy: number) {
+  const s = abs[i]
+  if (s?.c === "H" && dy) abs[i] = { c: "L", v: [...geo[i].to] }
+  if (s?.c === "V" && dx) abs[i] = { c: "L", v: [...geo[i].to] }
+  // The segment after keeps its own end: an H after a point that moves up and down would otherwise tilt
+  const n = abs[i + 1]
+  if (n?.c === "H" && dy) abs[i + 1] = { c: "L", v: [...geo[i + 1].to] }
+  if (n?.c === "V" && dx) abs[i + 1] = { c: "L", v: [...geo[i + 1].to] }
+}
+
 export function movePoint(segs: Seg[], index: number, kind: PointKind, x: number, y: number): Seg[] {
   const abs = absolutise(segs).map((s) => ({ c: s.c, v: [...s.v] }))
+  if (!abs[index]) return segs
+  if (kind === "end") {
+    const g = geometry(segs)
+    freeAxes(abs, g, index, x - g[index].to[0], y - g[index].to[1])
+  }
   const s = abs[index]
-  if (!s) return segs
   const set = (k: number) => { s.v[k] = x; s.v[k + 1] = y }
   if (kind === "end") {
     const g = geometry(segs)[index]
@@ -347,6 +362,8 @@ export function shiftPoints(segs: Seg[], points: PointRef[], dx: number, dy: num
   // "seg:valueIndex" of each x to move (y is the next value), plus lone axes
   const pairs = new Set<string>()
   const xs = new Set<number>(), ys = new Set<number>()
+  const geo = geometry(segs)
+  for (const p of points) if (p.kind === "end") freeAxes(abs, geo, p.seg, dx, dy)
   const end = (i: number) => {
     const s = abs[i]
     if (!s) return

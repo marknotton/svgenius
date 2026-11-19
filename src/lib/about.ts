@@ -11,6 +11,20 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.8.0",
+    date: "19 November 2026",
+    notes: [
+      "The top bar is gone. The logo (click it for About), Advanced, the desktop app link and Settings now sit at the bottom left of the footer. The Mac app keeps a slim empty strip for its window buttons",
+      "Editor: drag to resize the code panel and the path tools, and a layout switch (top right) moves them along the bottom for wide artwork",
+      "Refreshing the page brings you back to the same file, with the editor open if it was",
+      "Points on H and V lines (common in Illustrator exports) can now move sideways as well as up and down",
+      "The sidebar's markup box fills the spare height, and Expand is now an Open editor button",
+      "Filters: Add rule is a proper button under the last rule",
+      "Wording: Inspect is now List view, CSS is now Inject CSS, and Edit contents comes before Edit viewBox",
+      "Each row's checkbox and flag are stacked, the canvas hint is crisp, and toggles with an info tooltip no longer show a second, native tooltip on top"
+    ]
+  },
+  {
     version: "0.7.3",
     date: "19 November 2026",
     notes: [

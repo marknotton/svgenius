@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react"
-import { AppBar } from "./components/AppBar"
+import { AppBar, BrandBar } from "./components/AppBar"
 import { ConfigPanel } from "./components/ConfigPanel"
 import { ContextMenu, type MenuState } from "./components/ContextMenu"
 import { useDialogs } from "./components/Dialogs"
@@ -37,6 +37,11 @@ import { listenForCommands, textFocus, useCommands } from "./lib/commands"
 import { useFileWatch } from "./hooks/useFileWatch"
 import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "./lib/types"
 
+/** Where the last page load left off: the open file and whether its editor was up */
+const lastView: { focusId?: string | null, sidebarTab?: "preset" | "names" | "file", markupOpen?: boolean } = (() => {
+  try { return JSON.parse(sessionStorage.getItem("svgenius:view") ?? "{}") } catch { return {} }
+})()
+
 export default function App() {
   const { settings, update, loadError } = useAppSettings()
   const dark = useTheme(settings?.theme)
@@ -52,7 +57,7 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk, forceRender } = useItems()
+  const { items, ready, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk, forceRender } = useItems()
   // Once there are files, get the code editor ready before anyone opens it
   const hasItems = items.length > 0
   useEffect(() => { if (hasItems) preloadMonaco() }, [hasItems])
@@ -63,7 +68,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
   // The big markup editor, for the focused file
-  const [markupOpen, setMarkupOpen] = useState(false)
+  const [markupOpen, setMarkupOpen] = useState(() => lastView.markupOpen === true)
   const openMarkup = useCallback((id: string) => {
     setFocusId(id)
     setSidebarTab("file")
@@ -75,8 +80,12 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const [dragging, setDragging] = useState(false)
   const [busy, setBusy] = useState(false)
   const anchor = useRef<string | null>(null)
-  const [focusId, setFocusId] = useState<string | null>(null)
-  const [sidebarTab, setSidebarTab] = useState<"preset" | "names" | "file">("preset")
+  const [focusId, setFocusId] = useState<string | null>(() => lastView.focusId ?? null)
+  const [sidebarTab, setSidebarTab] = useState<"preset" | "names" | "file">(() => lastView.sidebarTab ?? "preset")
+  // Remember where you were, so a refresh lands back on the same file and editor
+  useEffect(() => {
+    try { sessionStorage.setItem("svgenius:view", JSON.stringify({ focusId, sidebarTab, markupOpen })) } catch { /* unavailable */ }
+  }, [focusId, sidebarTab, markupOpen])
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set())
 
   // ── Presets ─────────────────────────────────────────────────────────────────
@@ -293,8 +302,9 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   const focused = items.find((i) => i.id === focusId) ?? null
   useEffect(() => {
-    if (focusId && !focused) { setFocusId(null); setSidebarTab("preset") }
-  }, [focusId, focused])
+    // Wait for a refresh's list to come back before giving up on the file
+    if (ready && focusId && !focused) { setFocusId(null); setSidebarTab("preset"); setMarkupOpen(false) }
+  }, [ready, focusId, focused])
 
   // ── Export ──────────────────────────────────────────────────────────────────
 
@@ -622,8 +632,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     <PreviewCssContext.Provider value={appliedCss}>
     <RenderAnywayContext.Provider value={forceRender}>
       <div className={`app${narrow ? " is-narrow" : ""}${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px`, "--drawer-h": `${drawerH}px` } as CSSProperties}>
-        <AppBar onSettings={() => setSettingsOpen(true)} onAbout={() => setAboutOpen(true)}
-          advanced={settings.advanced} onAdvanced={(advanced) => update((s) => ({ ...s, advanced }))} />
+        <AppBar />
         <div className="workspace">
           <main className="workspace__main">
             {items.length === 0 ? (
@@ -758,6 +767,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
           }}
           onExport={doExport}
           onReport={() => setReportOpen(true)}
+          brand={<BrandBar onSettings={() => setSettingsOpen(true)} onAbout={() => setAboutOpen(true)}
+            advanced={settings.advanced} onAdvanced={(advanced) => update((s) => ({ ...s, advanced }))} />}
         />
         {reportOpen && (
           <ReportDialog entries={reportEntries} selected={selection} rename={settings.rename} onClose={() => setReportOpen(false)} />

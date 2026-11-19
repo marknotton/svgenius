@@ -106,7 +106,7 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
             <Segmented<Backdrop> label="Preview background" value={settings.backdrop} onChange={(v) => set("backdrop", v)}
               options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }]} />
           </div>
-          <Toggle label="Inspect mode" hint="Compact rows with dimensions, tags and presets. Off shows big before/after previews"
+          <Toggle label="List view" hint="Compact rows with dimensions, tags and presets. Off shows big before/after previews"
             checked={settings.showDetails} onChange={(v) => set("showDetails", v)} />
           <Toggle label="Circle guide" checked={settings.circleOverlay} onChange={(v) => set("circleOverlay", v)} />
           <Toggle label="Clip previews to a circle" checked={settings.circleClip} onChange={(v) => set("circleClip", v)} />

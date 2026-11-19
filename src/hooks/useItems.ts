@@ -13,6 +13,14 @@ import type { GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } f
 
 export type ResolveSpec = (item: SvgItem) => RunSpec
 
+const reloaded = (() => {
+  try {
+    const was = sessionStorage.getItem("svgenius:alive") === "1"
+    sessionStorage.setItem("svgenius:alive", "1")
+    return was
+  } catch { return false }
+})()
+
 export function useItems() {
   const [items, setItems] = useState<SvgItem[]>([])
   const itemsRef = useRef(items)
@@ -20,12 +28,16 @@ export function useItems() {
   // Latest run per item, so a slow earlier run can't overwrite a newer one
   const runs = useRef(new Map<string, number>())
 
-  // Browser: bring back the last list after a refresh, then keep it saved
-  const restored = useRef(isDesktop)
+  // Bring back the last list after a refresh, then keep it saved. The browser
+  // always does; the desktop app only on a reload (sessionStorage survives a
+  // reload but not a fresh launch), so opening the app still starts empty
+  const restored = useRef(false)
+  const [ready, setReady] = useState(false)
   useEffect(() => {
-    if (isDesktop) return
+    if (isDesktop && !reloaded) { restored.current = true; setReady(true); return }
     loadSession().then((saved) => {
       restored.current = true
+      setReady(true)
       if (saved.length === 0) return
       setItems((list) => {
         const known = new Set(list.map((i) => i.path))
@@ -34,7 +46,7 @@ export function useItems() {
     })
   }, [])
   useEffect(() => {
-    if (isDesktop || !restored.current) return
+    if (!restored.current) return
     const t = setTimeout(() => saveSession(items), 600)
     return () => clearTimeout(t)
   }, [items])
@@ -166,5 +178,5 @@ export function useItems() {
     return results
   }, [patch])
 
-  return { items, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk, forceRender }
+  return { items, ready, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, setConfig, optimise, reloadFromDisk, forceRender }
 }

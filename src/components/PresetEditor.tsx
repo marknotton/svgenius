@@ -56,12 +56,12 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
 
       {advanced && <>
       <section className="panel__section">
-        <EditViewBox trim={s.trim} onChange={trim} />
+        <EditContents trim={s.trim} onChange={trim}
+          markup={s.appendMarkup} onMarkup={(appendMarkup) => edit((x) => ({ ...x, appendMarkup }))} />
       </section>
 
       <section className="panel__section">
-        <EditContents trim={s.trim} onChange={trim}
-          markup={s.appendMarkup} onMarkup={(appendMarkup) => edit((x) => ({ ...x, appendMarkup }))} />
+        <EditViewBox trim={s.trim} onChange={trim} />
       </section>
 
       <section className="panel__section">
