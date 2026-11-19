@@ -11,6 +11,16 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "0.10.0",
+    date: "19 November 2026",
+    notes: [
+      "Align: left, centre, right, top, middle and bottom. One element lines up with the canvas, several with each other (or the canvas, from ···)",
+      "Distribute (in ···): spread three or more evenly by their centres, or give them equal gaps",
+      "Pathfinder: Unite, Minus front, Intersect and Exclude on two or more shapes. The result is one path with the top shape's paint (the bottom one's for Minus front)",
+      "Lock layers from the padlock in the layers tree or the right-click menu. Locked layers, and anything inside a locked group, can't be selected, moved or edited, and clicks go through to what's underneath"
+    ]
+  },
+  {
     version: "0.9.1",
     date: "19 November 2026",
     notes: [

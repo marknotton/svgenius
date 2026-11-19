@@ -11,6 +11,7 @@ import { textFocus, useCommands } from "../lib/commands"
 import type { Backdrop, SvgItem } from "../lib/types"
 import { CodeEditor } from "./CodeEditor"
 import { CanvasBackground, solidOf, useCanvasBg } from "./CanvasBackground"
+import { ArrangePanel } from "./ArrangePanel"
 import { InspectPreview, type ElementMove, type ElementTransform } from "./InspectPreview"
 import { LayersTree } from "./LayersTree"
 import vectorcraftIcon from "../assets/vectorcraft.png"
@@ -58,6 +59,13 @@ function useEditorLayout() {
   return [layout, set] as const
 }
 
+// ── Layer locks ───────────────────────────────────────────────────────────────
+// A lock remembers the element's opening tag (which can't change while it's
+// locked) and roughly where it was, so it survives edits that renumber things.
+// Kept per file for this visit, and never written into the markup.
+interface LockRef { tag: string, near: number }
+const LOCKS = new Map<string, LockRef[]>()
+
 export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onClose }: Props) {
   const markup = (tab === "source" ? item.source : item.result?.output) ?? ""
   const [layout, setLayout] = useEditorLayout()
@@ -74,6 +82,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
   const setSelected = (i: number) => setSelection(i >= 0 ? [i] : [])
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [bg, setBg] = useCanvasBg(backdrop)
+  const [locks, setLocks] = useState<LockRef[]>(() => LOCKS.get(item.id) ?? [])
+  useEffect(() => { LOCKS.set(item.id, locks) }, [item.id, locks])
   // The VectorCraft note, until it's dismissed on this device
   const [nodDismissed, setNodDismissed] = useState(() => { try { return localStorage.getItem("svgenius:nod-dismissed") === "1" } catch { return false } })
   const dismissNod = () => { setNodDismissed(true); try { localStorage.setItem("svgenius:nod-dismissed", "1") } catch { /* unavailable */ } }
@@ -158,6 +168,33 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
   const canUndo = hist.current.past.length > 0, canRedo = hist.current.future.length > 0
 
   const elements = useMemo(() => parseElements(markup), [markup])
+  // Each lock, matched to the element with the same opening tag nearest where it was
+  const lockAt = useMemo(() => locks.map((l) => {
+    let best = -1
+    ranges.forEach((r, k) => {
+      if (k > 0 && markup.slice(r.start, r.tagEnd) === l.tag && (best < 0 || Math.abs(k - l.near) < Math.abs(best - l.near))) best = k
+    })
+    return best
+  }), [locks, ranges, markup])
+  const ownLocked = useMemo(() => new Set(lockAt.filter((k) => k > 0)), [lockAt])
+  // Locking a group locks what's in it
+  const locked = useMemo(() => {
+    const out = new Set<number>()
+    if (!elements || !ownLocked.size) return out
+    const own = new Set([...ownLocked].map((k) => elements[k]))
+    elements.forEach((el, k) => { for (let p: Element | null = el; p; p = p.parentElement) if (own.has(p)) { out.add(k); break } })
+    return out
+  }, [elements, ownLocked])
+  const toggleLock = (k: number) => {
+    const at = lockAt.indexOf(k)
+    if (at >= 0) { setLocks((l) => l.filter((_, n) => n !== at)); return }
+    const r = ranges[k]
+    if (r && k > 0) setLocks((l) => [...l, { tag: markup.slice(r.start, r.tagEnd), near: k }])
+  }
+  // Locked things can't be in the selection, however they got there
+  useEffect(() => {
+    if (selection.some((k) => locked.has(k))) setSelection((s) => s.filter((k) => !locked.has(k)))
+  }, [selection, locked])
   const editable = tab === "source"
   const el = selected >= 0 ? elements?.[selected] : undefined
   const [active, setActive] = useState(-1)
@@ -318,9 +355,11 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
     e.preventDefault()
     if (!editable) return
     // Right-clicking outside the selection selects that one thing
+    const lockItem: MenuItem = { label: ownLocked.has(i) ? "Unlock" : "Lock", run: () => toggleLock(i), disabled: !ownLocked.has(i) && locked.has(i) }
+    if (locked.has(i)) { setMenu({ x: e.clientX, y: e.clientY, items: [lockItem] }); return }
     const pick = i > 0 && !selection.includes(i) ? [i] : selection
     if (pick !== selection) setSelection(pick)
-    const acts = available(pick)
+    const acts = available(pick).filter((a) => !a.panel)
     if (!acts.length) return
     const c = elements ? { markup, ranges, elements, selection: topLevel(pick, elements) } : null
     const items: Array<MenuItem | "-"> = []
@@ -330,6 +369,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
       last = a.group
       items.push({ label: a.shortcut ? `${a.label}    ${a.shortcut}` : a.label, danger: a.danger, run: () => { if (c) run(a, c) } })
     }
+    if (i > 0) items.push("-", lockItem)
     setMenu({ x: e.clientX, y: e.clientY, items })
   }
 
@@ -405,7 +445,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
                   onPick={pick} onSelectSet={(list) => { setSelection(list); const r = ranges[list[list.length - 1]]; if (r) setReveal((x) => ({ start: r.start, end: r.end, n: (x?.n ?? 0) + 1, focus: false })) }}
                   onHover={setHover} onMenu={openMenu}
                   onDelete={editable ? (i) => { const d = ACTIONS.find((a) => a.id === "delete"); const c = elements && { markup, ranges, elements, selection: [i] }; if (d && c) run(d, c) } : undefined}
-                  onMove={editable ? move : undefined} />
+                  onMove={editable ? move : undefined}
+                  locked={locked} ownLocked={ownLocked} onLock={toggleLock} />
               : <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
           </div>
           <div className="markup-dialog__canvas">
@@ -429,7 +470,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
               </>}
               <CanvasBackground value={bg} onChange={setBg} />
             </div>
-            <InspectPreview markup={markup} backdrop={bg.tone} solid={solidOf(bg)} selection={selection}
+            <InspectPreview markup={markup} backdrop={bg.tone} solid={solidOf(bg)} selection={selection} locked={ownLocked}
               onPick={(i, add) => { (document.activeElement as HTMLElement | null)?.blur?.(); pick(i, add ? "add" : "only") }}
               onSelect={(found, add) => setSelection((s) => (add ? [...s, ...found.filter((i) => !s.includes(i))] : found))}
               onMoveBy={moveBy} onContextMenu={openMenu} readOnly={!editable}
@@ -484,6 +525,10 @@ export function MarkupDialog({ item, tab, onTab, backdrop, onEdit, onRevert, onC
             />
             {/* Always here, the same height, so selecting things doesn't shuffle the code around */}
             <div className="markup-dialog__tools">
+              {editable && selection.some((i) => i > 0) && (
+                <ArrangePanel all={ACTIONS.filter((a) => a.panel)} applies={(a) => actions.includes(a)} run={(a) => run(a)}
+                  count={selection.filter((i) => i > 0).length} onMenu={setMenu} />
+              )}
               {layout.bottom
                 ? <Resizer edge="left" label="Resize the path tools" value={layout.toolsW} min={240} max={room("w") - 200}
                     onChange={(toolsW) => setLayout({ toolsW })} onReset={() => setLayout({ toolsW: LAYOUT_DEFAULTS.toolsW })} />

@@ -1186,3 +1186,21 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 /* Sidebar tabs keep their names; only an open file's tab gives way */
 .sidebar__tab { flex: none; }
 .sidebar__tab--file { flex: 0 1 auto; min-width: 48px; }
+
+/* Align and Pathfinder, at the top of the editor's tools */
+.arrange { flex: none; display: flex; flex-wrap: wrap; gap: 6px 18px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.arrange__group { display: flex; flex-direction: column; gap: 4px; }
+.arrange__group .panel__label { margin: 0; display: flex; gap: 6px; }
+.arrange__group .panel__label .text-3 { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.arrange__row { display: flex; gap: 2px; }
+.arrange__btn { width: 28px; height: 26px; }
+.arrange__btn:disabled { opacity: .35; }
+
+/* Layer locks: the padlock shows on hover, and stays put once locked */
+.layer__lock { margin-left: auto; flex: none; display: none; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--text-3); cursor: pointer; }
+.layer:hover .layer__lock, .layer.is-locked .layer__lock { display: inline-grid; }
+.layer__lock.is-on { color: var(--accent-ink); }
+.layer__lock:hover:not(:disabled) { color: var(--text); background: var(--surface-2); }
+.layer__lock:disabled { cursor: default; opacity: .6; }
+.layer.is-locked .layer__tag, .layer.is-locked .layer__detail { opacity: .55; }
+.layer__lock + .layer__delete { margin-left: 0; }

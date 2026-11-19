@@ -3,6 +3,8 @@ import { breakApart, convertToPath, duplicateElement, groupElements, moveElement
 import { outlineStrokes } from "./outlineStroke"
 import { SHAPES } from "./pathData"
 import type { Command } from "./commands"
+import { alignMoves, distributeMoves, pathfinder, PATHFINDER, type AlignMode, type DistributeMode, type Move } from "./arrange"
+import { setAttrs, translateAttrs } from "./markupEdit"
 
 // ── Things you can do to the selection in the editor ──────────────────────────
 // Each action says when it applies and what it does. The toolbar, the
@@ -39,6 +41,8 @@ export interface EditorAction {
   group: "edit" | "arrange" | "convert"
   /** Shown on the toolbar as well as in menus */
   toolbar?: boolean
+  /** Lives in the Align / Pathfinder panel instead of the menus */
+  panel?: "align" | "distribute" | "pathfinder"
   danger?: boolean
   hint?: string
   applies: (ctx: ActionContext) => boolean
@@ -198,6 +202,53 @@ export const ACTIONS: EditorAction[] = [
     },
   },
 ]
+
+// ── Align, distribute, Pathfinder (the panel under the code) ──
+
+/** Applies moves back to front, so earlier offsets stay put */
+function applyMoves(ctx: ActionContext, moves: Move[]): ActionResult | { error: string } {
+  if (!moves.length) return { error: "Already lined up" }
+  let markup = ctx.markup
+  for (const m of [...moves].sort((a, b) => b.index - a.index)) {
+    const r = elementRanges(markup)[m.index], el = ctx.elements[m.index]
+    if (r && el) markup = setAttrs(markup, r, translateAttrs(el, m.dx, m.dy))
+  }
+  return { markup, select: ctx.selection }
+}
+
+const ALIGN: { mode: AlignMode, label: string }[] = [
+  { mode: "left", label: "Align left edges" }, { mode: "hcentre", label: "Align horizontal centres" }, { mode: "right", label: "Align right edges" },
+  { mode: "top", label: "Align top edges" }, { mode: "vmiddle", label: "Align vertical centres" }, { mode: "bottom", label: "Align bottom edges" }
+]
+const DISTRIBUTE: { mode: DistributeMode, label: string, hint: string }[] = [
+  { mode: "hcentres", label: "Distribute horizontal centres", hint: "Spread three or more evenly left to right by their centres. The outer two stay put" },
+  { mode: "vcentres", label: "Distribute vertical centres", hint: "Spread three or more evenly top to bottom by their centres. The outer two stay put" },
+  { mode: "hspace", label: "Distribute horizontal spacing", hint: "Make the gaps between three or more the same, left to right" },
+  { mode: "vspace", label: "Distribute vertical spacing", hint: "Make the gaps between three or more the same, top to bottom" }
+]
+
+ACTIONS.push(
+  ...ALIGN.map((a): EditorAction => ({
+    id: `align-${a.mode}`, label: a.label, group: "arrange", panel: "align",
+    hint: `${a.label}. One element lines up with the canvas, several with each other`,
+    applies: (ctx) => picked(ctx).length > 0,
+    run: (ctx) => applyMoves(ctx, alignMoves(ctx.markup, picked(ctx), a.mode))
+  })),
+  ...DISTRIBUTE.map((d): EditorAction => ({
+    id: `distribute-${d.mode}`, label: d.label, group: "arrange", panel: "distribute", hint: d.hint,
+    applies: (ctx) => picked(ctx).length > 2,
+    run: (ctx) => applyMoves(ctx, distributeMoves(ctx.markup, picked(ctx), d.mode))
+  })),
+  ...PATHFINDER.map((p): EditorAction => ({
+    id: `pathfinder-${p.op}`, label: p.label, group: "convert", panel: "pathfinder", hint: p.hint,
+    applies: (ctx) => picked(ctx).filter((i) => tag(ctx, i) === "path" || SHAPES.has(tag(ctx, i))).length > 1,
+    run: async (ctx) => {
+      const out = await pathfinder(ctx.markup, ctx.ranges, picked(ctx), p.op)
+      if ("error" in out) return out
+      return { markup: out.markup, select: startsToIndices(out.markup, [out.start]) }
+    }
+  }))
+)
 
 /** Leaves out anything inside another selected element */
 export function topLevel(selection: number[], elements: Element[]) {

@@ -28,6 +28,8 @@ interface Props {
   hover?: number
   /** The selected path's points, drawn as draggable handles */
   path?: PathEdit | null
+  /** Locked elements: clicks and boxes go straight through them */
+  locked?: Set<number>
   /** A plain colour instead of the checkerboard */
   solid?: string | null
   /** When set, the selection gets a box with scale and rotate handles */
@@ -82,7 +84,7 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, solid }: Props) {
+export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, solid, locked }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
@@ -112,6 +114,17 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
     shadow.replaceChildren(base)
     if (root) shadow.appendChild(document.importNode(root, true))
   }, [root])
+
+  // Locked elements (and what's in them) ignore the pointer, so whatever is
+  // underneath gets the click instead
+  const lockKey = locked ? [...locked].sort().join(",") : ""
+  useLayoutEffect(() => {
+    const shadow = stage.current?.shadowRoot
+    if (!shadow) return
+    let style = shadow.getElementById("svgenius-locks")
+    if (!style) { style = document.createElement("style"); style.id = "svgenius-locks"; shadow.appendChild(style) }
+    style.textContent = lockKey ? lockKey.split(",").map((k) => `[${ATTR}="${k}"],[${ATTR}="${k}"] *`).join(",") + "{pointer-events:none}" : ""
+  }, [lockKey, root])
 
   // Outline boxes follow the picked and hovered elements
   useEffect(() => {
@@ -216,6 +229,8 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
         const tp = Math.min(box1.y0, box1.y1) + base.y, b = Math.max(box1.y0, box1.y1) + base.y
         const found = [...shadow.querySelectorAll(PICKABLE)].filter((el) => {
           if (el.closest(UNPAINTED)) return false
+          // Locked: pointer-events are off on it or a group it's in
+          if (getComputedStyle(el).pointerEvents === "none") return false
           const q = el.getBoundingClientRect()
           return q.width + q.height > 0 && q.right >= l && q.left <= r && q.bottom >= tp && q.top <= b
         }).map((el) => Number(el.getAttribute(ATTR)))

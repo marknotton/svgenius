@@ -60,3 +60,18 @@ export const IconPanelBottom = (p: P) => <Icon {...p}><rect x="2" y="2.5" width=
 // Select tools: a solid arrow picks whole objects, a hollow one picks points
 export const IconArrowSolid = (p: P) => <Icon {...p}><path d="M4 2.5v10.5l3-3 2 4.5 1.8-.8-2-4.4H13z" fill="currentColor" /></Icon>
 export const IconArrowHollow = (p: P) => <Icon {...p}><path d="M4 2.5v10.5l3-3 2 4.5 1.8-.8-2-4.4H13z" /></Icon>
+// Align: a bar for the edge or centre line, boxes lined up against it
+export const IconAlignLeft = (p: P) => <Icon {...p}><path d="M2.5 2v12" /><rect x="4.5" y="4" width="8" height="3" rx=".5" /><rect x="4.5" y="9" width="5" height="3" rx=".5" /></Icon>
+export const IconAlignHCentre = (p: P) => <Icon {...p}><path d="M8 2v12" /><rect x="3.5" y="4" width="9" height="3" rx=".5" /><rect x="5" y="9" width="6" height="3" rx=".5" /></Icon>
+export const IconAlignRight = (p: P) => <Icon {...p}><path d="M13.5 2v12" /><rect x="3.5" y="4" width="8" height="3" rx=".5" /><rect x="6.5" y="9" width="5" height="3" rx=".5" /></Icon>
+export const IconAlignTop = (p: P) => <Icon {...p}><path d="M2 2.5h12" /><rect x="4" y="4.5" width="3" height="8" rx=".5" /><rect x="9" y="4.5" width="3" height="5" rx=".5" /></Icon>
+export const IconAlignVMiddle = (p: P) => <Icon {...p}><path d="M2 8h12" /><rect x="4" y="3.5" width="3" height="9" rx=".5" /><rect x="9" y="5" width="3" height="6" rx=".5" /></Icon>
+export const IconAlignBottom = (p: P) => <Icon {...p}><path d="M2 13.5h12" /><rect x="4" y="3.5" width="3" height="8" rx=".5" /><rect x="9" y="6.5" width="3" height="5" rx=".5" /></Icon>
+// Pathfinder: two overlapping squares, with the part that's kept filled
+export const IconUnite = (p: P) => <Icon {...p}><path d="M2.5 2.5h7v4h4v7h-7v-4h-4z" fill="currentColor" fillOpacity=".35" /></Icon>
+export const IconMinusFront = (p: P) => <Icon {...p}><path d="M2.5 2.5h7v4h-3v3h-4z" fill="currentColor" fillOpacity=".35" /><rect x="6.5" y="6.5" width="7" height="7" strokeDasharray="1.5 1.5" /></Icon>
+export const IconIntersect = (p: P) => <Icon {...p}><rect x="2.5" y="2.5" width="7" height="7" strokeDasharray="1.5 1.5" /><rect x="6.5" y="6.5" width="7" height="7" strokeDasharray="1.5 1.5" /><rect x="6.5" y="6.5" width="3" height="3" fill="currentColor" fillOpacity=".5" /></Icon>
+export const IconExclude = (p: P) => <Icon {...p}><path d="M2.5 2.5h7v4h-3v3h-4zM9.5 9.5v-3h4v7h-7v-4z" fill="currentColor" fillOpacity=".35" /><rect x="6.5" y="6.5" width="3" height="3" /></Icon>
+export const IconMore = (p: P) => <Icon {...p}><circle cx="3.5" cy="8" r=".9" fill="currentColor" /><circle cx="8" cy="8" r=".9" fill="currentColor" /><circle cx="12.5" cy="8" r=".9" fill="currentColor" /></Icon>
+export const IconLock = (p: P) => <Icon {...p}><rect x="3.5" y="7" width="9" height="6.5" rx="1.2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></Icon>
+export const IconUnlock = (p: P) => <Icon {...p}><rect x="3.5" y="7" width="9" height="6.5" rx="1.2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 4.9-.7" /></Icon>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { IconCaret, IconTrash } from "../icons"
+import { IconCaret, IconLock, IconTrash, IconUnlock } from "../icons"
 import type { DropPlace } from "../lib/markupEdit"
 
 /** Elements that can hold others, so things can be dropped into them */
@@ -23,6 +23,11 @@ interface Props {
   /** The rest only in the editable markup */
   onDelete?: (index: number) => void
   onMove?: (from: number, to: number, place: DropPlace) => void
+  /** Locked layers, and everything inside them */
+  locked?: Set<number>
+  /** The layers locked themselves (not through a parent) */
+  ownLocked?: Set<number>
+  onLock?: (index: number) => void
 }
 
 interface Node { i: number, depth: number, parent: number, kids: number, label: string, detail: string }
@@ -38,7 +43,7 @@ function describe(el: Element) {
   return { label: el.localName, detail }
 }
 
-export function LayersTree({ elements, selection, hover, onPick, onSelectSet, onMenu, onHover, onDelete, onMove }: Props) {
+export function LayersTree({ elements, selection, hover, onPick, onSelectSet, onMenu, onHover, onDelete, onMove, locked, ownLocked, onLock }: Props) {
   const selected = selection.length ? selection[selection.length - 1] : -1
   const chosen = useMemo(() => new Set(selection), [selection])
   const nodes = useMemo(() => {
@@ -143,9 +148,9 @@ export function LayersTree({ elements, selection, hover, onPick, onSelectSet, on
       {visible.map((n) => (
         <div key={n.i} data-layer={n.i} role="treeitem" aria-selected={chosen.has(n.i)}
           aria-expanded={n.kids ? !collapsed.has(n.i) : undefined}
-          className={`layer${chosen.has(n.i) ? " is-selected" : ""}${n.i === hover ? " is-hover" : ""}${drag?.over === n.i ? ` is-drop-${drag.place}` : ""}${drag?.from === n.i ? " is-dragging" : ""}`}
+          className={`layer${chosen.has(n.i) ? " is-selected" : ""}${n.i === hover ? " is-hover" : ""}${drag?.over === n.i ? ` is-drop-${drag.place}` : ""}${drag?.from === n.i ? " is-dragging" : ""}${locked?.has(n.i) ? " is-locked" : ""}`}
           style={{ paddingLeft: 4 + n.depth * 12 }}
-          draggable={!!onMove && n.i > 0}
+          draggable={!!onMove && n.i > 0 && !locked?.has(n.i)}
           onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(n.i)); setDrag({ from: n.i, over: -1, place: "before" }) }}
           onDragOver={(e) => {
             if (!drag || !canDrop(drag.from, n.i)) return
@@ -159,13 +164,21 @@ export function LayersTree({ elements, selection, hover, onPick, onSelectSet, on
           onContextMenu={(e) => { e.preventDefault(); onMenu?.(n.i, e) }}
           onMouseEnter={() => onHover(n.i)}
           onMouseDown={(e) => { if (e.shiftKey) e.preventDefault() }}
-          onClick={(e) => click(n.i, e)}>
+          onClick={(e) => { if (!locked?.has(n.i)) click(n.i, e) }}>
           {n.kids > 0
             ? <button className={`layer__caret${collapsed.has(n.i) ? "" : " is-open"}`} tabIndex={-1} aria-label={collapsed.has(n.i) ? "Expand" : "Collapse"}
                 onClick={(e) => { e.stopPropagation(); toggle(n.i) }}><IconCaret /></button>
             : <span className="layer__caret" />}
           <span className="layer__tag">{n.label}</span>
           {n.detail && <span className="layer__detail text-3">{n.detail}</span>}
+          {onLock && n.i > 0 && (
+            <button className={`layer__lock${ownLocked?.has(n.i) ? " is-on" : ""}`} tabIndex={-1}
+              title={ownLocked?.has(n.i) ? "Unlock: it can be selected and edited again" : locked?.has(n.i) ? "Locked by a group it's in" : "Lock: it can't be selected or edited until unlocked"}
+              aria-label={`${ownLocked?.has(n.i) ? "Unlock" : "Lock"} ${n.label}`} disabled={!ownLocked?.has(n.i) && locked?.has(n.i)}
+              onClick={(e) => { e.stopPropagation(); onLock(n.i) }}>
+              {locked?.has(n.i) ? <IconLock width={11} height={11} /> : <IconUnlock width={11} height={11} />}
+            </button>
+          )}
           {onDelete && n.i > 0 && chosen.has(n.i) && (
             <button className="layer__delete" tabIndex={-1} title="Delete this element (Delete key)" aria-label={`Delete ${n.label}`}
               onClick={(e) => { e.stopPropagation(); onDelete(n.i) }}><IconTrash width={11} height={11} /></button>
