@@ -124,7 +124,7 @@ export function useItems() {
     history.current.set(id, h)
   }
   const withSource = (i: SvgItem, source: string): SvgItem =>
-    ({ ...i, source, size: byteLength(source), heavy: assessComplexity(source), rev: i.rev + 1, status: i.status === "error" ? "idle" : i.status, errorKey: undefined })
+    ({ ...i, source, size: byteLength(source), heavy: assessComplexity(source), rev: i.rev + 1, editedAt: Date.now(), status: i.status === "error" ? "idle" : i.status, errorKey: undefined })
 
   /** In-app edit of the markup. Never written back to the original file */
   const editSource = useCallback((id: string, source: string) => {
@@ -165,7 +165,7 @@ export function useItems() {
     const edited = item.fileSource !== undefined && item.source !== item.fileSource
     setItems((list) => list.map((i) => (i.path !== path ? i
       : edited ? { ...i, fileSource: text }
-      : { ...i, source: text, fileSource: text, size: byteLength(text), heavy: assessComplexity(text), rev: i.rev + 1, status: i.status === "error" ? "idle" : i.status, errorKey: undefined })))
+      : { ...i, source: text, fileSource: text, size: byteLength(text), heavy: assessComplexity(text), rev: i.rev + 1, mtime: Date.now(), status: i.status === "error" ? "idle" : i.status, errorKey: undefined })))
     return edited ? "kept" : "updated"
   }, [])
 

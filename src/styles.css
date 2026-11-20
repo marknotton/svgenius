@@ -1370,3 +1370,5 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .update-notice__acts { display: flex; justify-content: flex-end; gap: 6px; }
 .update-notice .update__notes { max-height: 120px; }
 .modal__actions .modal__aside { margin-right: auto; }
+/* Header buttons: file arrows, undo/redo and layout all one height */
+.markup-dialog__head .btn--sm { height: 28px; min-width: 28px; padding-block: 0; display: inline-flex; align-items: center; justify-content: center; }

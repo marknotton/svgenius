@@ -191,6 +191,8 @@ export interface ScannedFile {
   name: string
   relPath: string
   size: number
+  /** Last modified on disk, ms since the epoch */
+  mtime?: number | null
 }
 
 export type Flag = "red" | "orange" | "yellow" | "green" | "blue" | "purple"
@@ -228,6 +230,8 @@ export interface SvgItem extends ScannedFile {
   fileSource?: string
   /** Bumped on every in-app edit of the source */
   rev: number
+  /** When the source was last edited in the app, ms since the epoch */
+  editedAt?: number
   /** This file's own settings, used instead of its preset */
   config?: SvgoSettings
   /** A colour flag for sorting through files */

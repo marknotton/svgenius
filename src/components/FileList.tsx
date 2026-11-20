@@ -1,6 +1,6 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react"
 import { LIVE_BUFFER_PX } from "../lib/config"
-import { IconFile, IconFilter, IconFolder, IconTrash, IconProject } from "../icons"
+import { IconFile, IconFilter, IconSort, IconFolder, IconTrash, IconProject } from "../icons"
 import { plural } from "../lib/format"
 import type { FileTag } from "../lib/tags"
 import type { AppSettings, Preset, SvgItem } from "../lib/types"
@@ -34,6 +34,9 @@ interface Props {
   showFilters: boolean
   onFilters: () => void
   filterBar: ReactNode
+  /** The sort in use, or null for the list's own order */
+  sortLabel: string | null
+  onSort: (e: React.MouseEvent) => void
   onClearFilters: () => void
   tagsFor: (item: SvgItem) => FileTag[]
   exportNames: Map<string, string> | null
@@ -123,6 +126,10 @@ export function FileList(p: Props) {
           aria-pressed={p.filtersOpen} title="Advanced filters: markup, colours, elements, attributes, flags and status">
           <IconFilter /> Filters{p.filterCount > 0 && <span className="filters-btn__count">{p.filterCount}</span>}
         </button>}
+        <button className={`btn btn--ghost btn--sm filters-btn${p.sortLabel ? " is-on" : ""}`} onClick={p.onSort} aria-haspopup="menu"
+          title="Sort the files shown: name, folder, size, saving, viewBox, nodes, last updated or preset, and group by flag">
+          <IconSort /> {p.sortLabel ? `Sort: ${p.sortLabel}` : "Sort"}
+        </button>
         <div className="toolbar__spacer" />
         {p.viewControls}
       </div>

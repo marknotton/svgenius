@@ -91,3 +91,29 @@ export function readProject(text: string, current: AppSettings): { files: SvgIte
   const focusId = str(raw.focusId) ?? null
   return { files, focusId: focusId && files.some((f) => f.id === focusId) ? focusId : null, settings }
 }
+
+/**
+ * Roughly how many things changed between two project fingerprints (from
+ * buildProject, as JSON): each file added, removed or edited counts once, and
+ * so does each changed setting
+ */
+export function countChanges(before: string, after: string): number {
+  try {
+    const a = JSON.parse(before) as ProjectFile, b = JSON.parse(after) as ProjectFile
+    const was = new Map(a.files.map((f) => [f.id, JSON.stringify(f)]))
+    let n = 0
+    for (const f of b.files) {
+      const old = was.get(f.id)
+      if (old === undefined || old !== JSON.stringify(f)) n++
+      was.delete(f.id)
+    }
+    n += was.size
+    const keys = new Set([...Object.keys(a.settings ?? {}), ...Object.keys(b.settings ?? {})])
+    for (const k of keys) {
+      if (JSON.stringify((a.settings as Record<string, unknown>)[k]) !== JSON.stringify((b.settings as Record<string, unknown>)[k])) n++
+    }
+    return Math.max(1, n)
+  } catch {
+    return 1
+  }
+}

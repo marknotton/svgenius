@@ -108,7 +108,7 @@ export const scanPaths = async (paths: string[]): Promise<ScannedFile[]> => {
   if (isDesktop) return desktop.scanPaths(paths)
   return paths.flatMap((p) => {
     const f = webFiles.get(p)
-    return f ? [{ path: p, name: f.name, relPath: p, size: f.size }] : []
+    return f ? [{ path: p, name: f.name, relPath: p, size: f.size, mtime: f.lastModified }] : []
   })
 }
 

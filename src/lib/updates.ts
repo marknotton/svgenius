@@ -43,7 +43,10 @@ export async function checkForUpdate(): Promise<UpdateState> {
     set(pending ? { status: "available", version: pending.version, notes: pending.body?.trim() || undefined } : { status: "current" })
   } catch (e) {
     pending = null
-    set({ status: "error", error: String(e) })
+    const msg = String(e)
+    // No published release yet (latest.json isn't there), so nothing newer either
+    if (/valid release JSON|404|not found/i.test(msg)) set({ status: "current" })
+    else set({ status: "error", error: msg })
   }
   return state
 }

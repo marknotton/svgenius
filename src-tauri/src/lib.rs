@@ -28,6 +28,8 @@ struct ScannedFile {
     /// structure on export. A dropped folder keeps its own name as the root.
     rel_path: String,
     size: u64,
+    /// Last modified, in ms since the epoch, when the OS knows it
+    mtime: Option<f64>,
 }
 
 #[derive(Serialize)]
@@ -104,6 +106,9 @@ fn push_file(path: &Path, base: &Path, out: &mut Vec<ScannedFile>) {
         name: path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
         rel_path: rel,
         size: meta.len(),
+        mtime: meta.modified().ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as f64),
     });
 }
 

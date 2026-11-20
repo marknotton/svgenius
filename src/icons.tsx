@@ -49,6 +49,7 @@ export const IconDuplicate = (p: P) => <Icon {...p}><rect x="5.5" y="5.5" width=
 export const IconFlag = ({ filled, ...p }: P & { filled?: boolean }) => (
   <Icon {...p}><path d="M3.5 14.5v-12M3.5 2.5h8l-1.8 3 1.8 3h-8" fill={filled ? "currentColor" : "none"} /></Icon>
 )
+export const IconSort = (p: P) => <Icon {...p}><path d="M5 3v10M2.5 10.5 5 13l2.5-2.5M11 13V3M8.5 5.5 11 3l2.5 2.5" /></Icon>
 export const IconFilter = (p: P) => <Icon {...p}><path d="M2 3h12l-4.5 5.5V13l-3-1.5v-3z" /></Icon>
 export const IconCaret = (p: P) => <Icon width={10} height={10} {...p}><path d="m6 4 4 4-4 4" /></Icon>
 export const IconSwap = (p: P) => <Icon {...p}><path d="M2.5 5.5h10l-2.5-2.5M13.5 10.5h-10l2.5 2.5" /></Icon>

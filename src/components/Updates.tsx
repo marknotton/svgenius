@@ -36,7 +36,7 @@ function Status({ s }: { s: UpdateState }) {
     case "restarting": return <span className="update__line"><span className="spinner" /> Installed. Restarting SVGenius…</span>
     case "error": return (
       <span className="update__line text-2">
-        <span>Couldn't {s.version ? "install the update" : "check for updates"}. <a href={RELEASES_URL} target="_blank" rel="noopener">Download it from GitHub</a></span>
+        <span>{s.version ? "Couldn't install the update." : "Couldn't reach GitHub to check. Are you online?"} <a href={RELEASES_URL} target="_blank" rel="noopener">{s.version ? "Download it from GitHub" : "See releases"}</a></span>
       </span>
     )
   }

@@ -31,7 +31,8 @@ import { fileTags } from "./lib/tags"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
 import { canReveal, openInDefaultApp, errorMessage, exportSvgFile, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, listenForQuit, quitApp, setUnsavedGuard, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
-import { buildProject, readProject } from "./lib/project"
+import { buildProject, countChanges, readProject } from "./lib/project"
+import { SORT_KEYS, sortItems, sortStore, type SortState } from "./lib/sort"
 import { preloadMonaco, setEditorTheme } from "./components/CodeEditor"
 import { RenderAnywayContext } from "./components/TooComplex"
 import { isBlocked } from "./lib/complexity"
@@ -275,12 +276,33 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   // Search by original or export name; the rest of the list is hidden
   const [query, setQuery] = useState("")
   const usedFlags = useMemo(() => new Set(items.flatMap((i) => i.flag ? [i.flag as string] : [])), [items])
-  const shownItems = useMemo(() => {
+  const searched = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return filtered
     return filtered.filter((i) => i.name.toLowerCase().includes(q) || i.relPath.toLowerCase().includes(q)
       || (previewNames?.get(i.id) ?? "").toLowerCase().includes(q))
   }, [filtered, query, previewNames])
+
+  // Sort what's left after search and filters
+  const [sort, setSortState] = useState<SortState>(sortStore.get)
+  const setSort = (next: Partial<SortState>) => setSortState((s) => { const v = { ...s, ...next }; sortStore.set(v); return v })
+  const shownItems = useMemo(() => sortItems(searched, sort, settings), [searched, sort, settings])
+  const sortMenu = (e: MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const tick = (on: boolean, label: string) => `${on ? "✓" : "\u2003"}  ${label}`
+    setMenu({
+      x: r.left, y: r.bottom + 4,
+      items: [
+        ...SORT_KEYS.map((k) => ({ label: tick(sort.key === k.value, k.label), run: () => setSort({ key: k.value }) })),
+        "-",
+        { label: tick(!sort.desc, sort.key === "name" || sort.key === "folder" ? "A to Z" : sort.key === "updated" ? "Oldest first" : "Smallest first"), run: () => setSort({ desc: false }), disabled: sort.key === "added" },
+        { label: tick(sort.desc, sort.key === "name" || sort.key === "folder" ? "Z to A" : sort.key === "updated" ? "Newest first" : "Largest first"), run: () => setSort({ desc: true }), disabled: sort.key === "added" },
+        "-",
+        { label: tick(sort.byFlag, "Group by flag colour"), run: () => setSort({ byFlag: !sort.byFlag }) }
+      ]
+    })
+  }
+  const sortLabel = `${SORT_KEYS.find((k) => k.value === sort.key)?.short ?? "Sort"}${sort.key !== "added" ? (sort.desc ? " ↓" : " ↑") : ""}${sort.byFlag ? " · flags" : ""}`
 
 
   // ── Running ─────────────────────────────────────────────────────────────────
@@ -583,9 +605,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   /** With unsaved project changes, asks first. Resolves false to stay put */
   const settleUnsaved = async (action: string): Promise<boolean> => {
     if (!dirtyRef.current || !project) return true
+    const n = savedSig ? countChanges(savedSig, projectSig) : 1
     const choice = await dialogs.unsaved({
       title: `Save changes to ${project.name.replace(/\.svgenius$/i, "")}?`,
-      body: `Your changes will be lost if you ${action} without saving.`
+      body: `${n === 1 ? "1 change" : `${n} changes`} will be lost if you ${action} without saving.`
     })
     if (choice === null) return false
     if (choice === "save") return saveProjectRef.current()
@@ -863,6 +886,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onContextMenu={rowMenu}
                 onFlag={flagClick}
                 filterCount={filterCount}
+                sortLabel={sort.key === "added" && !sort.byFlag ? null : sortLabel}
+                onSort={sortMenu}
                 filtersOpen={filtersOpen}
                 showFilters
                 onClearFilters={() => setFilters(emptyFilters())}
