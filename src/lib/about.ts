@@ -11,6 +11,15 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "1.1.0",
+    date: "20 November 2026",
+    notes: [
+      "A new brand colour: magenta #AF307D, from the app icon to every accent",
+      "Desktop app updates itself: About checks for a new version, and on launch you're offered Update now, Skip this release or Later",
+      "SVGenius menu: Check for Updates…"
+    ]
+  },
+  {
     version: "1.0.1",
     date: "19 November 2026",
     notes: [

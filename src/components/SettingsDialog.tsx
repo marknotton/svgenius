@@ -118,7 +118,7 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
           <div className="field-row">
             <span>Circle guide colour</span>
             <span className="settings__colour">
-              <input type="color" aria-label="Circle guide colour" value={settings.circleColour ?? "#efa94b"} onChange={(e) => set("circleColour", e.target.value)} />
+              <input type="color" aria-label="Circle guide colour" value={settings.circleColour ?? "#af307d"} onChange={(e) => set("circleColour", e.target.value)} />
               {settings.circleColour
                 ? <button className="link" onClick={() => set("circleColour", null)} title="Back to the brand colour">Reset</button>
                 : <span className="text-3">Brand colour</span>}

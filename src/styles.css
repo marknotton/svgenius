@@ -12,15 +12,15 @@
   --text-3:        #9ca3af;
   --text-disabled: #d1d5db;
 
-  /* Brand orange. Fills use --accent with dark text on top; text and lines
-     on light backgrounds use the deeper --accent-ink for contrast */
-  --accent:        #EFA94B;
-  --accent-hover:  #E39A35;
-  --accent-ink:    #A8610C;
+  /* Brand magenta. Fills use --accent with white text on top (5.8:1); text
+     and lines on light backgrounds use the deeper --accent-ink */
+  --accent:        #AF307D;
+  --accent-hover:  #98266A;
+  --accent-ink:    #962868;
   --on-accent:     #ffffff;
-  --accent-soft:   #FDF4E7;
-  --accent-border: #F5CD94;
-  --accent-rgb:    239, 169, 75;
+  --accent-soft:   #FAEEF5;
+  --accent-border: #E8B6D3;
+  --accent-rgb:    175, 48, 125;
 
   --success: #16a34a;  --success-soft: #f0fdf4;  --success-border: #bbf7d0;
   --warning: #d97706;  --warning-soft: #fffbeb;  --warning-border: #fde68a;
@@ -66,10 +66,10 @@
   --text-3:        #71717a;
   --text-disabled: #4b4b53;
 
-  --accent-hover:  #F4B65F;
-  --accent-ink:    #F2B866;
-  --accent-soft:   #2e2416;
-  --accent-border: #6b4a1c;
+  --accent-hover:  #C2418F;
+  --accent-ink:    #EA8FC4;
+  --accent-soft:   #2d1624;
+  --accent-border: #6c2753;
 
   --success: #4ade80;  --success-soft: #11251a;  --success-border: #1f5133;
   --warning: #fbbf24;  --warning-soft: #2a2010;  --warning-border: #5c4512;
@@ -99,10 +99,10 @@
   --text-3:        #71717a;
   --text-disabled: #4b4b53;
 
-  --accent-hover:  #F4B65F;
-  --accent-ink:    #F2B866;
-  --accent-soft:   #2e2416;
-  --accent-border: #6b4a1c;
+  --accent-hover:  #C2418F;
+  --accent-ink:    #EA8FC4;
+  --accent-soft:   #2d1624;
+  --accent-border: #6c2753;
 
   --success: #4ade80;  --success-soft: #11251a;  --success-border: #1f5133;
   --warning: #fbbf24;  --warning-soft: #2a2010;  --warning-border: #5c4512;
