@@ -1,11 +1,13 @@
 import { IconFile, IconFolder, IconProject, Logo } from "../icons"
 import { clearRecent, useRecent, type Recent } from "../lib/recent"
-import { DOWNLOAD_URL, isDesktop } from "../lib/platform"
+import { isDesktop } from "../lib/platform"
+import { useDesktopDownload } from "../lib/download"
 
 // Phones and tablets have nothing to drag from
 const isTouch = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches
 
 export function EmptyState({ onAddFiles, onAddFolder, onOpenProject, onOpenRecent }: { onAddFiles: () => void, onAddFolder: () => void, onOpenProject?: () => void, onOpenRecent?: (r: Recent) => void }) {
+  const downloadUrl = useDesktopDownload()
   const recent = useRecent()
   return (
     <div className="empty">
@@ -15,7 +17,7 @@ export function EmptyState({ onAddFiles, onAddFolder, onOpenProject, onOpenRecen
         ? <p className="empty__body">Folders are searched for SVGs, sub-folders included. Nothing is changed on disk until you export.</p>
         : <p className="empty__body">
             Folders are searched for SVGs, sub-folders included. Everything happens in your browser: nothing is uploaded, and exports download as a zip.
-            Prefer exporting straight into folders? <a href={DOWNLOAD_URL} target="_blank" rel="noopener">Get the desktop app</a>.
+            Prefer exporting straight into folders? <a href={downloadUrl} target="_blank" rel="noopener">Get the desktop app</a>.
           </p>}
       <div className="empty__actions">
         <button className="btn btn--primary" onClick={onAddFiles}><IconFile /> Choose files</button>

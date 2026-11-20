@@ -1,6 +1,7 @@
 import type { MouseEvent } from "react"
 import { IconDownload, IconGear, Logo } from "../icons"
-import { DOWNLOAD_URL, isDesktop, startWindowDrag } from "../lib/platform"
+import { isDesktop, startWindowDrag } from "../lib/platform"
+import { useDesktopDownload } from "../lib/download"
 
 // ── Title strip (desktop only) ────────────────────────────────────────────────
 // The Mac window draws its traffic lights over the top of the page, so the
@@ -23,13 +24,14 @@ interface Props {
 }
 
 export function BrandBar({ onSettings, onAbout }: Props) {
+  const downloadUrl = useDesktopDownload()
   return (
     <div className="brand">
       <button className="brand__name" onClick={onAbout} title="About SVGenius: version history and credits">
         <Logo width={18} height={18} /> <span className="brand__label">SVGenius</span>
       </button>
       {!isDesktop && (
-        <a className="brand__link" href={DOWNLOAD_URL} target="_blank" rel="noopener"
+        <a className="brand__link" href={downloadUrl} target="_blank" rel="noopener"
           title="Get the desktop app: it reads and writes folders in place">
           <IconDownload width={12} height={12} /> <span className="brand__label">Desktop app</span>
         </a>

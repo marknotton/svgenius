@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { IconX } from "../icons"
+import { installerUrl } from "../lib/download"
 import { RELEASES_URL, canUpdate, checkForUpdate, currentVersion, installUpdate, skippedVersion, useUpdateState, type UpdateState } from "../lib/updates"
 
 // ── Updates: the About panel and the notice on launch ─────────────────────────
@@ -41,7 +42,7 @@ function Status({ s }: { s: UpdateState }) {
       return (
         <span className="update__error">
           <span className="update__line text-2">
-            <span>{s.version ? "Couldn't install the update." : "Couldn't reach GitHub to check. Are you online?"} <a href={RELEASES_URL} target="_blank" rel="noopener">{s.version ? "Download it from GitHub" : "See releases"}</a></span>
+            <span>{s.version ? "Couldn't install the update." : "Couldn't reach GitHub to check. Are you online?"} <a href={s.version ? installerUrl(s.version) : RELEASES_URL} target="_blank" rel="noopener">{s.version ? `Download v${s.version}` : "See releases"}</a></span>
           </span>
           {s.version && stuck && (
             <span className="text-3">macOS is running SVGenius from a locked copy. Run <code>xattr -dr com.apple.quarantine /Applications/SVGenius.app</code> in Terminal once, reopen SVGenius and try again.</span>
