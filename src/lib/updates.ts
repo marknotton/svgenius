@@ -8,7 +8,7 @@ import { DOWNLOAD_URL, isDesktop } from "./platform"
 // new version, swaps it in and restarts. The browser version updates itself,
 // so none of this runs there.
 
-export type UpdateStatus = "idle" | "checking" | "current" | "available" | "downloading" | "restarting" | "error"
+export type UpdateStatus = "idle" | "checking" | "current" | "available" | "downloading" | "restarting" | "installed" | "error"
 
 export interface UpdateState {
   status: UpdateStatus
@@ -62,11 +62,19 @@ export async function installUpdate() {
       if (e.event === "Started") total = e.data.contentLength ?? 0
       else if (e.event === "Progress") { got += e.data.chunkLength; set({ status: "downloading", version, notes, progress: total ? Math.min(1, got / total) : undefined }) }
     })
-    set({ status: "restarting", version, notes })
+  } catch (e) {
+    console.error("Update failed", e)
+    set({ status: "error", version, notes, error: String(e) })
+    return
+  }
+  // Installed. If the restart itself fails, a manual quit and reopen finishes it
+  set({ status: "restarting", version, notes })
+  try {
     const { relaunch } = await import("@tauri-apps/plugin-process")
     await relaunch()
   } catch (e) {
-    set({ status: "error", version, notes, error: String(e) })
+    console.error("Relaunch failed", e)
+    set({ status: "installed", version, notes })
   }
 }
 

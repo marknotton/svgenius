@@ -1,6 +1,6 @@
 [package]
 name = "svgenius"
-version = "1.2.1"
+version = "1.2.2"
 description = "Bulk SVG optimiser built on SVGO"
 authors = ["Mark Notton"]
 edition = "2021"

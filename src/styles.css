@@ -1397,3 +1397,6 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .section-nav__btn:hover { color: var(--text); background: var(--surface-2); }
 .section-nav__btn.is-active { color: var(--accent-ink); background: var(--accent-soft); }
 .panel__scroll { scroll-behavior: smooth; }
+.update__error { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.update__why summary { cursor: pointer; font-size: 11px; }
+.update__why code { display: block; margin-top: 4px; font-size: 11px; white-space: pre-wrap; word-break: break-word; color: var(--text-2); user-select: text; }

@@ -11,6 +11,13 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "1.2.2",
+    date: "20 November 2026",
+    notes: [
+      "Updates: when an update can't install, the reason shows under Details, with the fix when macOS has the app locked. If only the restart fails, it says to quit and reopen"
+    ]
+  },
+  {
     version: "1.2.1",
     date: "20 November 2026",
     notes: [

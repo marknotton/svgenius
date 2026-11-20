@@ -34,11 +34,22 @@ function Status({ s }: { s: UpdateState }) {
       </span>
     )
     case "restarting": return <span className="update__line"><span className="spinner" /> Installed. Restarting SVGenius…</span>
-    case "error": return (
-      <span className="update__line text-2">
-        <span>{s.version ? "Couldn't install the update." : "Couldn't reach GitHub to check. Are you online?"} <a href={RELEASES_URL} target="_blank" rel="noopener">{s.version ? "Download it from GitHub" : "See releases"}</a></span>
-      </span>
-    )
+    case "installed": return <span className="update__line"><span className="update__dot update__dot--ok" /> v{s.version} is installed. Quit and reopen SVGenius to use it</span>
+    case "error": {
+      // macOS runs a quarantined app from a read-only copy, so it can't replace itself
+      const stuck = /read-only|translocat|permission|denied|not permitted|EACCES|EROFS/i.test(s.error ?? "")
+      return (
+        <span className="update__error">
+          <span className="update__line text-2">
+            <span>{s.version ? "Couldn't install the update." : "Couldn't reach GitHub to check. Are you online?"} <a href={RELEASES_URL} target="_blank" rel="noopener">{s.version ? "Download it from GitHub" : "See releases"}</a></span>
+          </span>
+          {s.version && stuck && (
+            <span className="text-3">macOS is running SVGenius from a locked copy. Run <code>xattr -dr com.apple.quarantine /Applications/SVGenius.app</code> in Terminal once, reopen SVGenius and try again.</span>
+          )}
+          {s.error && <details className="update__why"><summary className="text-3">Details</summary><code>{s.error}</code></details>}
+        </span>
+      )
+    }
   }
 }
 
