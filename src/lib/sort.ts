@@ -14,9 +14,11 @@ export interface SortState {
   key: SortKey
   desc: boolean
   byFlag: boolean
+  /** Size, viewBox and nodes from the original markup instead of the optimised */
+  original: boolean
 }
 
-export const SORT_DEFAULT: SortState = { key: "added", desc: false, byFlag: false }
+export const SORT_DEFAULT: SortState = { key: "added", desc: false, byFlag: false, original: false }
 
 export const SORT_KEYS: Array<{ value: SortKey, label: string, short: string }> = [
   { value: "added", label: "As added", short: "As added" },
@@ -35,7 +37,7 @@ export const sortStore = {
   get: (): SortState => {
     try {
       const v = JSON.parse(localStorage.getItem(KEY) ?? "null")
-      if (v && SORT_KEYS.some((k) => k.value === v.key)) return { key: v.key, desc: !!v.desc, byFlag: !!v.byFlag }
+      if (v && SORT_KEYS.some((k) => k.value === v.key)) return { key: v.key, desc: !!v.desc, byFlag: !!v.byFlag, original: !!v.original }
     } catch { /* unavailable */ }
     return SORT_DEFAULT
   },
@@ -65,6 +67,7 @@ export function sortItems(list: SvgItem[], sort: SortState, settings: AppSetting
     const id = i.presetId ?? settings.defaultPresetId
     return id === settings.defaultPresetId ? [0, ""] : [1, presetNames.get(id) ?? ""]
   }
+  /** Sorting by these reads the markup, so Before or After matters */
   const cache = new Map<string, number>()
   const memo = (i: SvgItem, k: string, f: () => number) => {
     const key = `${k}:${i.id}`
@@ -72,12 +75,12 @@ export function sortItems(list: SvgItem[], sort: SortState, settings: AppSetting
     if (v === undefined) { v = f(); cache.set(key, v) }
     return v
   }
-  const shown = (i: SvgItem) => i.result?.output ?? i.source
+  const shown = (i: SvgItem) => (sort.original ? i.source : i.result?.output ?? i.source)
   const compare = (a: SvgItem, b: SvgItem): number => {
     switch (sort.key) {
       case "name": return collator.compare(a.name, b.name)
       case "folder": return collator.compare(dirOf(a.relPath), dirOf(b.relPath)) || collator.compare(a.name, b.name)
-      case "size": return (a.result?.size ?? a.size) - (b.result?.size ?? b.size)
+      case "size": return sort.original ? a.size - b.size : (a.result?.size ?? a.size) - (b.result?.size ?? b.size)
       case "saving": return (a.result ? a.size - a.result.size : 0) - (b.result ? b.size - b.result.size : 0)
       case "viewbox": return memo(a, "vb", () => viewBoxArea(shown(a))) - memo(b, "vb", () => viewBoxArea(shown(b)))
       case "nodes": return memo(a, "n", () => countNodes(shown(a))) - memo(b, "n", () => countNodes(shown(b)))
@@ -95,3 +98,6 @@ export function sortItems(list: SvgItem[], sort: SortState, settings: AppSetting
     || dir * compare(a, b)
     || (order.get(a.id)! - order.get(b.id)!))
 }
+
+/** Keys whose values differ between the original and the optimised markup */
+export const BEFORE_AFTER_KEYS: SortKey[] = ["size", "viewbox", "nodes"]

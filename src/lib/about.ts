@@ -14,7 +14,7 @@ export const HISTORY: Release[] = [
     version: "1.2.0",
     date: "20 November 2026",
     notes: [
-      "Sort, next to Filters: by file name, folder, size, saving, viewBox size, node count, last updated or preset, either way round, and group by flag colour on top. It sorts whatever search and filters leave",
+      "Sort, next to Filters: by file name, folder, size, saving, viewBox size, node count, last updated or preset, either way round, and group by flag colour on top. It sorts whatever search and filters leave. Size, viewBox and nodes can sort by the optimised (After) or original (Before) markup",
       "Quitting with unsaved project changes says how many changes would be lost",
       "No published release yet counts as up to date, instead of \"Couldn't check for updates\"",
       "Editor: the file arrows match the height of the buttons beside them"

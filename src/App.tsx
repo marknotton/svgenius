@@ -32,7 +32,7 @@ import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
 import { canReveal, openInDefaultApp, errorMessage, exportSvgFile, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, listenForQuit, quitApp, setUnsavedGuard, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
 import { buildProject, countChanges, readProject } from "./lib/project"
-import { SORT_KEYS, sortItems, sortStore, type SortState } from "./lib/sort"
+import { BEFORE_AFTER_KEYS, SORT_KEYS, sortItems, sortStore, type SortState } from "./lib/sort"
 import { preloadMonaco, setEditorTheme } from "./components/CodeEditor"
 import { RenderAnywayContext } from "./components/TooComplex"
 import { isBlocked } from "./lib/complexity"
@@ -298,11 +298,14 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         { label: tick(!sort.desc, sort.key === "name" || sort.key === "folder" ? "A to Z" : sort.key === "updated" ? "Oldest first" : "Smallest first"), run: () => setSort({ desc: false }), disabled: sort.key === "added" },
         { label: tick(sort.desc, sort.key === "name" || sort.key === "folder" ? "Z to A" : sort.key === "updated" ? "Newest first" : "Largest first"), run: () => setSort({ desc: true }), disabled: sort.key === "added" },
         "-",
+        { label: tick(!sort.original, "Use optimised (After)"), run: () => setSort({ original: false }), disabled: !BEFORE_AFTER_KEYS.includes(sort.key) },
+        { label: tick(sort.original, "Use original (Before)"), run: () => setSort({ original: true }), disabled: !BEFORE_AFTER_KEYS.includes(sort.key) },
+        "-",
         { label: tick(sort.byFlag, "Group by flag colour"), run: () => setSort({ byFlag: !sort.byFlag }) }
       ]
     })
   }
-  const sortLabel = `${SORT_KEYS.find((k) => k.value === sort.key)?.short ?? "Sort"}${sort.key !== "added" ? (sort.desc ? " ↓" : " ↑") : ""}${sort.byFlag ? " · flags" : ""}`
+  const sortLabel = `${SORT_KEYS.find((k) => k.value === sort.key)?.short ?? "Sort"}${sort.original && BEFORE_AFTER_KEYS.includes(sort.key) ? " (before)" : ""}${sort.key !== "added" ? (sort.desc ? " ↓" : " ↑") : ""}${sort.byFlag ? " · flags" : ""}`
 
 
   // ── Running ─────────────────────────────────────────────────────────────────
