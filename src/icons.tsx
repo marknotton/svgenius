@@ -74,6 +74,10 @@ export const IconMinusFront = (p: P) => <Icon {...p}><path d="M2.5 2.5h7v4h-3v3h
 export const IconIntersect = (p: P) => <Icon {...p}><rect x="2.5" y="2.5" width="7" height="7" strokeDasharray="1.5 1.5" /><rect x="6.5" y="6.5" width="7" height="7" strokeDasharray="1.5 1.5" /><rect x="6.5" y="6.5" width="3" height="3" fill="currentColor" fillOpacity=".5" /></Icon>
 export const IconExclude = (p: P) => <Icon {...p}><path d="M2.5 2.5h7v4h-3v3h-4zM9.5 9.5v-3h4v7h-7v-4z" fill="currentColor" fillOpacity=".35" /><rect x="6.5" y="6.5" width="3" height="3" /></Icon>
 export const IconPin = (p: P) => <Icon {...p}><path d="M6 2.5h4M6.8 2.5v4L4.5 9h7L9.2 6.5v-4M8 9v4.5" /></Icon>
+export const IconCrop = (p: P) => <Icon {...p}><path d="M4.5 1.5v10h10M1.5 4.5h10v10" /></Icon>
+export const IconFlask = (p: P) => <Icon {...p}><path d="M6 1.5h4M6.5 1.5v4.5L2.8 12.6a1.3 1.3 0 0 0 1.1 1.9h8.2a1.3 1.3 0 0 0 1.1-1.9L9.5 6V1.5M4.6 9.5h6.8" /></Icon>
+export const IconPuzzle = (p: P) => <Icon {...p}><path d="M2.5 5.5h3a1.5 1.5 0 1 1 3 0h3v3a1.5 1.5 0 1 1 0 3v2.5h-9v-3a1.5 1.5 0 1 0 0-3z" /></Icon>
+export const IconTag = (p: P) => <Icon {...p}><path d="M2 2.5h5.5l6.5 6.5-5 5-6.5-6.5V2.5z" /><circle cx="5" cy="5.5" r="1" /></Icon>
 export const IconMore = (p: P) => <Icon {...p}><circle cx="3.5" cy="8" r=".9" fill="currentColor" /><circle cx="8" cy="8" r=".9" fill="currentColor" /><circle cx="12.5" cy="8" r=".9" fill="currentColor" /></Icon>
 export const IconLock = (p: P) => <Icon {...p}><rect x="3.5" y="7" width="9" height="6.5" rx="1.2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" /></Icon>
 export const IconUnlock = (p: P) => <Icon {...p}><rect x="3.5" y="7" width="9" height="6.5" rx="1.2" /><path d="M5.5 7V5a2.5 2.5 0 0 1 4.9-.7" /></Icon>

@@ -10,6 +10,7 @@ import { ContextMenu, type MenuItem, type MenuState } from "./ContextMenu"
 import { textFocus, useCommands } from "../lib/commands"
 import type { Backdrop, SvgItem } from "../lib/types"
 import { CodeEditor } from "./CodeEditor"
+import { isDesktop } from "../lib/platform"
 import { CanvasBackground } from "./CanvasBackground"
 import { ArrangeTools } from "./ArrangePanel"
 import { PaintTools } from "./PaintTools"
@@ -98,7 +99,15 @@ const LOCKS = new Map<string, LockRef[]>()
 const HIDES = new Map<string, LockRef[]>()
 
 export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose, nav, circle }: Props) {
-  const markup = (tab === "source" ? item.source : item.result?.output) ?? ""
+  // Switching files paints an empty editor first, then fills it in on the next
+  // frame, so the arrows feel instant even when a big file takes a moment
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    let b = 0
+    const a = requestAnimationFrame(() => { b = requestAnimationFrame(() => setReady(true)) })
+    return () => { cancelAnimationFrame(a); cancelAnimationFrame(b) }
+  }, [])
+  const markup = ready ? (tab === "source" ? item.source : item.result?.output) ?? "" : ""
   const [layout, setLayout] = useEditorLayout()
   const bodyRef = useRef<HTMLDivElement>(null)
   // Panels can grow until the canvas is down to about a quarter of the space
@@ -596,15 +605,20 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
           <div className="markup-dialog__spacer" />
           {nav && nav.total > 1 && (
             <div className="file-nav" role="group" aria-label="Files">
-              <button className="btn btn--secondary btn--sm" onClick={() => nav.go(-1)} title="Previous file" aria-label="Previous file"><IconChevronLeft width={14} height={14} /></button>
               <span className="text-3 file-nav__pos">{nav.pos} of {nav.total}</span>
-              <button className="btn btn--secondary btn--sm" onClick={() => nav.go(1)} title="Next file" aria-label="Next file"><IconChevronRight width={14} height={14} /></button>
+              <div className="btn-join">
+                <button className="btn btn--secondary btn--sm" onClick={() => nav.go(-1)} title="Previous file" aria-label="Previous file"><IconChevronLeft width={14} height={14} /></button>
+                <button className="btn btn--secondary btn--sm" onClick={() => nav.go(1)} title="Next file" aria-label="Next file"><IconChevronRight width={14} height={14} /></button>
+              </div>
             </div>
           )}
+          {/* The desktop app has Undo and Redo in the Edit menu, so the buttons are for the browser */}
+          {!isDesktop && (
           <div className="btn-join" role="group" aria-label="History">
             <button className="btn btn--secondary btn--sm" onClick={() => travel(true)} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo"><IconUndo width={12} height={12} /></button>
             <button className="btn btn--secondary btn--sm" onClick={() => travel(false)} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo"><IconRedo width={12} height={12} /></button>
           </div>
+          )}
           {tab === "source" && edited && <button className="link" onClick={onRevert} title="Throw away edits and reload the file's markup"><IconReset width={11} height={11} /> Revert</button>}
           {tab === "output" && <button className="link" onClick={copy} disabled={!markup}><IconCopy width={11} height={11} /> {copied ? "Copied" : "Copy"}</button>}
           {tab === "output" && item.result && (
@@ -705,7 +719,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
                   onMove={editable ? move : undefined}
                   locked={locked} ownLocked={ownLocked} onLock={toggleLock}
                   hidden={hidden} ownHidden={ownHidden} onHide={toggleHide} flash={flash} />
-              : <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
+              : ready && <p className="text-3">{markup ? "The markup doesn't parse, fix it to see the layers." : "Nothing here yet."}</p>}
           </div>
           {/* Double-click a selected item with Select to dive into its points */}
           <div className="markup-dialog__canvas" onDoubleClick={(e) => {
@@ -747,7 +761,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
                   onChange={(sideH) => setLayout({ sideH })} onReset={() => setLayout({ sideH: LAYOUT_DEFAULTS.sideH })} />
               : <Resizer edge="left" label="Resize the code panel" value={layout.sideW} min={280} max={room("w")}
                   onChange={(sideW) => setLayout({ sideW })} onReset={() => setLayout({ sideW: LAYOUT_DEFAULTS.sideW })} />}
-            <CodeEditor
+            {!ready ? <div className="markup-dialog__code markup-dialog__code--blank" /> : <CodeEditor
               key={tab}
               className="markup-dialog__code"
               label={tab === "source" ? "Source markup" : "Optimised markup"}
@@ -772,7 +786,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
                 const i = rangeAt(ranges, offset)
                 if (i > 0 && !selRef.current.includes(i)) setSelected(i)
               }}
-            />
+            />}
             {/* Always here, the same height, so selecting things doesn't shuffle the code around */}
             <div className="markup-dialog__tools">
               {layout.bottom

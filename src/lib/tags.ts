@@ -14,7 +14,7 @@ export interface FileTag {
 export function fileTags(item: SvgItem, settings: SvgoSettings, customOn: number): FileTag[] {
   const t = settings.trim
   const tags: FileTag[] = []
-  if (item.config) tags.push({ label: "Own settings", title: "This file uses its own settings, not a preset", tone: "accent" })
+  if (item.config) tags.push({ label: "Custom settings", title: "This file uses its own settings, not a preset", tone: "accent" })
   if (item.fileSource !== undefined && item.source !== item.fileSource) {
     tags.push({ label: "Markup edited", title: "Edited in SVGenius. The original file isn't touched", tone: "warning" })
   }

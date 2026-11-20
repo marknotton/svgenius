@@ -25,7 +25,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
   const trim = (patch: Partial<SvgoSettings["trim"]>) => edit((x) => ({ ...x, trim: { ...x.trim, ...patch } }))
   return (
     <>
-      <section className="panel__section">
+      <section className="panel__section" data-nav="output" data-nav-title="Output">
         <div className="panel__label">Output</div>
         <Toggle label="Multipass" hint="Run the plugins repeatedly until nothing more is saved"
           checked={s.multipass} onChange={(v) => edit((x) => ({ ...x, multipass: v }))} />
@@ -55,26 +55,26 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
       </section>
 
       {advanced && <>
-      <section className="panel__section">
+      <section className="panel__section" data-nav="contents" data-nav-title="Edit contents">
         <EditContents trim={s.trim} onChange={trim}
           markup={s.appendMarkup} onMarkup={(appendMarkup) => edit((x) => ({ ...x, appendMarkup }))} />
       </section>
 
-      <section className="panel__section">
+      <section className="panel__section" data-nav="viewbox" data-nav-title="Edit viewBox">
         <EditViewBox trim={s.trim} onChange={trim} />
       </section>
 
-      <section className="panel__section">
+      <section className="panel__section" data-nav="replace" data-nav-title="Find & replace">
         <ReplaceList rules={s.replacements} onChange={(replacements) => edit((x) => ({ ...x, replacements }))} />
       </section>
 
-      <section className="panel__section">
+      <section className="panel__section" data-nav="attrs" data-nav-title="Attribute rules">
         <AttrRuleList rules={s.attrRules} onChange={(attrRules) => edit((x) => ({ ...x, attrRules }))} />
       </section>
 
       </>}
 
-      <section className="panel__section">
+      <section className="panel__section" data-nav="plugins" data-nav-title="SVGO plugins">
         <PluginList
           settings={s}
           onToggle={(name, on) => edit((x) => ({ ...x, plugins: { ...x.plugins, [name]: on } }))}
@@ -86,7 +86,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
       </section>
 
       {advanced && <>
-      <section className="panel__section">
+      <section className="panel__section" data-nav="beta" data-nav-title="Beta">
         <div className="panel__label">Beta <span className="pill pill--beta">Experimental</span></div>
         <p className="panel__hint text-3">Geometry changes made after SVGO. Check the results before exporting.</p>
         <Toggle label="Flatten transforms"
@@ -117,7 +117,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
           checked={s.mergePaths} onChange={(v) => edit((x) => ({ ...x, mergePaths: v }))} />
       </section>
 
-      <section className="panel__section">
+      <section className="panel__section" data-nav="custom" data-nav-title="Custom plugins">
         <CustomPluginList
           plugins={customPlugins}
           settings={s}

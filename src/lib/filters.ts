@@ -57,7 +57,7 @@ export const STATUSES: Array<{ value: FilterStatus, label: string }> = [
   { value: "pending", label: "Not optimised yet" },
   { value: "error", label: "Failed" },
   { value: "edited", label: "Markup edited" },
-  { value: "own", label: "Own settings" }
+  { value: "own", label: "Custom settings" }
 ]
 
 export const ELEMENTS = ["path", "circle", "ellipse", "rect", "line", "polyline", "polygon", "g", "use", "symbol", "defs", "text", "tspan",

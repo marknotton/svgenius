@@ -4,6 +4,8 @@ import type { PresetActions } from "../hooks/useAppSettings"
 import type { AppSettings, CustomPlugin, Preset } from "../lib/types"
 import { PresetEditor } from "./PresetEditor"
 import { PresetSelect } from "./PresetSelect"
+import { SectionNav } from "./SectionNav"
+import { useRef } from "react"
 
 interface Props {
   settings: AppSettings
@@ -22,6 +24,7 @@ interface Props {
 
 export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
   const s = preset.settings
+  const scrollRef = useRef<HTMLDivElement>(null)
   const isDefault = preset.id === settings.defaultPresetId
   const edit = actions.edit.bind(null, preset.id)
 
@@ -66,10 +69,11 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
         </div>
       </div>
 
-      <div className="panel__scroll">
+      <div className="panel__scroll" ref={scrollRef}>
         <PresetEditor settings={s} edit={edit} customPlugins={settings.customPlugins}
           onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} advanced={settings.advanced} />
       </div>
+      <SectionNav scroller={scrollRef} />
     </aside>
   )
 }

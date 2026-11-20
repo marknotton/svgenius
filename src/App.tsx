@@ -32,6 +32,7 @@ import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
 import { canReveal, openInDefaultApp, errorMessage, exportSvgFile, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, listenForQuit, quitApp, setUnsavedGuard, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
 import { buildProject, countChanges, readProject } from "./lib/project"
+import { forget as forgetRecent, remember } from "./lib/recent"
 import { BEFORE_AFTER_KEYS, SORT_KEYS, sortItems, sortStore, type SortState } from "./lib/sort"
 import { preloadMonaco, setEditorTheme } from "./components/CodeEditor"
 import { RenderAnywayContext } from "./components/TooComplex"
@@ -143,6 +144,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     try {
       const { added } = await addPaths(paths)
       if (added === 0) push({ tone: "info", text: "No new SVGs found there" })
+      // A handful of picks go in Recent; a big multi-select would just push everything else out
+      if (paths.length <= 3) for (const p of [...paths].reverse()) remember(p)
     } catch (e) {
       push({ tone: "error", text: errorMessage(e) })
     }
@@ -266,9 +269,9 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     return items.map((item) => ({
       item,
       settings: settingsFor(item),
-      preset: item.config ? "Own settings" : presetFor(item).name,
+      preset: item.config ? "Custom settings" : presetFor(item).name,
       exportName: previewNames?.get(item.id) ?? all?.get(item.id),
-      tags: tagsFor(item).filter((t) => t.label !== "Own settings").map((t) => t.label),
+      tags: tagsFor(item).filter((t) => t.label !== "Custom settings").map((t) => t.label),
       stale: isStale(item)
     }))
   }, [reportOpen, items, settings.rename, settingsFor, presetFor, previewNames, tagsFor, isStale])
@@ -597,6 +600,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       const savedName = to.split(/[\\/]/).pop() ?? to
       snapNext.current = true
       setProject({ path: to.includes("/") || to.includes("\\") ? to : null, name: savedName })
+      remember(to, "project")
       push({ tone: "success", text: `Saved ${savedName}` })
       return true
     } catch (e) {
@@ -647,6 +651,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       setMarkupOpen(false)
       snapNext.current = true
       setProject({ path: to.includes("/") || to.includes("\\") ? to : null, name: savedName })
+      remember(to, "project")
       push({ tone: "success", text: `Created ${savedName}. Add some SVGs, then ⌘S saves them to it` })
     } catch (e) {
       push({ tone: "error", text: `Couldn't create the project: ${errorMessage(e)}` })
@@ -677,8 +682,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       setMarkupOpen(false)
       snapNext.current = true
       setProject({ path: file.path, name: file.name })
+      if (file.path) remember(file.path, "project")
       push({ tone: "success", text: `Opened ${file.name}: ${plural(files.length, "file")}` })
     } catch (e) {
+      if (path) forgetRecent(path)
       push({ tone: "error", text: `Couldn't open the project: ${errorMessage(e)}` })
     }
   }
@@ -866,7 +873,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         <div className="workspace">
           <main className="workspace__main">
             {items.length === 0 ? (
-              <EmptyState onAddFiles={addFiles} onAddFolder={addFolder} onOpenProject={() => openProjectRef.current()} />
+              <EmptyState onAddFiles={addFiles} onAddFolder={addFolder} onOpenProject={() => openProjectRef.current()}
+                onOpenRecent={(r) => (r.kind === "project" ? openProjectRef.current(r.path) : add([r.path]))} />
             ) : (
               <FileList
                 items={shownItems}
@@ -918,7 +926,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
               onReset={() => update((s) => ({ ...s, sidebarWidth: SIDEBAR.default }))}
             />
           )}
-          <aside className="sidebar">
+          {/* Until there are files, the settings are there to look at, not to change. Advanced still toggles */}
+          <aside className={`sidebar${items.length ? "" : " is-idle"}`}>
             <div className="sidebar__tabs" role="tablist">
               <button role="tab" aria-selected={sidebarTab === "preset"} className={`sidebar__tab${sidebarTab === "preset" ? " is-active" : ""}`}
                 onClick={() => setSidebarTab("preset")}>Config</button>

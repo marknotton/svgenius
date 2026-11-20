@@ -149,7 +149,7 @@ export const FileRow = memo(function FileRow(p: Props) {
               : nodesBefore.toLocaleString("en-GB")}
           </Fact>
           {vbDiffers && <Fact label="viewBox">{fmtNum(vb.w, 2)} × {fmtNum(vb.h, 2)}</Fact>}
-          <Fact label="Settings">{item.config ? "Own settings" : (p.presets.find((x) => x.id === item.presetId) ?? p.defaultPreset).name}</Fact>
+          <Fact label="Settings">{item.config ? "Custom settings" : (p.presets.find((x) => x.id === item.presetId) ?? p.defaultPreset).name}</Fact>
           {dir && <Fact label="Folder" wide>{dir}</Fact>}
         </dl>
         {p.tags.length > 0 && (

@@ -946,8 +946,9 @@ body.is-resizing * { user-select: none !important; }
 .panel__scroll .panel__section > .panel__label,
 .panel__scroll .panel__section > .plugins__head,
 .panel__scroll .panel__section > :not(.rules--inline) > .plugins__head:first-child {
-  position: sticky; top: 0; z-index: 3;
-  margin: -12px -14px 2px; padding: 12px 14px 6px;
+  /* -1px tucks it under the edge, so half-pixel layouts can't leave a sliver of content showing above it */
+  position: sticky; top: -1px; z-index: 3;
+  margin: -13px -14px 2px; padding: 13px 14px 6px;
   background: var(--surface);
 }
 .panel__scroll .panel__foot { border-top: 0; padding-block: 10px 14px; }
@@ -1286,7 +1287,7 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 
 /* Previous / next file */
 .file-nav { display: inline-flex; align-items: center; gap: 4px; }
-.file-nav__pos { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
+.file-nav__pos { font-size: 12px; font-variant-numeric: tabular-nums; min-width: 44px; text-align: right; }
 
 /* Holding C shows the optimised result */
 .markup-dialog__canvas { position: relative; }
@@ -1372,3 +1373,27 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .modal__actions .modal__aside { margin-right: auto; }
 /* Header buttons: file arrows, undo/redo and layout all one height */
 .markup-dialog__head .btn--sm { height: 28px; min-width: 28px; padding-block: 0; display: inline-flex; align-items: center; justify-content: center; }
+
+/* No files yet: the sidebar is for a look around. It scrolls, but nothing in it works except Advanced */
+.sidebar.is-idle > :not(.sidebar__tabs) { opacity: .45; filter: grayscale(1); user-select: none; cursor: default; }
+.sidebar.is-idle > :not(.sidebar__tabs) * { pointer-events: none; }
+.sidebar.is-idle .sidebar__tab { opacity: .45; pointer-events: none; }
+
+/* Recently opened, on the start screen (desktop) */
+.recent { width: min(440px, 100%); margin-top: 22px; text-align: left; }
+.recent__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.recent__head .panel__label { margin: 0; }
+.recent__list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); max-height: 260px; overflow: auto; }
+.recent__list li + li { border-top: 1px solid var(--border); }
+.recent__item { width: 100%; display: grid; grid-template-columns: 18px minmax(0, auto) minmax(0, 1fr); align-items: center; gap: 8px; padding: 7px 10px; border: 0; background: none; color: var(--text); font: inherit; font-size: 12.5px; text-align: left; cursor: pointer; }
+.recent__item:hover { background: var(--accent-soft); }
+.recent__icon { display: inline-grid; color: var(--accent-ink); }
+.recent__name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent__path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+
+/* Section footer under the settings panels: jump to a section, the one in view lit */
+.section-nav { flex: none; display: flex; justify-content: space-around; gap: 2px; padding: 5px 8px; border-top: 1px solid var(--border); background: var(--surface); }
+.section-nav__btn { flex: 1; max-width: 40px; height: 28px; display: inline-grid; place-items: center; padding: 0; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-3); cursor: pointer; transition: color .15s, background .15s; }
+.section-nav__btn:hover { color: var(--text); background: var(--surface-2); }
+.section-nav__btn.is-active { color: var(--accent-ink); background: var(--accent-soft); }
+.panel__scroll { scroll-behavior: smooth; }

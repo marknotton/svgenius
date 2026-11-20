@@ -29,7 +29,7 @@ export const SORT_KEYS: Array<{ value: SortKey, label: string, short: string }> 
   { value: "viewbox", label: "viewBox size", short: "viewBox" },
   { value: "nodes", label: "Node count", short: "Nodes" },
   { value: "updated", label: "Last updated", short: "Updated" },
-  { value: "preset", label: "Preset (default, others, own settings)", short: "Preset" }
+  { value: "preset", label: "Preset (default, others, custom settings)", short: "Preset" }
 ]
 
 const KEY = "svgenius:sort"

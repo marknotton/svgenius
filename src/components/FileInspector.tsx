@@ -13,6 +13,7 @@ import { SliderField } from "./SliderField"
 import { Thumb } from "./Thumb"
 import { TooComplex } from "./TooComplex"
 import { isBlocked } from "../lib/complexity"
+import { SectionNav } from "./SectionNav"
 
 // ── Per-file inspector ────────────────────────────────────────────────────────
 // Info, tags, a live markup editor and the file's preset or own settings.
@@ -60,6 +61,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
   const [tab, setTab] = useState<MarkupTab>("source")
   // The markup box fills whatever height the sidebar has spare (at least 180px)
   const codeSection = useRef<HTMLElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const sec = codeSection.current
     const scroll = sec?.closest(".panel__scroll") as HTMLElement | null
@@ -114,8 +116,8 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
           onChange={(px) => p.onPreviewPx(Math.round(px))} />
       </div>
 
-      <div className="panel__scroll">
-        <section className="panel__section">
+      <div className="panel__scroll" ref={scrollRef}>
+        <section className="panel__section" data-nav="file" data-nav-title="File">
           <div className="panel__label">File</div>
           <dl className="info">
             <dt>Path</dt><dd className="info__path" title={item.path}>{item.relPath}</dd>
@@ -135,7 +137,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
           )}
         </section>
 
-        <section className="panel__section">
+        <section className="panel__section" data-nav="preset" data-nav-title="Settings for this file">
           <div className="panel__label">Settings for this file</div>
           {item.config ? (
             <>
@@ -154,7 +156,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
           )}
         </section>
         {(p.advanced || item.config) && (
-          <details className="accordion" open={!!item.config}
+          <details className="accordion" open={!!item.config} data-nav="customise" data-nav-title="Customise this file"
             onToggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open && !item.config) p.onCustomise() }}>
             <summary className="accordion__summary">
               <span className="panel__label">Customise this file</span>
@@ -167,7 +169,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
         )}
 
         {/* The markup and the editor button belong to the advanced view */}
-        {p.advanced && <section ref={codeSection} className="panel__section inspector__code">
+        {p.advanced && <section ref={codeSection} className="panel__section inspector__code" data-nav="markup" data-nav-title="Markup">
           <div className="inspector__codehead">
             <span className="panel__label">Markup</span>
             <CodeTabs value={tab} onChange={setTab} />
@@ -197,6 +199,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             backdrop={backdrop} toolbarSide={p.editorToolbar} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => p.onMarkupOpen(false)} />
         )}
       </div>
+      <SectionNav scroller={scrollRef} />
     </div>
   )
 }

@@ -11,6 +11,18 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "1.2.1",
+    date: "20 November 2026",
+    notes: [
+      "Start screen lists recent projects, files and folders (desktop), with Clear history",
+      "Until there are files, the sidebar is greyed out: scroll around for a look, Advanced still switches",
+      "Settings panels get a footer of section icons: the one in view lights up, and a click glides there",
+      "Editor: switching files clears the panels instantly, then fills them in. The file counter sits before the two arrows, joined like undo and redo",
+      "Desktop editor: undo and redo live in the Edit menu and shortcuts, not the header",
+      "\"Own settings\" is now \"Custom settings\", and the sticky section headings no longer leave a sliver above them"
+    ]
+  },
+  {
     version: "1.2.0",
     date: "20 November 2026",
     notes: [

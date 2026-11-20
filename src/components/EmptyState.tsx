@@ -1,10 +1,12 @@
-import { IconFile, IconFolder, Logo } from "../icons"
+import { IconFile, IconFolder, IconProject, Logo } from "../icons"
+import { clearRecent, useRecent, type Recent } from "../lib/recent"
 import { DOWNLOAD_URL, isDesktop } from "../lib/platform"
 
 // Phones and tablets have nothing to drag from
 const isTouch = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches
 
-export function EmptyState({ onAddFiles, onAddFolder, onOpenProject }: { onAddFiles: () => void, onAddFolder: () => void, onOpenProject?: () => void }) {
+export function EmptyState({ onAddFiles, onAddFolder, onOpenProject, onOpenRecent }: { onAddFiles: () => void, onAddFolder: () => void, onOpenProject?: () => void, onOpenRecent?: (r: Recent) => void }) {
+  const recent = useRecent()
   return (
     <div className="empty">
       <Logo width={44} height={44} />
@@ -20,6 +22,25 @@ export function EmptyState({ onAddFiles, onAddFolder, onOpenProject }: { onAddFi
         <button className="btn btn--secondary" onClick={onAddFolder}><IconFolder /> Choose folder</button>
       </div>
       {onOpenProject && <button className="link empty__project" onClick={onOpenProject}>Open a saved project (.svgenius)</button>}
+      {onOpenRecent && recent.length > 0 && (
+        <div className="recent">
+          <div className="recent__head">
+            <span className="panel__label">Recent</span>
+            <button className="link" onClick={clearRecent}>Clear history</button>
+          </div>
+          <ul className="recent__list">
+            {recent.map((r) => (
+              <li key={r.path}>
+                <button className="recent__item" onClick={() => onOpenRecent(r)} title={r.path}>
+                  <span className="recent__icon">{r.kind === "project" ? <IconProject /> : r.kind === "folder" ? <IconFolder /> : <IconFile />}</span>
+                  <span className="recent__name">{r.name.replace(/\.svgenius$/i, "")}</span>
+                  <span className="recent__path text-3">{r.path.replace(/[\\/][^\\/]+$/, "").replace(/^\/Users\/[^/]+/, "~")}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }
