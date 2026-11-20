@@ -34,10 +34,34 @@ jobs:
         with:
           workspaces: src-tauri
       - run: yarn install --immutable
+      # Auto-update: with the signing secrets set, the build also makes signed
+      # update bundles and a latest.json, which installed apps check against.
+      # Without them it still builds, just with no in-app updates
+      - name: Turn on signed updates
+        shell: bash
+        env:
+          PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          PUBKEY: ${{ secrets.TAURI_UPDATER_PUBKEY }}
+        run: |
+          if [ -n "$PRIVATE_KEY" ] && [ -n "$PUBKEY" ]; then
+            node -e '
+              const fs = require("fs"), p = "src-tauri/tauri.conf.json", c = JSON.parse(fs.readFileSync(p, "utf8"))
+              c.bundle.createUpdaterArtifacts = true
+              c.plugins.updater.pubkey = process.env.PUBKEY.trim()
+              fs.writeFileSync(p, JSON.stringify(c, null, 2))
+            '
+            echo "Signed updates on"
+          else
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY and TAURI_UPDATER_PUBKEY aren't both set, so this release has no in-app updates"
+          fi
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
           tagName: v__VERSION__
           releaseName: SVGenius v__VERSION__
           releaseBody: Download the .dmg for macOS or the .msi / .exe for Windows. The app isn't signed yet, so on a Mac right-click it and choose Open the first time.

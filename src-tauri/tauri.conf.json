@@ -61,6 +61,18 @@
         "role": "Editor",
         "mimeType": "application/x-svgenius-project+json"
       }
-    ]
+    ],
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE5RjRCRTM3RTVGNEFEQjAKUldTd3JmVGxONzcwR2RVTjB5SG1EaHJaY0FpNkpPRjZRbmdiK0NUSDdlUWtJWGdjd2NTSTBZanoK",
+      "endpoints": [
+        "https://github.com/marknotton/svgenius/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

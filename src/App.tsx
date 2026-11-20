@@ -17,6 +17,7 @@ import { activeRules, emptyFilters, matchesFilters, nextFlag, type FilterSet } f
 import { ReportDialog } from "./components/ReportDialog"
 import { SettingsDialog } from "./components/SettingsDialog"
 import { AboutDialog } from "./components/AboutDialog"
+import { UpdateNotice } from "./components/Updates"
 import { Toasts, useToasts } from "./components/Toast"
 import { ViewControls } from "./components/ViewControls"
 import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/useAppSettings"
@@ -645,11 +646,13 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   // Settings: ⌘, from the menu or the keyboard
   useEffect(() => {
     const unlisten = listenFor("menu:settings", () => setSettingsOpen(true))
+    // Check for Updates… opens About, which checks as it opens
+    const unlistenUpdates = listenFor("menu:updates", () => setAboutOpen(true))
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === ",") { e.preventDefault(); setSettingsOpen(true) }
     }
     window.addEventListener("keydown", onKey)
-    return () => { unlisten(); window.removeEventListener("keydown", onKey) }
+    return () => { unlisten(); unlistenUpdates(); window.removeEventListener("keydown", onKey) }
   }, [])
 
   const setViewPrefs = (patch: Partial<Pick<AppSettings, "thumbPx" | "galleryPx" | "inspectorPx" | "listCompare" | "showDetails" | "backdrop" | "checker" | "backdropColour" | "previewCss" | "previewCssEnabled" | "circleOverlay" | "circleClip">>) =>
@@ -912,6 +915,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         )}
         {menu && <ContextMenu menu={menu} onClose={() => setMenu(null)} />}
         {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
+        <UpdateNotice />
         {settingsOpen && (
           <SettingsDialog
             settings={settings}

@@ -2,6 +2,7 @@ import { IconX, Logo } from "../icons"
 import { APP_VERSION, CREDITS, HISTORY, INSPIRATION, type Release as ReleaseInfo } from "../lib/about"
 import { DOWNLOAD_URL, REPO_URL, isDesktop } from "../lib/platform"
 import { Modal } from "./Dialogs"
+import { UpdatePanel } from "./Updates"
 
 // ── About SVGenius ────────────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
                 ? <a href={WEB_URL} target="_blank" rel="noopener">Browser version</a>
                 : <a href={DOWNLOAD_URL} target="_blank" rel="noopener">Desktop app</a>}
             </div>
+            <UpdatePanel />
           </div>
         </section>
 

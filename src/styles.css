@@ -1351,3 +1351,21 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 .paint__pop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .paint__pop .arrange__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .paint__pop .arrange__row { flex-wrap: wrap; }
+
+/* Desktop updates: About panel and the launch notice */
+.update { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); font-size: 12px; }
+.update__line { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.update__line--grow { flex: 1; }
+.update__acts { margin-left: auto; display: flex; gap: 6px; }
+.update__dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.update__dot--ok { background: #22c55e; }
+.update__dot--new { background: var(--accent); }
+.update__bar { flex: 1; min-width: 80px; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.update__bar > span { display: block; height: 100%; background: var(--accent); transition: width .2s; }
+.update__bar > span.is-unknown { animation: update-slide 1.2s ease-in-out infinite; }
+@keyframes update-slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+.update__notes { flex-basis: 100%; margin: 0; max-height: 140px; overflow: auto; white-space: pre-wrap; font: inherit; color: var(--text-2); }
+.update-notice { position: fixed; right: 16px; bottom: 76px; z-index: 900; width: 340px; display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 12px 34px rgba(0, 0, 0, .22); font-size: 12px; }
+.update-notice__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; }
+.update-notice__acts { display: flex; justify-content: flex-end; gap: 6px; }
+.update-notice .update__notes { max-height: 120px; }

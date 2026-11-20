@@ -17,6 +17,8 @@
           "path": "**"
         }
       ]
-    }
+    },
+    "updater:default",
+    "process:allow-restart"
   ]
 }

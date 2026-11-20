@@ -294,9 +294,11 @@ fn build_menu(app: &App) -> tauri::Result<()> {
         .accelerator("CmdOrCtrl+,")
         .build(app)?;
     let reset_layout = MenuItemBuilder::with_id("reset-layout", "Reset Layout").build(app)?;
+    let updates = MenuItemBuilder::with_id("updates", "Check for Updates…").build(app)?;
 
     let app_menu = SubmenuBuilder::new(app, "SVGenius")
         .about(Some(about))
+        .item(&updates)
         .separator()
         .item(&settings)
         .item(&reset_layout)
@@ -371,6 +373,7 @@ fn build_menu(app: &App) -> tauri::Result<()> {
         match event.id().as_ref() {
             "reset-layout" => { let _ = app.emit("menu:reset-layout", ()); }
             "settings" => { let _ = app.emit("menu:settings", ()); }
+            "updates" => { let _ = app.emit("menu:updates", ()); }
             id if id.starts_with("cmd:") => { let _ = app.emit("menu:command", id.trim_start_matches("cmd:").to_string()); }
             _ => {}
         }
@@ -387,6 +390,8 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(pending)
         .setup(|app| {
             build_menu(app)?;
