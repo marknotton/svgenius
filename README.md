@@ -87,7 +87,7 @@ Custom plugin code is imported from a blob URL inside the workers only (hence `s
 
 **Updates.** The desktop app uses Tauri's updater against `latest.json` on the latest GitHub release. The release workflow signs update bundles when the repo has two secrets: `TAURI_SIGNING_PRIVATE_KEY` (the private key file's contents, from `yarn tauri signer generate -w ~/.tauri/svgenius.key`) and `TAURI_UPDATER_PUBKEY` (the `.pub` file's contents). Add `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` too if the key has one. Without them, releases still build but installed apps can't update from them.
 
-**Publishing.** Every push to `main` builds the browser version and publishes it to GitHub Pages (`.github/workflows/pages.yml`). To make a desktop release, run the **Desktop release** workflow from the Actions tab (or push a tag like `v1.0.0`). It builds macOS and Windows installers into a draft release that you publish when happy.
+**Publishing.** Every push to `main` builds the browser version and publishes it to GitHub Pages (`.github/workflows/pages.yml`). To make a desktop release, run the **Desktop release** workflow from the Actions tab. It builds macOS and Windows installers into a draft release that you publish when happy.
 
 ```
 src/

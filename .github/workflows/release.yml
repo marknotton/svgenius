@@ -1,10 +1,11 @@
 # Builds the desktop app for macOS and Windows and attaches it to a draft release.
-# Run it from the Actions tab, or push a tag like v0.2.0. Publish the draft when happy.
+# Run it from the Actions tab, then publish the draft when happy. Publishing
+# creates the tag, so it deliberately doesn't run on tags: a second build would
+# replace the update files after latest.json was written, and installed apps
+# would reject the update because its signature no longer matched.
 name: Desktop release
 
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
