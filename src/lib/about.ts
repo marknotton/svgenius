@@ -16,7 +16,8 @@ export const HISTORY: Release[] = [
     notes: [
       "A new brand colour: magenta #AF307D, from the app icon to every accent",
       "Desktop app updates itself: About checks for a new version, and on launch you're offered Update now, Skip this release or Later",
-      "SVGenius menu: Check for Updates…"
+      "SVGenius menu: Check for Updates…",
+      "Projects: New Project (⌘N) picks where to save straight away. A project with unsaved changes shows a dot, and quitting, closing or opening another asks to Save, Don't save or Cancel. Lists that aren't a project are never asked about"
     ]
   },
   {

@@ -31,3 +31,6 @@ export const takePendingOpenFiles = () => invoke<string[]>("take_pending_open_fi
 
 export const errorMessage = (e: unknown) =>
   e instanceof Error ? e.message : typeof e === "string" ? e : "Something went wrong"
+
+export const setUnsaved = (unsaved: boolean) => invoke<void>("set_unsaved", { unsaved })
+export const quitApp = () => invoke<void>("quit_app")

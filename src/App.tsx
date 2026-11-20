@@ -30,7 +30,7 @@ import { exportNames } from "./lib/rename"
 import { fileTags } from "./lib/tags"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
-import { canReveal, openInDefaultApp, errorMessage, exportSvgFile, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
+import { canReveal, openInDefaultApp, errorMessage, exportSvgFile, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, listenForQuit, quitApp, setUnsavedGuard, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
 import { buildProject, readProject } from "./lib/project"
 import { preloadMonaco, setEditorTheme } from "./components/CodeEditor"
 import { RenderAnywayContext } from "./components/TooComplex"
@@ -539,26 +539,103 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   // Save and open everything in the list as one .svgenius file. On the desktop
   // ⌘S saves back to the project it came from
   const [project, setProject] = useState<{ path: string | null, name: string } | null>(null)
-  const saveProject = async (as = false) => {
-    if (!items.length) { push({ tone: "info", text: "Add some SVGs first, there's nothing to save yet" }); return }
+
+  // Unsaved changes: only for a list that belongs to a project file. A
+  // fingerprint of what the file holds is taken on open, new and save, and
+  // compared with what it would hold now. Anonymous sessions skip all this
+  const projectSig = useMemo(() => {
+    if (!project) return ""
+    const { savedAt: _s, focusId: _f, appVersion: _v, ...rest } = buildProject(settings, items, null)
+    return JSON.stringify(rest)
+  }, [project, settings, items])
+  const [savedSig, setSavedSig] = useState<string | null>(null)
+  const snapNext = useRef(false)
+  useEffect(() => {
+    if (!snapNext.current || !project) return
+    snapNext.current = false
+    setSavedSig(projectSig)
+  }, [project, projectSig])
+  const dirty = !!project && savedSig !== null && projectSig !== savedSig
+  useEffect(() => { setUnsavedGuard(dirty) }, [dirty])
+  const dirtyRef = useRef(dirty)
+  dirtyRef.current = dirty
+  const leaveProject = () => { setProject(null); setSavedSig(null) }
+
+  /** Saves the project; resolves true once it's written */
+  const saveProject = async (as = false): Promise<boolean> => {
+    if (!items.length && !project) { push({ tone: "info", text: "Add some SVGs first, there's nothing to save yet" }); return false }
     try {
       const data = JSON.stringify(buildProject(settings, items, focusId), null, 2)
       const name = project?.name ?? `${items[0].relPath.includes("/") ? items[0].relPath.split("/")[0] : "SVGenius project"}.${PROJECT_EXT}`
       const to = await saveProjectFile(as ? null : project?.path ?? null, name, data)
-      if (!to) return
+      if (!to) return false
       const savedName = to.split(/[\\/]/).pop() ?? to
+      snapNext.current = true
       setProject({ path: to.includes("/") || to.includes("\\") ? to : null, name: savedName })
       push({ tone: "success", text: `Saved ${savedName}` })
+      return true
     } catch (e) {
       push({ tone: "error", text: `Couldn't save the project: ${errorMessage(e)}` })
+      return false
     }
   }
+
+  /** With unsaved project changes, asks first. Resolves false to stay put */
+  const settleUnsaved = async (action: string): Promise<boolean> => {
+    if (!dirtyRef.current || !project) return true
+    const choice = await dialogs.unsaved({
+      title: `Save changes to ${project.name.replace(/\.svgenius$/i, "")}?`,
+      body: `Your changes will be lost if you ${action} without saving.`
+    })
+    if (choice === null) return false
+    if (choice === "save") return saveProjectRef.current()
+    return true
+  }
+  const settleRef = useRef(settleUnsaved)
+  settleRef.current = settleUnsaved
+
+  // Quitting or closing the window with unsaved project changes
+  useEffect(() => listenForQuit(() => {
+    void settleRef.current("quit").then((ok) => { if (ok) quitApp() })
+  }), [])
+
+  /** Starts an empty project, saved where you choose straight away */
+  const newProject = async () => {
+    if (!await settleUnsaved("start a new project")) return
+    if (itemsRef.current.length && !project) {
+      const ok = await dialogs.confirm({
+        title: "Start a new project?",
+        body: `It clears the ${plural(itemsRef.current.length, "file")} in the list. Files on disk aren't touched. To keep them in a project, use Save project instead.`,
+        confirmLabel: "New project"
+      })
+      if (!ok) return
+    }
+    try {
+      const data = JSON.stringify(buildProject(settings, [], null), null, 2)
+      const to = await saveProjectFile(null, `Untitled.${PROJECT_EXT}`, data)
+      if (!to) return
+      const savedName = to.split(/[\\/]/).pop() ?? to
+      clear()
+      setSelection(new Set())
+      setFocusId(null)
+      setMarkupOpen(false)
+      snapNext.current = true
+      setProject({ path: to.includes("/") || to.includes("\\") ? to : null, name: savedName })
+      push({ tone: "success", text: `Created ${savedName}. Add some SVGs, then ⌘S saves them to it` })
+    } catch (e) {
+      push({ tone: "error", text: `Couldn't create the project: ${errorMessage(e)}` })
+    }
+  }
+  const newProjectRef = useRef(newProject)
+  newProjectRef.current = newProject
+
   const openProject = async (path?: string) => {
     try {
+      if (!await settleUnsaved("open another project")) return
       const file = path ? await readProjectFile(path) : await openProjectFile()
       if (!file) return
       const { files, focusId: fid, settings: next } = readProject(file.text, settings)
-      if (itemsRef.current.length) {
+      if (itemsRef.current.length && !dirtyRef.current && !project) {
         const ok = await dialogs.confirm({
           title: `Open ${file.name}?`,
           body: `It replaces the ${plural(itemsRef.current.length, "file")} in the list now. Files on disk aren't touched.`,
@@ -572,6 +649,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       setFocusId(fid)
       setSidebarTab(fid ? "file" : "preset")
       setMarkupOpen(false)
+      snapNext.current = true
       setProject({ path: file.path, name: file.name })
       push({ tone: "success", text: `Opened ${file.name}: ${plural(files.length, "file")}` })
     } catch (e) {
@@ -584,6 +662,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   saveProjectRef.current = saveProject
   useCommands((cmd) => {
     if (cmd === "openProject") { openProjectRef.current(); return true }
+    if (cmd === "newProject") { newProjectRef.current(); return true }
     if (cmd === "saveProject" || cmd === "saveProjectAs") { saveProjectRef.current(cmd === "saveProjectAs"); return true }
     return false
   })
@@ -592,10 +671,12 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     setMenu({
       x: r.left, y: r.bottom + 4,
       items: [
+        { label: "New project…    ⌘N", run: () => newProjectRef.current() },
         { label: "Open project…    ⌘O", run: () => openProjectRef.current() },
         "-",
-        { label: `Save project${project?.path ? "" : "…"}    ⌘S`, run: () => saveProjectRef.current(), disabled: !items.length },
-        { label: "Save project as…    ⇧⌘S", run: () => saveProjectRef.current(true), disabled: !items.length }
+        { label: `Save project${project?.path ? "" : "…"}    ⌘S`, run: () => saveProjectRef.current(), disabled: !items.length && !project },
+        { label: "Save project as…    ⇧⌘S", run: () => saveProjectRef.current(true), disabled: !items.length && !project },
+        ...(project ? ["-" as const, { label: "Close project", run: () => void settleRef.current("close it").then((ok) => { if (ok) leaveProject() }) }] : [])
       ]
     })
   }
@@ -603,7 +684,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const removeItems = async () => {
     if (selection.size) return removeIds(selection)
     const ok = await dialogs.confirm({ title: "Clear the list?", body: "Files on disk aren't touched.", confirmLabel: "Clear" })
-    if (ok) { clear(); setProject(null) }
+    if (ok) { clear(); if (!project) setProject(null) }
   }
 
   // Delete / Backspace removes the selected files (not while typing)
@@ -792,7 +873,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onAddFiles={addFiles}
                 onAddFolder={addFolder}
                 onProjectMenu={projectMenu}
-                projectName={project?.name}
+                projectName={project ? `${project.name.replace(/\.svgenius$/i, "")}${dirty ? " •" : ""}` : undefined}
                 onRemove={removeItems}
                 viewControls={viewControls}
                 cssBar={cssBar}

@@ -368,3 +368,19 @@ export function listenFor<T = unknown>(event: string, run: (payload: T) => void)
 }
 
 export const errorMessage = desktop.errorMessage
+
+// ── Unsaved project guard ─────────────────────────────────────────────────────
+// Only for a list that belongs to a project file. The desktop app holds the
+// quit and asks the page; the browser can only show its own leave-page prompt
+
+const onBeforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = "" }
+
+export function setUnsavedGuard(unsaved: boolean) {
+  if (isDesktop) { desktop.setUnsaved(unsaved).catch(() => {}); return }
+  window.removeEventListener("beforeunload", onBeforeUnload)
+  if (unsaved) window.addEventListener("beforeunload", onBeforeUnload)
+}
+
+export const quitApp = () => { if (isDesktop) desktop.quitApp().catch(() => {}) }
+
+export const listenForQuit = (run: () => void) => listenFor("app:quit-requested", run)

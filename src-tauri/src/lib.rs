@@ -1,11 +1,11 @@
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use tauri::menu::{AboutMetadataBuilder, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{App, AppHandle, Emitter, Manager, State};
-#[cfg(any(target_os = "macos", target_os = "ios"))]
 use tauri::RunEvent;
 
 // ── Shared state ──────────────────────────────────────────────────────────────
@@ -276,6 +276,32 @@ fn take_pending_open_files(state: State<'_, PendingOpenFiles>) -> Vec<String> {
     std::mem::take(&mut *state.lock().unwrap())
 }
 
+// ── Unsaved project guard ─────────────────────────────────────────────────────
+// The page says when an open project has unsaved changes. Quitting or closing
+// the window then asks the page first ("app:quit-requested"), which asks the
+// user and calls quit_app when it's fine to go
+
+static UNSAVED: AtomicBool = AtomicBool::new(false);
+
+#[tauri::command]
+fn set_unsaved(unsaved: bool) {
+    UNSAVED.store(unsaved, Ordering::SeqCst);
+}
+
+#[tauri::command]
+fn quit_app(app: AppHandle) {
+    UNSAVED.store(false, Ordering::SeqCst);
+    app.exit(0);
+}
+
+fn request_quit(app: &AppHandle) -> bool {
+    if UNSAVED.load(Ordering::SeqCst) {
+        let _ = app.emit("app:quit-requested", ());
+        return false;
+    }
+    true
+}
+
 // ── Menu ──────────────────────────────────────────────────────────────────────
 
 fn build_menu(app: &App) -> tauri::Result<()> {
@@ -295,6 +321,8 @@ fn build_menu(app: &App) -> tauri::Result<()> {
         .build(app)?;
     let reset_layout = MenuItemBuilder::with_id("reset-layout", "Reset Layout").build(app)?;
     let updates = MenuItemBuilder::with_id("updates", "Check for Updates…").build(app)?;
+    // Our own Quit, so unsaved project changes get a say first
+    let quit = MenuItemBuilder::with_id("quit", "Quit SVGenius").accelerator("CmdOrCtrl+Q").build(app)?;
 
     let app_menu = SubmenuBuilder::new(app, "SVGenius")
         .about(Some(about))
@@ -309,7 +337,7 @@ fn build_menu(app: &App) -> tauri::Result<()> {
         .hide_others()
         .show_all()
         .separator()
-        .quit()
+        .item(&quit)
         .build()?;
 
     // Without an Edit menu, copy/paste shortcuts don't work in inputs on macOS.
@@ -342,6 +370,7 @@ fn build_menu(app: &App) -> tauri::Result<()> {
 
     // Projects: every loaded file with its settings and edits, in one .svgenius file
     let file_menu = SubmenuBuilder::new(app, "File")
+        .item(&cmd("newProject", "New Project…", "CmdOrCtrl+N")?)
         .item(&cmd("openProject", "Open Project…", "CmdOrCtrl+O")?)
         .separator()
         .item(&cmd("saveProject", "Save Project", "CmdOrCtrl+S")?)
@@ -374,6 +403,7 @@ fn build_menu(app: &App) -> tauri::Result<()> {
             "reset-layout" => { let _ = app.emit("menu:reset-layout", ()); }
             "settings" => { let _ = app.emit("menu:settings", ()); }
             "updates" => { let _ = app.emit("menu:updates", ()); }
+            "quit" => { if request_quit(app) { app.exit(0); } }
             id if id.starts_with("cmd:") => { let _ = app.emit("menu:command", id.trim_start_matches("cmd:").to_string()); }
             _ => {}
         }
@@ -408,12 +438,24 @@ pub fn run() {
             read_json_file,
             write_json_file,
             read_plugin_file,
-            take_pending_open_files
+            take_pending_open_files,
+            set_unsaved,
+            quit_app
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
     app.run(|_app_handle, _event| {
+        // Closing the window or quitting from the Dock with unsaved project changes
+        match &_event {
+            RunEvent::WindowEvent { event: tauri::WindowEvent::CloseRequested { api, .. }, .. } => {
+                if !request_quit(_app_handle) { api.prevent_close(); }
+            }
+            RunEvent::ExitRequested { api, code: None, .. } => {
+                if !request_quit(_app_handle) { api.prevent_exit(); }
+            }
+            _ => {}
+        }
         // Finder "Open With" / dropping SVGs on the Dock icon
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         if let RunEvent::Opened { urls } = _event {

@@ -5,10 +5,13 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 interface PromptOpts { title: string, initial?: string, confirmLabel?: string, hint?: string }
 interface ConfirmOpts { title: string, body?: ReactNode, confirmLabel?: string, danger?: boolean }
+interface UnsavedOpts { title: string, body?: ReactNode, saveLabel?: string, discardLabel?: string }
+export type UnsavedChoice = "save" | "discard" | null
 
 type State =
   | { kind: "prompt", opts: PromptOpts, resolve: (v: string | null) => void }
   | { kind: "confirm", opts: ConfirmOpts, resolve: (v: boolean) => void }
+  | { kind: "unsaved", opts: UnsavedOpts, resolve: (v: UnsavedChoice) => void }
   | null
 
 export function useDialogs() {
@@ -20,15 +23,21 @@ export function useDialogs() {
   const confirm = useCallback((opts: ConfirmOpts) =>
     new Promise<boolean>((resolve) => setState({ kind: "confirm", opts, resolve })), [])
 
+  /** Save, Don't save or Cancel (null) */
+  const unsaved = useCallback((opts: UnsavedOpts) =>
+    new Promise<UnsavedChoice>((resolve) => setState({ kind: "unsaved", opts, resolve })), [])
+
   const close = () => setState(null)
 
   const node = state && (
     state.kind === "prompt"
       ? <PromptDialog opts={state.opts} onDone={(v) => { state.resolve(v); close() }} />
-      : <ConfirmDialog opts={state.opts} onDone={(v) => { state.resolve(v); close() }} />
+      : state.kind === "confirm"
+        ? <ConfirmDialog opts={state.opts} onDone={(v) => { state.resolve(v); close() }} />
+        : <UnsavedDialog opts={state.opts} onDone={(v) => { state.resolve(v); close() }} />
   )
 
-  return { node, prompt, confirm }
+  return { node, prompt, confirm, unsaved }
 }
 
 export function Modal({ children, onCancel }: { children: ReactNode, onCancel: () => void }) {
@@ -77,6 +86,20 @@ function ConfirmDialog({ opts, onDone }: { opts: ConfirmOpts, onDone: (v: boolea
         <button type="button" autoFocus className={`btn ${opts.danger ? "btn--danger" : "btn--primary"}`} onClick={() => onDone(true)}>
           {opts.confirmLabel ?? "OK"}
         </button>
+      </div>
+    </Modal>
+  )
+}
+
+function UnsavedDialog({ opts, onDone }: { opts: UnsavedOpts, onDone: (v: UnsavedChoice) => void }) {
+  return (
+    <Modal onCancel={() => onDone(null)}>
+      <h2 className="modal__title">{opts.title}</h2>
+      {opts.body && <div className="modal__body">{opts.body}</div>}
+      <div className="modal__actions">
+        <button type="button" className="btn btn--secondary modal__aside" onClick={() => onDone("discard")}>{opts.discardLabel ?? "Don't save"}</button>
+        <button type="button" className="btn btn--secondary" onClick={() => onDone(null)}>Cancel</button>
+        <button type="button" autoFocus className="btn btn--primary" onClick={() => onDone("save")}>{opts.saveLabel ?? "Save"}</button>
       </div>
     </Modal>
   )
