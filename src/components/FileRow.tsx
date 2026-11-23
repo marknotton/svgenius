@@ -4,7 +4,7 @@ import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
 import type { FileTag } from "../lib/tags"
 import { FLAGS } from "../lib/filters"
 import { IconFlag, IconFolder, IconPencil } from "../icons"
-import { isDesktop, openInDefaultApp, reveal } from "../lib/platform"
+import { isDesktop, isPasted, openInDefaultApp, reveal } from "../lib/platform"
 import type { Backdrop, Preset, SvgItem } from "../lib/types"
 import { Thumb } from "./Thumb"
 import { TooComplex } from "./TooComplex"
@@ -216,7 +216,7 @@ function Check({ item, selected, onToggle }: { item: SvgItem, selected: boolean,
 
 /** Reveal in Finder, and open the original in the user's SVG app (desktop only: the browser has no path) */
 function FileButtons({ item }: { item: SvgItem }) {
-  if (!isDesktop) return null
+  if (!isDesktop || isPasted(item.path)) return null
   return (
     <span className="file-btns">
       <button type="button" className="btn btn--icon file-open" title="Show the original file in Finder"

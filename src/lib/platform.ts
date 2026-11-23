@@ -3,6 +3,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { open, save } from "@tauri-apps/plugin-dialog"
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener"
+import { readText as readNativeClipboard } from "@tauri-apps/plugin-clipboard-manager"
 import * as desktop from "./tauri"
 import type { ScannedFile } from "./types"
 
@@ -134,6 +135,24 @@ export async function pickSvgs(kind: "files" | "folder"): Promise<string[] | nul
   return picked ? (Array.isArray(picked) ? picked : [picked]) : null
 }
 
+// ── Pasted code ───────────────────────────────────────────────────────────────
+// SVGs pasted in as code have no file behind them. Their path is made up, so
+// nothing tries to read, watch, reveal or open it.
+
+const PASTED = "pasted:"
+export const pastedPath = (id: string, name: string) => `${PASTED}${id}/${name}`
+export const isPasted = (path: string) => path.startsWith(PASTED)
+
+/**
+ * The clipboard's text. Desktop: the native clipboard, no prompt. Browser: the
+ * browser may ask first, and throws when it says no (or can't read at all)
+ */
+export async function readClipboardText(): Promise<string> {
+  if (isDesktop) return (await readNativeClipboard()) ?? ""
+  if (!navigator.clipboard?.readText) throw new Error("This browser can't read the clipboard")
+  return navigator.clipboard.readText()
+}
+
 interface DropHandlers {
   onHover: (over: boolean) => void
   onDrop: (paths: string[]) => void
@@ -254,15 +273,17 @@ export const canReveal = isDesktop
 
 /** Last-modified times for files on disk. Desktop only (browser files can't change under us) */
 export const fileMtimes = async (paths: string[]): Promise<Array<number | null>> =>
-  isDesktop && paths.length ? desktop.fileMtimes(paths) : paths.map(() => null)
+  isDesktop && paths.some((p) => !isPasted(p))
+    ? desktop.fileMtimes(paths).then((t) => t.map((m, k) => (isPasted(paths[k]) ? null : m)))
+    : paths.map(() => null)
 
 /** Opens the original file in whatever app the system uses for SVGs. Desktop only */
 export const openInDefaultApp = (path: string) => {
-  if (isDesktop) openPath(path).catch(() => {})
+  if (isDesktop && !isPasted(path)) openPath(path).catch(() => {})
 }
 
 export const reveal = (path: string) => {
-  if (isDesktop) revealItemInDir(path).catch(() => {})
+  if (isDesktop && !isPasted(path)) revealItemInDir(path).catch(() => {})
 }
 
 // ── Settings, presets and plugins ─────────────────────────────────────────────

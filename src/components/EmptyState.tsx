@@ -1,4 +1,5 @@
 import { IconFile, IconFolder, IconProject, Logo } from "../icons"
+import { AddChoices } from "./AddDialog"
 import { clearRecent, useRecent, type Recent } from "../lib/recent"
 import { isDesktop } from "../lib/platform"
 import { useDesktopDownload } from "../lib/download"
@@ -6,7 +7,7 @@ import { useDesktopDownload } from "../lib/download"
 // Phones and tablets have nothing to drag from
 const isTouch = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches
 
-export function EmptyState({ onAddFiles, onAddFolder, onOpenProject, onOpenRecent }: { onAddFiles: () => void, onAddFolder: () => void, onOpenProject?: () => void, onOpenRecent?: (r: Recent) => void }) {
+export function EmptyState({ onAddFiles, onAddFolder, onPaste, onOpenProject, onOpenRecent }: { onAddFiles: () => void, onAddFolder: () => void, onPaste: () => void, onOpenProject?: () => void, onOpenRecent?: (r: Recent) => void }) {
   const downloadUrl = useDesktopDownload()
   const recent = useRecent()
   return (
@@ -19,10 +20,7 @@ export function EmptyState({ onAddFiles, onAddFolder, onOpenProject, onOpenRecen
             Folders are searched for SVGs, sub-folders included. Everything happens in your browser: nothing is uploaded, and exports download as a zip.
             Prefer exporting straight into folders? <a href={downloadUrl} target="_blank" rel="noopener">Get the desktop app</a>.
           </p>}
-      <div className="empty__actions">
-        <button className="btn btn--primary" onClick={onAddFiles}><IconFile /> Choose files</button>
-        <button className="btn btn--secondary" onClick={onAddFolder}><IconFolder /> Choose folder</button>
-      </div>
+      <AddChoices onFiles={onAddFiles} onFolder={onAddFolder} onPaste={onPaste} />
       {onOpenProject && <button className="link empty__project" onClick={onOpenProject}>Open a saved project (.svgenius)</button>}
       {onOpenRecent && recent.length > 0 && (
         <div className="recent">

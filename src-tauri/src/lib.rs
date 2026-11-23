@@ -375,6 +375,8 @@ fn build_menu(app: &App) -> tauri::Result<()> {
 
     // Projects: every loaded file with its settings and edits, in one .svgenius file
     let file_menu = SubmenuBuilder::new(app, "File")
+        .item(&cmd("addSvgs", "Add SVGs…", "CmdOrCtrl+Shift+O")?)
+        .separator()
         .item(&cmd("newProject", "New Project…", "CmdOrCtrl+N")?)
         .item(&cmd("openProject", "Open Project…", "CmdOrCtrl+O")?)
         .separator()
@@ -425,6 +427,7 @@ pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .manage(pending)

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { byteLength } from "../lib/format"
 import { CONCURRENCY, optimiseSvg, runLimited } from "../lib/optimiser"
 import { newId } from "../lib/settings"
-import { errorMessage, forgetFiles, isDesktop, readSvg, scanPaths } from "../lib/platform"
+import { errorMessage, forgetFiles, isDesktop, pastedPath, readSvg, scanPaths } from "../lib/platform"
 import { loadSession, saveSession } from "../lib/session"
 import { postProcess } from "../lib/trim"
 import { optimiseAutoPrecision } from "../lib/precision"
@@ -82,6 +82,20 @@ export function useItems() {
     })
     return result
   }, [patch])
+
+  /** SVGs pasted in as code (names already unique). Returns the new ids */
+  const addPasted = useCallback((files: Array<{ name: string, svg: string }>) => {
+    const now = Date.now()
+    const fresh: SvgItem[] = files.map(({ name, svg }) => {
+      const id = newId()
+      return {
+        id, path: pastedPath(id, name), name, relPath: name, size: byteLength(svg), mtime: now,
+        source: svg, fileSource: svg, status: "idle", presetId: null, rev: 0, heavy: assessComplexity(svg)
+      }
+    })
+    setItems((list) => [...list, ...fresh])
+    return fresh.map((i) => i.id)
+  }, [])
 
   const remove = useCallback((ids: Set<string>) => {
     forgetFiles(itemsRef.current.filter((i) => ids.has(i.id)).map((i) => i.path))
@@ -216,5 +230,5 @@ export function useItems() {
     return results
   }, [patch])
 
-  return { items, ready, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, optimise, reloadFromDisk, forceRender }
+  return { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, optimise, reloadFromDisk, forceRender }
 }

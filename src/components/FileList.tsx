@@ -1,6 +1,6 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react"
 import { LIVE_BUFFER_PX } from "../lib/config"
-import { IconFile, IconFilter, IconSort, IconFolder, IconTrash, IconProject } from "../icons"
+import { IconFilter, IconSort, IconPlus, IconTrash, IconProject } from "../icons"
 import { plural } from "../lib/format"
 import type { FileTag } from "../lib/tags"
 import type { AppSettings, Preset, SvgItem } from "../lib/types"
@@ -40,8 +40,8 @@ interface Props {
   onClearFilters: () => void
   tagsFor: (item: SvgItem) => FileTag[]
   exportNames: Map<string, string> | null
-  onAddFiles: () => void
-  onAddFolder: () => void
+  /** Opens the Add SVGs dialog: files, a folder or pasted code */
+  onAdd: () => void
   /** Open and save .svgenius projects */
   onProjectMenu?: (e: React.MouseEvent) => void
   projectName?: string
@@ -106,8 +106,7 @@ export function FileList(p: Props) {
             : p.query.trim() || p.filterCount ? `${items.length} of ${plural(p.total, "file")}` : plural(p.total, "file")}
         </span>
         <div className="toolbar__group">
-          <button className="btn btn--ghost btn--sm" onClick={p.onAddFiles}><IconFile /> Files</button>
-          <button className="btn btn--ghost btn--sm" onClick={p.onAddFolder}><IconFolder /> Folder</button>
+          <button className="btn btn--ghost btn--sm" onClick={p.onAdd} title="Add SVGs: files, a folder, or code pasted from the clipboard"><IconPlus /> Add</button>
           {p.onProjectMenu && (
             <button className="btn btn--ghost btn--sm" onClick={p.onProjectMenu}
               title={p.projectName ? `Project: ${p.projectName}. Open or save projects (all files, settings and edits)` : "Open or save a project: every file, its settings and edits, in one .svgenius file"}>

@@ -10,6 +10,7 @@
     "core:window:allow-start-dragging",
     "dialog:default",
     "opener:default",
+    "clipboard-manager:allow-read-text",
     {
       "identifier": "opener:allow-open-path",
       "allow": [

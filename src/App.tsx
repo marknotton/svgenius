@@ -30,7 +30,7 @@ import { exportNames } from "./lib/rename"
 import { fileTags } from "./lib/tags"
 import { LIVE_DEBOUNCE_MS } from "./lib/config"
 import { probePlugin } from "./lib/optimiser"
-import { canReveal, openInDefaultApp, errorMessage, exportSvgFile, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, listenForQuit, quitApp, setUnsavedGuard, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
+import { canReveal, isPasted, openInDefaultApp, errorMessage, exportSvgFile, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, listenForQuit, quitApp, setUnsavedGuard, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
 import { buildProject, countChanges, readProject } from "./lib/project"
 import { forget as forgetRecent, remember } from "./lib/recent"
 import { BEFORE_AFTER_KEYS, SORT_KEYS, sortItems, sortStore, type SortState } from "./lib/sort"
@@ -41,6 +41,8 @@ import { checkPreviewCss, type CssWarning } from "./lib/cssCheck"
 import { useTheme } from "./lib/theme"
 import { listenForCommands, textFocus, useCommands } from "./lib/commands"
 import { useFileWatch } from "./hooks/useFileWatch"
+import { AddDialog, type AddMode } from "./components/AddDialog"
+import { looksLikeSvg } from "./lib/svgImport"
 import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "./lib/types"
 
 /** Where the last page load left off: the open file and whether its editor was up */
@@ -65,7 +67,7 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, ready, itemsRef, addPaths, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, optimise, reloadFromDisk, forceRender } = useItems()
+  const { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, optimise, reloadFromDisk, forceRender } = useItems()
   // Once there are files, get the code editor ready before anyone opens it
   const hasItems = items.length > 0
   useEffect(() => { if (hasItems) preloadMonaco() }, [hasItems])
@@ -160,6 +162,28 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     const picked = await pickSvgs("folder")
     if (picked) add(picked)
   }
+
+  // The Add SVGs dialog: files, a folder, or pasted code
+  const [adding, setAdding] = useState<{ mode: AddMode, text?: string } | null>(null)
+  const addCode = (files: Array<{ name: string, svg: string }>) => {
+    const ids = addPasted(files)
+    setAdding(null)
+    if (ids.length === 1) { setFocusId(ids[0]); setSidebarTab("file") }
+    push({ tone: "success", text: files.length === 1 ? `Added ${files[0].name}` : `Added ${plural(files.length, "SVG")}` })
+  }
+
+  // ⌘V with nothing else to paste into: SVG markup on the clipboard opens straight in the dialog
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (e.defaultPrevented || textFocus() || document.querySelector(".modal")) return
+      const text = e.clipboardData?.getData("text/plain") ?? ""
+      if (!looksLikeSvg(text)) return
+      e.preventDefault()
+      setAdding({ mode: "paste", text })
+    }
+    document.addEventListener("paste", onPaste)
+    return () => document.removeEventListener("paste", onPaste)
+  }, [])
 
   useEffect(() => listenForDrops({ onHover: setDragging, onDrop: add }), [add])
 
@@ -695,6 +719,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   saveProjectRef.current = saveProject
   useCommands((cmd) => {
     if (cmd === "openProject") { openProjectRef.current(); return true }
+    if (cmd === "addSvgs") { if (!document.querySelector(".modal")) setAdding({ mode: "choose" }); return true }
     if (cmd === "newProject") { newProjectRef.current(); return true }
     if (cmd === "saveProject" || cmd === "saveProjectAs") { saveProjectRef.current(cmd === "saveProjectAs"); return true }
     return false
@@ -746,7 +771,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       items: [
         { label: "Open in editor", run: () => openMarkup(id) },
         { label: "Export optimised SVG…", run: () => exportOneRef.current(id), disabled: item.source === undefined || isBlocked(item) },
-        ...(canReveal ? [
+        ...(canReveal && !isPasted(item.path) ? [
           { label: "Open in default app", run: () => openInDefaultApp(item.path) },
           { label: "Reveal in Finder", run: () => reveal(item.path) }
         ] : []),
@@ -873,7 +898,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         <div className="workspace">
           <main className="workspace__main">
             {items.length === 0 ? (
-              <EmptyState onAddFiles={addFiles} onAddFolder={addFolder} onOpenProject={() => openProjectRef.current()}
+              <EmptyState onAddFiles={addFiles} onAddFolder={addFolder} onPaste={() => setAdding({ mode: "paste" })} onOpenProject={() => openProjectRef.current()}
                 onOpenRecent={(r) => (r.kind === "project" ? openProjectRef.current(r.path) : add([r.path]))} />
             ) : (
               <FileList
@@ -906,8 +931,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 filterBar={<FilterBar filters={filters} onChange={setFilters} shown={shownItems.length} total={items.length} usedFlags={usedFlags} />}
                 tagsFor={tagsFor}
                 exportNames={previewNames}
-                onAddFiles={addFiles}
-                onAddFolder={addFolder}
+                onAdd={() => setAdding({ mode: "choose" })}
                 onProjectMenu={projectMenu}
                 projectName={project ? `${project.name.replace(/\.svgenius$/i, "")}${dirty ? " •" : ""}` : undefined}
                 onRemove={removeItems}
@@ -1046,6 +1070,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             onResetLayout={resetLayout}
             onClose={() => setSettingsOpen(false)}
           />
+        )}
+        {adding && (
+          <AddDialog mode={adding.mode} text={adding.text} backdrop={settings.backdrop} taken={items.map((i) => i.relPath)}
+            onFiles={addFiles} onFolder={addFolder} onAdd={addCode} onClose={() => setAdding(null)} />
         )}
         {dragging && <DropOverlay />}
         {dialogs.node}
