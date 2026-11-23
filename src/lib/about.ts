@@ -11,6 +11,17 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "1.3.0",
+    date: "23 November 2026",
+    notes: [
+      "Paste SVG code: the new Add button (and the start screen) offers Files, Folder or Paste code. The clipboard is read straight away, previewed and named from the markup",
+      "⌘V anywhere outside a text field opens SVG on the clipboard in the paste view. File › Add SVGs… is ⌘⇧O",
+      "Pasted markup is checked and repaired where it can be: missing xmlns, unquoted attributes, data URIs, SVG inside HTML. Errors say where and why",
+      "A bare <symbol> becomes a proper SVG, a sprite splits into one SVG per symbol, and a missing viewBox is measured from the artwork",
+      "Scripts and event handlers are stripped, and very large pastes ask before they're processed"
+    ]
+  },
+  {
     version: "1.2.2",
     date: "20 November 2026",
     notes: [
