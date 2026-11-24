@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { IconPlus, IconTrash } from "../icons"
-import type { CustomPlugin, SvgoSettings } from "@svgenius/core/types"
+import type { CustomPlugin, SvgoSettings } from "@marknotton/svgenius-core/types"
 import { Toggle } from "./Toggle"
 
 // ── Third-party plugins ───────────────────────────────────────────────────────

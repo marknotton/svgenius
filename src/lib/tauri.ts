@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core"
-import type { ScannedFile } from "@svgenius/core/types"
+import type { ScannedFile } from "@marknotton/svgenius-core/types"
 
 // ── Typed wrappers around the Rust commands ──────────────────────────────────
 

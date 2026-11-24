@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { ThemeChoice } from "@svgenius/core/types"
+import type { ThemeChoice } from "@marknotton/svgenius-core/types"
 
 // ── App theme ─────────────────────────────────────────────────────────────────
 // "system" leaves data-theme off so the CSS media query decides.

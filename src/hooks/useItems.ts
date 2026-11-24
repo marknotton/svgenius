@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { byteLength } from "@svgenius/core/format"
-import { CONCURRENCY, optimiseSvg, runLimited } from "@svgenius/core/optimiser"
-import { newId } from "@svgenius/core/settings"
+import { byteLength } from "@marknotton/svgenius-core/format"
+import { CONCURRENCY, optimiseSvg, runLimited } from "@marknotton/svgenius-core/optimiser"
+import { newId } from "@marknotton/svgenius-core/settings"
 import { errorMessage, forgetFiles, isDesktop, pastedPath, readSvg, scanPaths } from "../lib/platform"
 import { loadSession, saveSession } from "../lib/session"
-import { postProcess } from "@svgenius/core/trim"
-import { optimiseAutoPrecision } from "@svgenius/core/precision"
-import { assessComplexity, isBlocked } from "@svgenius/core/complexity"
-import type { GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "@svgenius/core/types"
+import { postProcess } from "@marknotton/svgenius-core/trim"
+import { optimiseAutoPrecision } from "@marknotton/svgenius-core/precision"
+import { assessComplexity, isBlocked } from "@marknotton/svgenius-core/complexity"
+import type { GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "@marknotton/svgenius-core/types"
 
 // ── File list + optimisation queue ────────────────────────────────────────────
 

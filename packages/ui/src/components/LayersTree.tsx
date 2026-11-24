@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { IconCaret, IconEye, IconEyeOff, IconLock, IconTrash, IconUnlock } from "../icons"
-import type { DropPlace } from "@svgenius/core/markupEdit"
+import type { DropPlace } from "@marknotton/svgenius-core/markupEdit"
 
 /** Elements that can hold others, so things can be dropped into them */
 const CONTAINERS = new Set(["svg", "g", "defs", "symbol", "mask", "clipPath", "a", "switch", "pattern", "marker"])

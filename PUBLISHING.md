@@ -1,4 +1,4 @@
-# Publishing @svgenius/core and @svgenius/ui
+# Publishing @marknotton/svgenius-core and @marknotton/svgenius-ui
 
 Both packages live in this repo under `packages/` and are published to npm from Mark's personal account.
 
@@ -7,10 +7,10 @@ Both packages live in this repo under `packages/` and are published to npm from 
 3. Pack with Yarn, which swaps the `workspace:` ranges for real versions, then publish the tarballs with npm:
 
 ```bash
-yarn workspace @svgenius/core pack --out /tmp/svgenius-core.tgz
-yarn workspace @svgenius/ui pack --out /tmp/svgenius-ui.tgz
+yarn workspace @marknotton/svgenius-core pack --out /tmp/svgenius-core.tgz
+yarn workspace @marknotton/svgenius-ui pack --out /tmp/svgenius-ui.tgz
 npm publish /tmp/svgenius-core.tgz --access public
 npm publish /tmp/svgenius-ui.tgz --access public
 ```
 
-Publish core first, since ui depends on it. The `@svgenius` scope has to belong to the account (create a free npm organisation called `svgenius` once).
+Publish core first, since ui depends on it. They publish under the `marknotton` npm organisation, so the account must be a member of it.

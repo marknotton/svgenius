@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from "react"
 import { Modal } from "./Dialogs"
 import { Segmented } from "./Segmented"
-import { detailedReport, summaryReport, type ReportColumns, type ReportEntry, type ReportFormat } from "@svgenius/core/report"
-import { savingPercent } from "@svgenius/core/format"
-import type { RenameSettings } from "@svgenius/core/types"
+import { detailedReport, summaryReport, type ReportColumns, type ReportEntry, type ReportFormat } from "@marknotton/svgenius-core/report"
+import { savingPercent } from "@marknotton/svgenius-core/format"
+import type { RenameSettings } from "@marknotton/svgenius-core/types"
 
 // ── Report: copyable text of what was done ────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { IconAlignBottom, IconAlignHCentre, IconAlignLeft, IconAlignRight, IconAlignTop, IconAlignVMiddle, IconExclude, IconIntersect, IconMinusFront, IconMore, IconPin, IconUnite } from "../icons"
-import { alignTarget } from "@svgenius/core/arrange"
-import type { EditorAction } from "@svgenius/core/editorActions"
+import { alignTarget } from "@marknotton/svgenius-core/arrange"
+import type { EditorAction } from "@marknotton/svgenius-core/editorActions"
 import type { MenuItem, MenuState } from "./ContextMenu"
 import { Pop } from "./PaintTools"
 

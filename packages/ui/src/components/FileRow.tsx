@@ -1,14 +1,14 @@
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from "react"
-import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "@svgenius/core/svgRoot"
-import { formatBytes, formatSaving, plural, savingPercent } from "@svgenius/core/format"
-import type { FileTag } from "@svgenius/core/tags"
-import { FLAGS } from "@svgenius/core/filters"
+import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "@marknotton/svgenius-core/svgRoot"
+import { formatBytes, formatSaving, plural, savingPercent } from "@marknotton/svgenius-core/format"
+import type { FileTag } from "@marknotton/svgenius-core/tags"
+import { FLAGS } from "@marknotton/svgenius-core/filters"
 import { IconFlag, IconFolder, IconPencil } from "../icons"
 import { adapter } from "../host"
-import type { Backdrop, Preset, SvgItem } from "@svgenius/core/types"
+import type { Backdrop, Preset, SvgItem } from "@marknotton/svgenius-core/types"
 import { Thumb } from "./Thumb"
 import { TooComplex } from "./TooComplex"
-import { countNodes, isBlocked } from "@svgenius/core/complexity"
+import { countNodes, isBlocked } from "@marknotton/svgenius-core/complexity"
 
 interface Props {
   item: SvgItem

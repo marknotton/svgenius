@@ -1,6 +1,6 @@
 import { useEffect, useRef, type MutableRefObject } from "react"
 import { fileMtimes, isDesktop, readSvg } from "../lib/platform"
-import type { SvgItem } from "@svgenius/core/types"
+import type { SvgItem } from "@marknotton/svgenius-core/types"
 
 // ── Watch files on disk ───────────────────────────────────────────────────────
 // Desktop only. Polls modified times while the app is visible, so a file saved

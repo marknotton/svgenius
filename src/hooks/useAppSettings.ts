@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { sanitiseAppSettings } from "@svgenius/core/settings"
+import { sanitiseAppSettings } from "@marknotton/svgenius-core/settings"
 import { loadSettings, saveSettings } from "../lib/platform"
-import type { AppSettings } from "@svgenius/core/types"
+import type { AppSettings } from "@marknotton/svgenius-core/types"
 
 // ── Persistent app settings ───────────────────────────────────────────────────
 // Lives in the app config folder as settings.json, so presets survive restarts.
@@ -47,5 +47,5 @@ export function useAppSettings() {
 
 // ── Preset helpers ────────────────────────────────────────────────────────────
 
-export { presetById, presetActions, uniqueName } from "@svgenius/core/presets"
-export type { Update, PresetActions } from "@svgenius/core/presets"
+export { presetById, presetActions, uniqueName } from "@marknotton/svgenius-core/presets"
+export type { Update, PresetActions } from "@marknotton/svgenius-core/presets"

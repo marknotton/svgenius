@@ -1,8 +1,8 @@
 import { useDragSort } from "../hooks/useDragSort"
 import { IconDuplicate, IconGrip, IconPlus, IconTrash } from "../icons"
-import { canonicalColour } from "@svgenius/core/cutOuts"
-import { createCutMatcher, duplicateAfter } from "@svgenius/core/settings"
-import type { CutMatcher } from "@svgenius/core/types"
+import { canonicalColour } from "@marknotton/svgenius-core/cutOuts"
+import { createCutMatcher, duplicateAfter } from "@marknotton/svgenius-core/settings"
+import type { CutMatcher } from "@marknotton/svgenius-core/types"
 
 // ── Shapes that become cut-outs ───────────────────────────────────────────────
 // Like Find & replace: add as many matchers as you need, each a fill colour

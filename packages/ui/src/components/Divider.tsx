@@ -1,5 +1,5 @@
 import { useRef, type PointerEvent } from "react"
-import { SIDEBAR } from "@svgenius/core/settings"
+import { SIDEBAR } from "@marknotton/svgenius-core/settings"
 
 // ── Draggable sidebar divider ─────────────────────────────────────────────────
 

@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import type { Backdrop } from "@svgenius/core/types"
-import { svgSize } from "@svgenius/core/svgRoot"
-import { allAnchors, geometry, pointAt, pointKey, serialisePath, shiftPoints, type PointKind, type PointRef, type Seg } from "@svgenius/core/pathData"
-import { deletePoints, toggleCorner } from "@svgenius/core/pathPoints"
+import type { Backdrop } from "@marknotton/svgenius-core/types"
+import { svgSize } from "@marknotton/svgenius-core/svgRoot"
+import { allAnchors, geometry, pointAt, pointKey, serialisePath, shiftPoints, type PointKind, type PointRef, type Seg } from "@marknotton/svgenius-core/pathData"
+import { deletePoints, toggleCorner } from "@marknotton/svgenius-core/pathPoints"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 
 // ── Inspectable preview ───────────────────────────────────────────────────────

@@ -1,9 +1,9 @@
 import { useState, type ReactNode } from "react"
-import { IconDownload, IconPlay, IconReport, IconChevronDown } from "@svgenius/ui/icons"
-import { ContextMenu, type MenuState } from "@svgenius/ui/components/ContextMenu"
-import { InfoTip } from "@svgenius/ui/components/InfoTip"
-import { formatBytes, formatSaving, plural, savingPercent } from "@svgenius/core/format"
-import type { SvgItem } from "@svgenius/core/types"
+import { IconDownload, IconPlay, IconReport, IconChevronDown } from "@marknotton/svgenius-ui/icons"
+import { ContextMenu, type MenuState } from "@marknotton/svgenius-ui/components/ContextMenu"
+import { InfoTip } from "@marknotton/svgenius-ui/components/InfoTip"
+import { formatBytes, formatSaving, plural, savingPercent } from "@marknotton/svgenius-core/format"
+import type { SvgItem } from "@marknotton/svgenius-core/types"
 import { isDesktop } from "../lib/platform"
 
 // A folder picker follows on the desktop; the browser downloads straight away

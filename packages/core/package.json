@@ -1,5 +1,5 @@
 {
-  "name": "@svgenius/core",
+  "name": "@marknotton/svgenius-core",
   "version": "0.1.0",
   "description": "The SVGenius engine: SVGO presets, attribute rules, find and replace, trim, geometry and markup editing helpers.",
   "keywords": [

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { parseTargets, SVG_ELEMENTS } from "@svgenius/core/elements"
+import { parseTargets, SVG_ELEMENTS } from "@marknotton/svgenius-core/elements"
 
 // ── Multi-select of SVG element names ─────────────────────────────────────────
 // Nothing ticked = every element. Stored as a comma-separated string.

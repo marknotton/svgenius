@@ -1,5 +1,5 @@
-import { IconFile, IconFolder, IconProject, Logo } from "@svgenius/ui/icons"
-import { AddChoices } from "@svgenius/ui/components/AddDialog"
+import { IconFile, IconFolder, IconProject, Logo } from "@marknotton/svgenius-ui/icons"
+import { AddChoices } from "@marknotton/svgenius-ui/components/AddDialog"
 import { clearRecent, useRecent, type Recent } from "../lib/recent"
 import { isDesktop } from "../lib/platform"
 import { useDesktopDownload } from "../lib/download"

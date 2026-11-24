@@ -1,5 +1,5 @@
 {
-  "name": "@svgenius/ui",
+  "name": "@marknotton/svgenius-ui",
   "version": "0.1.0",
   "description": "The SVGenius React screens (preset editor, markup editor and friends), for embedding in other apps through a host profile.",
   "keywords": [
@@ -38,7 +38,7 @@
     "README.md"
   ],
   "dependencies": {
-    "@svgenius/core": "workspace:^",
+    "@marknotton/svgenius-core": "workspace:^",
     "monaco-editor": "^0.57.0"
   },
   "peerDependencies": {

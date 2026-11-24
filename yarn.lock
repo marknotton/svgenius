@@ -42,6 +42,27 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@marknotton/svgenius-core@workspace:*, @marknotton/svgenius-core@workspace:^, @marknotton/svgenius-core@workspace:packages/core":
+  version: 0.0.0-use.local
+  resolution: "@marknotton/svgenius-core@workspace:packages/core"
+  dependencies:
+    paper: "npm:0.12.18"
+    svgo: "npm:^4.1.0"
+  languageName: unknown
+  linkType: soft
+
+"@marknotton/svgenius-ui@workspace:*, @marknotton/svgenius-ui@workspace:packages/ui":
+  version: 0.0.0-use.local
+  resolution: "@marknotton/svgenius-ui@workspace:packages/ui"
+  dependencies:
+    "@marknotton/svgenius-core": "workspace:^"
+    monaco-editor: "npm:^0.57.0"
+  peerDependencies:
+    react: ^19.0.0
+    react-dom: ^19.0.0
+  languageName: unknown
+  linkType: soft
+
 "@napi-rs/wasm-runtime@npm:1.2.6":
   version: 1.2.6
   resolution: "@napi-rs/wasm-runtime@npm:1.2.6"
@@ -183,27 +204,6 @@ __metadata:
   checksum: 10c0/ee35ab757a5b6cc296a13abfd3b1f998ef141a6bf302f2d25eee53ab9cb1aea265bea0d55495664f02e91c38c3995c79773ea8e14213089d9c31c1821997b606
   languageName: node
   linkType: hard
-
-"@svgenius/core@workspace:*, @svgenius/core@workspace:^, @svgenius/core@workspace:packages/core":
-  version: 0.0.0-use.local
-  resolution: "@svgenius/core@workspace:packages/core"
-  dependencies:
-    paper: "npm:0.12.18"
-    svgo: "npm:^4.1.0"
-  languageName: unknown
-  linkType: soft
-
-"@svgenius/ui@workspace:*, @svgenius/ui@workspace:packages/ui":
-  version: 0.0.0-use.local
-  resolution: "@svgenius/ui@workspace:packages/ui"
-  dependencies:
-    "@svgenius/core": "workspace:^"
-    monaco-editor: "npm:^0.57.0"
-  peerDependencies:
-    react: ^19.0.0
-    react-dom: ^19.0.0
-  languageName: unknown
-  linkType: soft
 
 "@tauri-apps/api@npm:^2.12.0, @tauri-apps/api@npm:^2.12.5":
   version: 2.12.5
@@ -1157,8 +1157,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "svgenius@workspace:."
   dependencies:
-    "@svgenius/core": "workspace:*"
-    "@svgenius/ui": "workspace:*"
+    "@marknotton/svgenius-core": "workspace:*"
+    "@marknotton/svgenius-ui": "workspace:*"
     "@tauri-apps/api": "npm:^2.12.5"
     "@tauri-apps/cli": "npm:^2.12.5"
     "@tauri-apps/plugin-clipboard-manager": "npm:^2"

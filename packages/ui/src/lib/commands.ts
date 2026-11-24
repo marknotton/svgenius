@@ -7,7 +7,7 @@ import { adapter } from "../host"
 // commands come from key presses. Either way the topmost handler (the open
 // editor, say) gets first go, and text fields keep their usual behaviour.
 
-import type { Command } from "@svgenius/core/types"
+import type { Command } from "@marknotton/svgenius-core/types"
 export type { Command }
 
 type Handler = (cmd: Command) => boolean

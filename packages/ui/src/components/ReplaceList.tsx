@@ -1,9 +1,9 @@
 import type { ReactNode } from "react"
 import { useDragSort } from "../hooks/useDragSort"
 import { IconDuplicate, IconGrip, IconPlus, IconTrash } from "../icons"
-import { ruleError } from "@svgenius/core/replace"
-import { createReplacement, duplicateAfter } from "@svgenius/core/settings"
-import type { Replacement } from "@svgenius/core/types"
+import { ruleError } from "@marknotton/svgenius-core/replace"
+import { createReplacement, duplicateAfter } from "@marknotton/svgenius-core/settings"
+import type { Replacement } from "@marknotton/svgenius-core/types"
 
 // ── Find & replace rules ──────────────────────────────────────────────────────
 

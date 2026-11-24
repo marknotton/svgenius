@@ -1,8 +1,8 @@
-import { IconX, Logo } from "@svgenius/ui/icons"
+import { IconX, Logo } from "@marknotton/svgenius-ui/icons"
 import { APP_VERSION, CREDITS, HISTORY, INSPIRATION, type Release as ReleaseInfo } from "../lib/about"
 import { REPO_URL, isDesktop } from "../lib/platform"
 import { useDesktopDownload } from "../lib/download"
-import { Modal } from "@svgenius/ui/components/Dialogs"
+import { Modal } from "@marknotton/svgenius-ui/components/Dialogs"
 import { UpdatePanel } from "./Updates"
 
 // ── About SVGenius ────────────────────────────────────────────────────────────

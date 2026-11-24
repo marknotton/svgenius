@@ -1,7 +1,7 @@
 import { memo, useMemo, type CSSProperties } from "react"
-import { svgDataUrl } from "@svgenius/core/format"
-import { svgSize } from "@svgenius/core/svgRoot"
-import type { Backdrop } from "@svgenius/core/types"
+import { svgDataUrl } from "@marknotton/svgenius-core/format"
+import { svgSize } from "@marknotton/svgenius-core/svgRoot"
+import type { Backdrop } from "@marknotton/svgenius-core/types"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 
 interface Props {

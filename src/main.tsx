@@ -1,9 +1,9 @@
 import React from "react"
 import ReactDOM from "react-dom/client"
 import App from "./App"
-import { configureHost } from "@svgenius/ui/host"
+import { configureHost } from "@marknotton/svgenius-ui/host"
 import { isDesktop, isPasted, listenFor, openInDefaultApp, readClipboardText, reveal } from "./lib/platform"
-import "@svgenius/ui/styles.css"
+import "@marknotton/svgenius-ui/styles.css"
 
 // The shared UI asks this profile for anything that depends on the host
 configureHost({

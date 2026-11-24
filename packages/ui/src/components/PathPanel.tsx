@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { IconSwap } from "../icons"
-import { COMMAND_NAMES, PARAM_NAMES, caseOf, fmt, reversePath, toAbsolute, toRelative, toggleCase, type Seg } from "@svgenius/core/pathData"
+import { COMMAND_NAMES, PARAM_NAMES, caseOf, fmt, reversePath, toAbsolute, toRelative, toggleCase, type Seg } from "@marknotton/svgenius-core/pathData"
 
 // ── Path commands for the selected path ───────────────────────────────────────
 

@@ -5,7 +5,7 @@ import { open, save } from "@tauri-apps/plugin-dialog"
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener"
 import { readText as readNativeClipboard } from "@tauri-apps/plugin-clipboard-manager"
 import * as desktop from "./tauri"
-import type { ScannedFile } from "@svgenius/core/types"
+import type { ScannedFile } from "@marknotton/svgenius-core/types"
 
 // ── Desktop or browser ────────────────────────────────────────────────────────
 // The app runs in Tauri on the desktop and as a plain web app. Everything that
