@@ -18,6 +18,7 @@ import { ReportDialog } from "@marknotton/svgenius-ui/components/ReportDialog"
 import { SettingsDialog } from "@marknotton/svgenius-ui/components/SettingsDialog"
 import { AboutDialog } from "./components/AboutDialog"
 import { UpdateNotice } from "./components/Updates"
+import { setUpdateGuard } from "./lib/updates"
 import { Toasts, useToasts } from "@marknotton/svgenius-ui/components/Toast"
 import { ViewControls } from "@marknotton/svgenius-ui/components/ViewControls"
 import { presetActions, presetById, uniqueName, useAppSettings } from "./hooks/useAppSettings"
@@ -652,6 +653,9 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   useEffect(() => listenForQuit(() => {
     void settleRef.current("quit").then((ok) => { if (ok) quitApp() })
   }), [])
+
+  // Updating restarts the app, so it asks the same question before downloading
+  useEffect(() => setUpdateGuard(() => settleRef.current("update SVGenius")), [])
 
   /** Starts an empty project, saved where you choose straight away */
   const newProject = async () => {

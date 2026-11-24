@@ -51,8 +51,15 @@ export async function checkForUpdate(): Promise<UpdateState> {
   return state
 }
 
+// Updating restarts the app, so the page gets a say first, the same as quitting.
+// It resolves false to cancel (unsaved project changes and the user hit Cancel)
+let beforeInstall: () => Promise<boolean> = async () => true
+export function setUpdateGuard(fn: () => Promise<boolean>) { beforeInstall = fn }
+
 /** Downloads the new version, installs it over this one and restarts */
 export async function installUpdate() {
+  if (!pending) return
+  if (!await beforeInstall()) return
   if (!pending) return
   const { version, notes } = state
   let total = 0, got = 0
