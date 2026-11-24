@@ -184,7 +184,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@svgenius/core@workspace:*, @svgenius/core@workspace:packages/core":
+"@svgenius/core@workspace:*, @svgenius/core@workspace:^, @svgenius/core@workspace:packages/core":
   version: 0.0.0-use.local
   resolution: "@svgenius/core@workspace:packages/core"
   dependencies:
@@ -197,7 +197,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@svgenius/ui@workspace:packages/ui"
   dependencies:
-    "@svgenius/core": "workspace:*"
+    "@svgenius/core": "workspace:^"
+    monaco-editor: "npm:^0.57.0"
   peerDependencies:
     react: ^19.0.0
     react-dom: ^19.0.0

@@ -2,14 +2,32 @@
   "name": "@svgenius/core",
   "version": "0.1.0",
   "description": "The SVGenius engine: SVGO presets, attribute rules, find and replace, trim, geometry and markup editing helpers.",
+  "keywords": [
+    "svg",
+    "svgo",
+    "optimise",
+    "icons"
+  ],
   "license": "MIT",
+  "author": "Mark Notton",
+  "homepage": "https://github.com/marknotton/svgenius",
+  "bugs": "https://github.com/marknotton/svgenius/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marknotton/svgenius.git",
+    "directory": "packages/core"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
     "./*": "./src/*.ts"
   },
   "files": [
-    "src"
+    "src",
+    "README.md"
   ],
   "dependencies": {
     "paper": "0.12.18",

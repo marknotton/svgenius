@@ -1,7 +1,25 @@
 {
   "name": "@svgenius/ui",
   "version": "0.1.0",
+  "description": "The SVGenius React screens (preset editor, markup editor and friends), for embedding in other apps through a host profile.",
+  "keywords": [
+    "svg",
+    "svgo",
+    "react",
+    "editor"
+  ],
   "license": "MIT",
+  "author": "Mark Notton",
+  "homepage": "https://github.com/marknotton/svgenius",
+  "bugs": "https://github.com/marknotton/svgenius/issues",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/marknotton/svgenius.git",
+    "directory": "packages/ui"
+  },
   "type": "module",
   "sideEffects": [
     "*.css"
@@ -16,10 +34,12 @@
     "./lib/*": "./src/lib/*.ts"
   },
   "files": [
-    "src"
+    "src",
+    "README.md"
   ],
   "dependencies": {
-    "@svgenius/core": "workspace:*"
+    "@svgenius/core": "workspace:^",
+    "monaco-editor": "^0.57.0"
   },
   "peerDependencies": {
     "react": "^19.0.0",
