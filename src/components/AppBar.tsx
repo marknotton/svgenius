@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react"
-import { IconDownload, IconGear, Logo } from "../icons"
+import { IconDownload, IconGear, Logo } from "@svgenius/ui/icons"
 import { isDesktop, startWindowDrag } from "../lib/platform"
 import { useDesktopDownload } from "../lib/download"
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { IconCode, IconFile, IconFolder, IconX } from "../icons"
-import { readClipboardText } from "../lib/platform"
+import { adapter } from "../host"
 import { looksLikeSvg, prepareSvg, sizeCheck, uniqueName, type Prepared } from "@svgenius/core/svgImport"
 import { formatBytes, plural } from "@svgenius/core/format"
 import { svgSize, fmtNum } from "@svgenius/core/svgRoot"
@@ -77,7 +77,7 @@ export function AddDialog(p: Props) {
     if (mode !== "paste" || asked.current || text) return
     asked.current = true
     setClip("reading")
-    readClipboardText()
+    adapter().readClipboardText()
       .then((t) => {
         if (looksLikeSvg(t)) { setText(t); setClip("pasted") }
         else { setClip("empty"); area.current?.focus() }
@@ -113,7 +113,7 @@ export function AddDialog(p: Props) {
 
   const pasteAgain = () => {
     setClip("reading")
-    readClipboardText()
+    adapter().readClipboardText()
       .then((t) => { if (looksLikeSvg(t)) { setText(t); setAllowBig(false); setEdited(false); setClip("pasted") } else setClip("empty") })
       .catch(() => { setClip("denied"); area.current?.focus() })
   }

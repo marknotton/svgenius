@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react"
-import { isDesktop, listenFor } from "./platform"
+import { adapter } from "../host"
 
 // ── Commands: shortcuts that work the same in the browser and on the desktop ─
 // On macOS the app menu takes ⌘-shortcuts before the page sees them, so the
@@ -82,7 +82,7 @@ export function commandFor(e: KeyboardEvent): Command | null {
  * the keys, which go to text fields as normal unless a handler takes them.
  */
 export function listenForCommands() {
-  const offMenu = isDesktop ? listenFor<Command>("menu:command", (c) => { dispatch(c) }) : () => {}
+  const offMenu = adapter().isDesktop ? adapter().listenFor<Command>("menu:command", (c) => { dispatch(c) }) : () => {}
   const key = (e: KeyboardEvent) => {
     const cmd = commandFor(e)
     if (!cmd) return

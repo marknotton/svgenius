@@ -4,7 +4,7 @@ import { formatBytes, formatSaving, plural, savingPercent } from "@svgenius/core
 import type { FileTag } from "@svgenius/core/tags"
 import { FLAGS } from "@svgenius/core/filters"
 import { IconFlag, IconFolder, IconPencil } from "../icons"
-import { isDesktop, isPasted, openInDefaultApp, reveal } from "../lib/platform"
+import { adapter } from "../host"
 import type { Backdrop, Preset, SvgItem } from "@svgenius/core/types"
 import { Thumb } from "./Thumb"
 import { TooComplex } from "./TooComplex"
@@ -216,17 +216,17 @@ function Check({ item, selected, onToggle }: { item: SvgItem, selected: boolean,
 
 /** Reveal in Finder, and open the original in the user's SVG app (desktop only: the browser has no path) */
 function FileButtons({ item }: { item: SvgItem }) {
-  if (!isDesktop || isPasted(item.path)) return null
+  if (!adapter().isDesktop || adapter().isPasted(item.path)) return null
   return (
     <span className="file-btns">
       <button type="button" className="btn btn--icon file-open" title="Show the original file in Finder"
         aria-label={`Show ${item.name} in Finder`}
-        onClick={(e) => { e.stopPropagation(); reveal(item.path) }}>
+        onClick={(e) => { e.stopPropagation(); adapter().reveal(item.path) }}>
         <IconFolder />
       </button>
       <button type="button" className="btn btn--icon file-open" title="Open the original file in your default SVG app"
         aria-label={`Open ${item.name} in your default app`}
-        onClick={(e) => { e.stopPropagation(); openInDefaultApp(item.path) }}>
+        onClick={(e) => { e.stopPropagation(); adapter().openInDefaultApp(item.path) }}>
         <IconPencil />
       </button>
     </span>

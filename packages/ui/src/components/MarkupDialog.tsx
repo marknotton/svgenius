@@ -10,7 +10,7 @@ import { ContextMenu, type MenuItem, type MenuState } from "./ContextMenu"
 import { textFocus, useCommands } from "../lib/commands"
 import type { Backdrop, SvgItem } from "@svgenius/core/types"
 import { CodeEditor } from "./CodeEditor"
-import { isDesktop } from "../lib/platform"
+import { adapter } from "../host"
 import { CanvasBackground } from "./CanvasBackground"
 import { ArrangeTools } from "./ArrangePanel"
 import { PaintTools } from "./PaintTools"
@@ -613,7 +613,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             </div>
           )}
           {/* The desktop app has Undo and Redo in the Edit menu, so the buttons are for the browser */}
-          {!isDesktop && (
+          {!adapter().isDesktop && (
           <div className="btn-join" role="group" aria-label="History">
             <button className="btn btn--secondary btn--sm" onClick={() => travel(true)} disabled={!canUndo} title="Undo (⌘Z)" aria-label="Undo"><IconUndo width={12} height={12} /></button>
             <button className="btn btn--secondary btn--sm" onClick={() => travel(false)} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo"><IconRedo width={12} height={12} /></button>

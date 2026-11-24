@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { IconX } from "../icons"
+import { IconX } from "@svgenius/ui/icons"
 import { installerUrl } from "../lib/download"
 import { RELEASES_URL, canUpdate, checkForUpdate, currentVersion, installUpdate, skippedVersion, useUpdateState, type UpdateState } from "../lib/updates"
 

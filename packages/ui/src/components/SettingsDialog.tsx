@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useDragSort } from "../hooks/useDragSort"
-import type { PresetActions } from "../hooks/useAppSettings"
+import type { PresetActions } from "@svgenius/core/presets"
 import { IconDownload, IconDuplicate, IconGrip, IconStar, IconTrash, IconUpload, IconX } from "../icons"
 import { plural } from "@svgenius/core/format"
 import type { AppSettings, Backdrop, ThemeChoice } from "@svgenius/core/types"

@@ -1,6 +1,6 @@
 import { IconDownload, IconPencil, IconPlus, IconReset, IconStar, IconTrash, IconUpload } from "../icons"
 import { plural } from "@svgenius/core/format"
-import type { PresetActions } from "../hooks/useAppSettings"
+import type { PresetActions } from "@svgenius/core/presets"
 import type { AppSettings, CustomPlugin, Preset } from "@svgenius/core/types"
 import { PresetEditor } from "./PresetEditor"
 import { PresetSelect } from "./PresetSelect"

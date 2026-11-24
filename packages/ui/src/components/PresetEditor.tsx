@@ -1,6 +1,7 @@
 import type { CustomPlugin, PrecisionTolerance, SvgoSettings } from "@svgenius/core/types"
 import { AttrRuleList } from "./AttrRuleList"
 import { CustomPluginList } from "./CustomPluginList"
+import { host } from "../host"
 import { CutMatcherList } from "./CutMatcherList"
 import { EditContents, EditViewBox } from "./EditSections"
 import { PluginList } from "./PluginList"
@@ -117,7 +118,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
           checked={s.mergePaths} onChange={(v) => edit((x) => ({ ...x, mergePaths: v }))} />
       </section>
 
-      <section className="panel__section" data-nav="custom" data-nav-title="Custom plugins">
+      {host().capabilities.customPlugins && <section className="panel__section" data-nav="custom" data-nav-title="Custom plugins">
         <CustomPluginList
           plugins={customPlugins}
           settings={s}
@@ -128,7 +129,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
             custom: { ...x.custom, [id]: { on: x.custom[id]?.on ?? false, params: x.custom[id]?.params ?? "", ...patch } }
           }))}
         />
-      </section>
+      </section>}
       </>}
       {!advanced && (
         <p className="panel__simple text-3">Switch on <strong>Advanced</strong> at the top for the viewBox and contents tools, rules, custom plugins and Beta tools.</p>
