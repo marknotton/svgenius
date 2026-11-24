@@ -24,12 +24,16 @@ export interface HostCapabilities {
   bulkExport: boolean
   /** Writes edited files straight back to disk */
   writeFiles: boolean
+  /** Presets can use trim, viewBox and geometry steps (they need a browser) */
+  geometryPresets: boolean
 }
 
 export interface HostProfile {
   name: HostName
   adapter: HostAdapter
   capabilities: HostCapabilities
+  /** Where floating bits (tooltips) are portalled. Defaults to document.body */
+  portalRoot?: () => HTMLElement
   /** Free-form extras a host can hand to its own components */
   extensions?: Record<string, unknown>
 }
@@ -46,12 +50,12 @@ const fallback: HostProfile = {
     reveal: noop,
     listenFor: () => noop,
   },
-  capabilities: { customPlugins: true, bulkExport: true, writeFiles: false },
+  capabilities: { customPlugins: true, bulkExport: true, writeFiles: false, geometryPresets: true },
 }
 
 let current: HostProfile = fallback
 
-export function configureHost(profile: Partial<HostProfile> & { adapter?: Partial<HostAdapter> }) {
+export function configureHost(profile: Omit<Partial<HostProfile>, "adapter" | "capabilities"> & { adapter?: Partial<HostAdapter>, capabilities?: Partial<HostCapabilities> }) {
   current = {
     ...current,
     ...profile,
@@ -63,3 +67,4 @@ export function configureHost(profile: Partial<HostProfile> & { adapter?: Partia
 export const host = () => current
 export const adapter = () => current.adapter
 export const isHost = (name: HostName) => current.name === name
+export const portalRoot = () => current.portalRoot?.() ?? document.body

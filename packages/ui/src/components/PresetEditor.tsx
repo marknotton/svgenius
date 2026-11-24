@@ -23,6 +23,9 @@ interface Props {
 }
 
 export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, onRemovePlugin, advanced }: Props) {
+  // Trim, viewBox and the beta geometry tools need a browser, so a host that
+  // applies presets on a server (Symbols) leaves them out
+  const geometry = host().capabilities.geometryPresets
   const trim = (patch: Partial<SvgoSettings["trim"]>) => edit((x) => ({ ...x, trim: { ...x.trim, ...patch } }))
   return (
     <>
@@ -56,14 +59,18 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
       </section>
 
       {advanced && <>
+      {geometry && <>
       <section className="panel__section" data-nav="contents" data-nav-title="Edit contents">
         <EditContents trim={s.trim} onChange={trim}
           markup={s.appendMarkup} onMarkup={(appendMarkup) => edit((x) => ({ ...x, appendMarkup }))} />
       </section>
+      </>}
 
+      {geometry && <>
       <section className="panel__section" data-nav="viewbox" data-nav-title="Edit viewBox">
         <EditViewBox trim={s.trim} onChange={trim} />
       </section>
+      </>}
 
       <section className="panel__section" data-nav="replace" data-nav-title="Find & replace">
         <ReplaceList rules={s.replacements} onChange={(replacements) => edit((x) => ({ ...x, replacements }))} />
@@ -87,6 +94,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
       </section>
 
       {advanced && <>
+      {geometry && <>
       <section className="panel__section" data-nav="beta" data-nav-title="Beta">
         <div className="panel__label">Beta <span className="pill pill--beta">Experimental</span></div>
         <p className="panel__hint text-3">Geometry changes made after SVGO. Check the results before exporting.</p>
@@ -117,6 +125,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
           hint="Joins shapes that share a fill and opacity into one path (a boolean union), so see-through overlaps don't show and files get smaller. Shapes with strokes, IDs, masks or filters are left alone"
           checked={s.mergePaths} onChange={(v) => edit((x) => ({ ...x, mergePaths: v }))} />
       </section>
+      </>}
 
       {host().capabilities.customPlugins && <section className="panel__section" data-nav="custom" data-nav-title="Custom plugins">
         <CustomPluginList

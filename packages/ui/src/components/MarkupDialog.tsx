@@ -49,6 +49,8 @@ interface Props {
   nav?: { pos: number, total: number, go: (step: 1 | -1) => void }
   /** The circle guide and clip, shared with the list's previews */
   circle?: { on: boolean, clip: boolean, onToggle: () => void, onClip: () => void }
+  /** Extra buttons from the host (Symbols puts its Save button here) */
+  actions?: React.ReactNode
 }
 
 // Zoom steps for + and −, and the zoom menu's presets (as real-size percentages)
@@ -98,7 +100,7 @@ const LOCKS = new Map<string, LockRef[]>()
 /** Layers hidden in the editor, kept the same way. The file isn't changed */
 const HIDES = new Map<string, LockRef[]>()
 
-export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose, nav, circle }: Props) {
+export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose, nav, circle, actions: hostActions }: Props) {
   // Switching files paints an empty editor first, then fills it in on the next
   // frame, so the arrows feel instant even when a big file takes a moment
   const [ready, setReady] = useState(false)
@@ -619,6 +621,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             <button className="btn btn--secondary btn--sm" onClick={() => travel(false)} disabled={!canRedo} title="Redo (⇧⌘Z)" aria-label="Redo"><IconRedo width={12} height={12} /></button>
           </div>
           )}
+          {hostActions}
           {tab === "source" && edited && <button className="link" onClick={onRevert} title="Throw away edits and reload the file's markup"><IconReset width={11} height={11} /> Revert</button>}
           {tab === "output" && <button className="link" onClick={copy} disabled={!markup}><IconCopy width={11} height={11} /> {copied ? "Copied" : "Copy"}</button>}
           {tab === "output" && item.result && (

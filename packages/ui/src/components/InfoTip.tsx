@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
+import { portalRoot } from "../host"
 import { IconInfo } from "../icons"
 
 // ── Info tooltip ──────────────────────────────────────────────────────────────
@@ -48,7 +49,7 @@ export function InfoTip({ children, label = "More info" }: { children: ReactNode
         <div ref={tip} className="infotip" role="tooltip" style={pos ? { left: pos.left, top: pos.top } : { visibility: "hidden" }}>
           {children}
         </div>,
-        document.body
+        portalRoot()
       )}
     </>
   )

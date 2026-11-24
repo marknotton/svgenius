@@ -9,7 +9,7 @@ import "@svgenius/ui/styles.css"
 configureHost({
   name: "svgenius",
   adapter: { isDesktop, isPasted, readClipboardText, openInDefaultApp, reveal, listenFor },
-  capabilities: { customPlugins: true, bulkExport: true, writeFiles: isDesktop },
+  capabilities: { customPlugins: true, bulkExport: true, writeFiles: isDesktop, geometryPresets: true },
 })
 
 document.documentElement.classList.add(isDesktop ? "is-desktop" : "is-web")
