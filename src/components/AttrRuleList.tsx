@@ -1,9 +1,9 @@
 import { useDragSort } from "../hooks/useDragSort"
 import { IconDuplicate, IconGrip, IconPlus, IconTrash } from "../icons"
 import { ElementPicker } from "./ElementPicker"
-import { ACTIONS, CONDITIONS, isRuleReady } from "../lib/attrRules"
-import { createAttrRule, duplicateAfter } from "../lib/settings"
-import type { AttrRule } from "../lib/types"
+import { ACTIONS, CONDITIONS, isRuleReady } from "@svgenius/core/attrRules"
+import { createAttrRule, duplicateAfter } from "@svgenius/core/settings"
+import type { AttrRule } from "@svgenius/core/types"
 
 // ── Attribute rules (recipes) ─────────────────────────────────────────────────
 

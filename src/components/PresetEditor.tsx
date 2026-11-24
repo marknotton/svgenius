@@ -1,4 +1,4 @@
-import type { CustomPlugin, PrecisionTolerance, SvgoSettings } from "../lib/types"
+import type { CustomPlugin, PrecisionTolerance, SvgoSettings } from "@svgenius/core/types"
 import { AttrRuleList } from "./AttrRuleList"
 import { CustomPluginList } from "./CustomPluginList"
 import { CutMatcherList } from "./CutMatcherList"

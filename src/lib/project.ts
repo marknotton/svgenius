@@ -1,7 +1,7 @@
 import { APP_VERSION } from "./about"
-import { mergeImport, sanitiseRename, sanitiseSvgoSettings } from "./settings"
+import { mergeImport, sanitiseRename, sanitiseSvgoSettings } from "@svgenius/core/settings"
 import type { Saved } from "./session"
-import type { AppSettings, SvgItem } from "./types"
+import type { AppSettings, SvgItem } from "@svgenius/core/types"
 
 // ── Projects ──────────────────────────────────────────────────────────────────
 // A .svgenius file is JSON: every file in the list (its markup as loaded, any

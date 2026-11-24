@@ -1,4 +1,4 @@
-import type { SvgItem } from "./types"
+import type { SvgItem } from "@svgenius/core/types"
 
 // ── Export planning ───────────────────────────────────────────────────────────
 

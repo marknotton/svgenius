@@ -2,8 +2,8 @@ import { useState, type ReactNode } from "react"
 import { IconDownload, IconPlay, IconReport, IconChevronDown } from "../icons"
 import { ContextMenu, type MenuState } from "./ContextMenu"
 import { InfoTip } from "./InfoTip"
-import { formatBytes, formatSaving, plural, savingPercent } from "../lib/format"
-import type { SvgItem } from "../lib/types"
+import { formatBytes, formatSaving, plural, savingPercent } from "@svgenius/core/format"
+import type { SvgItem } from "@svgenius/core/types"
 import { isDesktop } from "../lib/platform"
 
 // A folder picker follows on the desktop; the browser downloads straight away

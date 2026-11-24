@@ -241,3 +241,7 @@ export interface SvgItem extends ScannedFile {
   /** Render and optimise it anyway */
   forceRender?: boolean
 }
+
+/** Editor commands that the host's menu or shortcuts can send */
+export type Command = "undo" | "redo" | "selectAll" | "duplicate" | "group" | "ungroup" | "breakApart" | "forward" | "backward"
+  | "zoomIn" | "zoomOut" | "zoomFit" | "zoomActual" | "newProject" | "openProject" | "saveProject" | "saveProjectAs" | "addSvgs"

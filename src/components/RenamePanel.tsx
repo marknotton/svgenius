@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react"
-import { CASES, defaultRename, exportNames } from "../lib/rename"
-import type { RenameSettings, SvgItem } from "../lib/types"
+import { CASES, defaultRename, exportNames } from "@svgenius/core/rename"
+import type { RenameSettings, SvgItem } from "@svgenius/core/types"
 import { Segmented } from "./Segmented"
 import { Toggle } from "./Toggle"
 

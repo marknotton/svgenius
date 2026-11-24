@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { createPreset, defaultSvgoSettings, duplicateAfter, sanitiseAppSettings } from "../lib/settings"
+import { createPreset, defaultSvgoSettings, duplicateAfter, sanitiseAppSettings } from "@svgenius/core/settings"
 import { loadSettings, saveSettings } from "../lib/platform"
-import type { AppSettings, Preset, SvgoSettings } from "../lib/types"
+import type { AppSettings, Preset, SvgoSettings } from "@svgenius/core/types"
 
 // ── Persistent app settings ───────────────────────────────────────────────────
 // Lives in the app config folder as settings.json, so presets survive restarts.

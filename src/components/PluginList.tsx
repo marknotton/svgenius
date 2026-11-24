@@ -1,8 +1,8 @@
 import { useState } from "react"
 import { IconInfo } from "../icons"
-import { PLUGINS, type PluginInfo } from "../lib/plugins"
-import { isPluginOn } from "../lib/settings"
-import type { SvgoSettings } from "../lib/types"
+import { PLUGINS, type PluginInfo } from "@svgenius/core/plugins"
+import { isPluginOn } from "@svgenius/core/settings"
+import type { SvgoSettings } from "@svgenius/core/types"
 import { Toggle } from "./Toggle"
 
 interface Props {

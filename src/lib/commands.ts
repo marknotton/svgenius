@@ -7,8 +7,8 @@ import { isDesktop, listenFor } from "./platform"
 // commands come from key presses. Either way the topmost handler (the open
 // editor, say) gets first go, and text fields keep their usual behaviour.
 
-export type Command = "undo" | "redo" | "selectAll" | "duplicate" | "group" | "ungroup" | "breakApart" | "forward" | "backward"
-  | "zoomIn" | "zoomOut" | "zoomFit" | "zoomActual" | "newProject" | "openProject" | "saveProject" | "saveProjectAs" | "addSvgs"
+import type { Command } from "@svgenius/core/types"
+export type { Command }
 
 type Handler = (cmd: Command) => boolean
 

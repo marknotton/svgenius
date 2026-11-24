@@ -1,4 +1,4 @@
-import type { SvgItem } from "./types"
+import type { SvgItem } from "@svgenius/core/types"
 
 // ── Browser session ───────────────────────────────────────────────────────────
 // The browser can't reopen files by path, so the list itself (markup, edits,

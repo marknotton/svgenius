@@ -2,7 +2,7 @@ import { elementRanges, type TagRange } from "./markupMap"
 import { breakApart, convertToPath, duplicateElement, groupElements, moveElement, removeElement, ungroupElement } from "./markupEdit"
 import { outlineStrokes } from "./outlineStroke"
 import { SHAPES } from "./pathData"
-import type { Command } from "./commands"
+import type { Command } from "./types"
 import { alignMoves, distributeMoves, pathfinder, PATHFINDER, type AlignMode, type DistributeMode, type Move } from "./arrange"
 import { setAttrs, translateAttrs } from "./markupEdit"
 

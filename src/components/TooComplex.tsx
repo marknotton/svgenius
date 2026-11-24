@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react"
-import type { SvgItem } from "../lib/types"
+import type { SvgItem } from "@svgenius/core/types"
 
 // ── "Too complex to render" placeholder ───────────────────────────────────────
 

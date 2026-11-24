@@ -1,5 +1,5 @@
-import { validScale } from "../lib/settings"
-import type { TrimSettings } from "../lib/types"
+import { validScale } from "@svgenius/core/settings"
+import type { TrimSettings } from "@svgenius/core/types"
 import { Segmented } from "./Segmented"
 import { SliderField } from "./SliderField"
 import { Toggle } from "./Toggle"

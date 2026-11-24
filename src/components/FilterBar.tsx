@@ -1,7 +1,7 @@
 import { IconDuplicate, IconPlus, IconTrash } from "../icons"
-import { canonicalColour } from "../lib/cutOuts"
-import { ELEMENTS, FIELDS, FLAGS, STATUSES, activeRules, createFilterRule, type FilterField, type FilterRule, type FilterSet } from "../lib/filters"
-import { duplicateAfter } from "../lib/settings"
+import { canonicalColour } from "@svgenius/core/cutOuts"
+import { ELEMENTS, FIELDS, FLAGS, STATUSES, activeRules, createFilterRule, type FilterField, type FilterRule, type FilterSet } from "@svgenius/core/filters"
+import { duplicateAfter } from "@svgenius/core/settings"
 import { Segmented } from "./Segmented"
 
 // ── Advanced filters ──────────────────────────────────────────────────────────

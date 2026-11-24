@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react"
 import { IconChecker, IconInkDrop, IconMoon, IconSun } from "../icons"
-import type { Backdrop } from "../lib/types"
+import type { Backdrop } from "@svgenius/core/types"
 
 // ── Preview background ────────────────────────────────────────────────────────
 // One setting for every preview, in the list and the editor: light or dark,

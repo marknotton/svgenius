@@ -184,6 +184,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@svgenius/core@workspace:*, @svgenius/core@workspace:packages/core":
+  version: 0.0.0-use.local
+  resolution: "@svgenius/core@workspace:packages/core"
+  dependencies:
+    paper: "npm:0.12.18"
+    svgo: "npm:^4.1.0"
+  languageName: unknown
+  linkType: soft
+
 "@tauri-apps/api@npm:^2.12.0, @tauri-apps/api@npm:^2.12.5":
   version: 2.12.5
   resolution: "@tauri-apps/api@npm:2.12.5"
@@ -1136,6 +1145,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "svgenius@workspace:."
   dependencies:
+    "@svgenius/core": "workspace:*"
     "@tauri-apps/api": "npm:^2.12.5"
     "@tauri-apps/cli": "npm:^2.12.5"
     "@tauri-apps/plugin-clipboard-manager": "npm:^2"

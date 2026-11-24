@@ -1,4 +1,4 @@
-import type { Preset } from "../lib/types"
+import type { Preset } from "@svgenius/core/types"
 
 const DEFAULT = "__default__"
 const NEW = "__new__"

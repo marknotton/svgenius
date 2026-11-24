@@ -1,9 +1,9 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react"
-import { LIVE_BUFFER_PX } from "../lib/config"
+import { LIVE_BUFFER_PX } from "@svgenius/core/config"
 import { IconFilter, IconSort, IconPlus, IconTrash, IconProject } from "../icons"
-import { plural } from "../lib/format"
-import type { FileTag } from "../lib/tags"
-import type { AppSettings, Preset, SvgItem } from "../lib/types"
+import { plural } from "@svgenius/core/format"
+import type { FileTag } from "@svgenius/core/tags"
+import type { AppSettings, Preset, SvgItem } from "@svgenius/core/types"
 import { FileRow } from "./FileRow"
 
 interface Props {

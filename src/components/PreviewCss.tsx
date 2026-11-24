@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react"
-import type { CssWarning } from "../lib/cssCheck"
+import type { CssWarning } from "@svgenius/core/cssCheck"
 
 // ── Preview-only CSS ──────────────────────────────────────────────────────────
 // Injected into each SVG as a <style> just before </svg>, so it wins over the

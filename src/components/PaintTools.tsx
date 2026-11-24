@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
-import { toHex, type Gradient, type Paint } from "../lib/paint"
+import { toHex, type Gradient, type Paint } from "@svgenius/core/paint"
 import { Segmented } from "./Segmented"
 
 // ── Fill and stroke swatches for the editor toolbar ───────────────────────────

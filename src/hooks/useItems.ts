@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { byteLength } from "../lib/format"
-import { CONCURRENCY, optimiseSvg, runLimited } from "../lib/optimiser"
-import { newId } from "../lib/settings"
+import { byteLength } from "@svgenius/core/format"
+import { CONCURRENCY, optimiseSvg, runLimited } from "@svgenius/core/optimiser"
+import { newId } from "@svgenius/core/settings"
 import { errorMessage, forgetFiles, isDesktop, pastedPath, readSvg, scanPaths } from "../lib/platform"
 import { loadSession, saveSession } from "../lib/session"
-import { postProcess } from "../lib/trim"
-import { optimiseAutoPrecision } from "../lib/precision"
-import { assessComplexity, isBlocked } from "../lib/complexity"
-import type { GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "../lib/types"
+import { postProcess } from "@svgenius/core/trim"
+import { optimiseAutoPrecision } from "@svgenius/core/precision"
+import { assessComplexity, isBlocked } from "@svgenius/core/complexity"
+import type { GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "@svgenius/core/types"
 
 // ── File list + optimisation queue ────────────────────────────────────────────
 
