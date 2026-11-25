@@ -15,6 +15,10 @@ export const existingFiles = (outDir: string, relPaths: string[]) =>
 export const exportFiles = (outDir: string, files: Array<{ relPath: string, contents: string }>) =>
   invoke<string[]>("export_files", { outDir, files })
 
+/** Writes zip bytes to `path` as a raw body (no JSON array of numbers). Returns the full path */
+export const writeZip = (path: string, bytes: Uint8Array) =>
+  invoke<string>("write_zip", bytes, { headers: { "x-path": encodeURIComponent(path) } })
+
 export const loadSettingsFile = () => invoke<string | null>("load_settings")
 
 export const saveSettingsFile = (json: string) => invoke<void>("save_settings", { json })

@@ -220,16 +220,37 @@ export interface ExportOutcome {
 
 type ExportFile = { relPath: string, contents: string }
 
+const ZIP_NAME = "svgenius-export.zip"
+
+/** Every file in one zip, folders kept as they are in the relative paths */
+async function zipFiles(files: ExportFile[]): Promise<Uint8Array> {
+  const { zipSync, strToU8 } = await import("fflate")
+  const tree: Record<string, Uint8Array> = {}
+  for (const f of files) tree[f.relPath] = strToU8(f.contents)
+  return zipSync(tree, { level: 6 })
+}
+
 /**
  * Desktop: asks for a folder, checks for clashes (confirm decides) and writes.
- * Browser: one file downloads as is, more come as a zip that keeps the folders.
+ * With `zip`, asks where to save one .zip instead.
+ * Browser: one file downloads as is, more (or any with `zip`) come as a zip
+ * that keeps the folders.
  * Returns null when the user backs out.
  */
 export async function exportSvgs(
   files: ExportFile[],
   title: string,
-  confirmReplace: (clashes: string[]) => Promise<boolean>
+  confirmReplace: (clashes: string[]) => Promise<boolean>,
+  zip = false
 ): Promise<ExportOutcome | null> {
+  if (isDesktop && zip) {
+    // The save dialog asks about replacing an existing zip itself
+    const picked = await save({ title, defaultPath: ZIP_NAME, filters: [{ name: "Zip archive", extensions: ["zip"] }] })
+    if (!picked) return null
+    const to = /\.zip$/i.test(picked) ? picked : `${picked}.zip`
+    const written = await desktop.writeZip(to, await zipFiles(files))
+    return { count: files.length, reveal: () => { revealItemInDir(written).catch(() => {}) } }
+  }
   if (isDesktop) {
     const outDir = await open({ directory: true, title })
     if (typeof outDir !== "string") return null
@@ -238,17 +259,13 @@ export async function exportSvgs(
     const written = await desktop.exportFiles(outDir, files)
     return { count: written.length, reveal: written[0] ? () => { revealItemInDir(written[0]).catch(() => {}) } : undefined }
   }
-  if (files.length === 1) {
+  if (files.length === 1 && !zip) {
     const name = files[0].relPath.split("/").pop() ?? "image.svg"
     download(name, new Blob([files[0].contents], { type: "image/svg+xml" }))
     return { count: 1, download: name }
   }
-  const { zipSync, strToU8 } = await import("fflate")
-  const tree: Record<string, Uint8Array> = {}
-  for (const f of files) tree[f.relPath] = strToU8(f.contents)
-  const zip = zipSync(tree, { level: 6 })
-  download("svgenius-export.zip", new Blob([zip as BlobPart], { type: "application/zip" }))
-  return { count: files.length, download: "svgenius-export.zip" }
+  download(ZIP_NAME, new Blob([await zipFiles(files) as BlobPart], { type: "application/zip" }))
+  return { count: files.length, download: ZIP_NAME }
 }
 
 /**

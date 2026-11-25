@@ -132,7 +132,7 @@ fn ensure_json(path: &Path) -> Result<(), String> {
     if ok { Ok(()) } else { Err("Settings and project files must end in .json or .svgenius".into()) }
 }
 
-fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
+fn write_atomic(path: &Path, contents: impl AsRef<[u8]>) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
@@ -222,6 +222,43 @@ fn export_files(out_dir: String, files: Vec<ExportFile>) -> Result<Vec<String>, 
         written.push(target.to_string_lossy().into_owned());
     }
     Ok(written)
+}
+
+/// Undoes JS `encodeURIComponent`, so non-ASCII paths survive the header
+fn percent_decode(s: &str) -> Result<String, String> {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            let hex = std::str::from_utf8(&b[i + 1..i + 3]).map_err(|e| e.to_string())?;
+            out.push(u8::from_str_radix(hex, 16).map_err(|_| format!("Bad path encoding: {s}"))?);
+            i += 3;
+        } else {
+            out.push(b[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).map_err(|e| e.to_string())
+}
+
+/// Zipped export: the bytes arrive as a raw body, the target path in a header.
+/// The path came from the save dialog, so it can go anywhere but must end in .zip
+#[tauri::command]
+fn write_zip(request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("Expected zip bytes".into());
+    };
+    let header = request.headers().get("x-path")
+        .and_then(|v| v.to_str().ok())
+        .ok_or("Missing export path")?;
+    let path = PathBuf::from(percent_decode(header)?);
+    let is_zip = path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("zip")).unwrap_or(false);
+    if !is_zip {
+        return Err("Zip exports must end in .zip".into());
+    }
+    write_atomic(&path, bytes)?;
+    Ok(path.to_string_lossy().into_owned())
 }
 
 // ── Commands: settings ────────────────────────────────────────────────────────
@@ -441,6 +478,7 @@ pub fn run() {
             file_mtimes,
             existing_files,
             export_files,
+            write_zip,
             load_settings,
             save_settings,
             read_json_file,
@@ -485,6 +523,12 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn percent_decode_round_trips() {
+        assert_eq!(percent_decode("%2FUsers%2Fm%C3%A9%2Fa%20b.zip").unwrap(), "/Users/mé/a b.zip");
+        assert!(percent_decode("%zz").is_err());
+    }
 
     #[test]
     fn safe_join_rejects_escapes() {

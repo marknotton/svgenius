@@ -30,7 +30,7 @@ interface Props {
   keepStructure: boolean
   onKeepStructure: (v: boolean) => void
   onOptimise: () => void
-  onExport: (clear: boolean) => void
+  onExport: (clear: boolean, zip?: boolean) => void
   onReport: () => void
   /** Logo (About), desktop link, Advanced and Settings, bottom left */
   brand: ReactNode
@@ -106,10 +106,14 @@ export function Footer(p: Props) {
             const r = e.currentTarget.getBoundingClientRect()
             setMenu({
               x: r.right - 220,
-              y: r.top - 8 - 2 * 30,
+              y: r.top - 8 - 4 * 30 - 9,
               items: [
                 { label: `Export ${scope}${count}${dots}`, run: () => p.onExport(false) },
-                { label: `Export and clear ${count}${dots}`, run: () => p.onExport(true) }
+                { label: `Export and clear ${count}${dots}`, run: () => p.onExport(true) },
+                "-",
+                // One .zip instead of loose files (folders kept inside when Keep folder structure is on)
+                { label: `Export ${scope}${count} as zip${dots}`, run: () => p.onExport(false, true) },
+                { label: `Export and clear ${count} as zip${dots}`, run: () => p.onExport(true, true) }
               ]
             })
           }}><IconChevronDown width={14} height={14} /></button>
