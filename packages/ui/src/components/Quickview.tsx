@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react"
-import { adjustFromText, adjustToText, composeAdjust, diffAdjust, IDENTITY, isIdentity } from "@marknotton/svgenius-core/designPrinciples"
+import { adjustFromText, adjustToText, applyAdjustToBox, composeAdjust, diffAdjust, IDENTITY, isIdentity, makeAdjust, syOf, unapplyAdjustToBox } from "@marknotton/svgenius-core/designPrinciples"
 import { svgDataUrl } from "@marknotton/svgenius-core/format"
 import { shapeMaskUrl, type GuideShape } from "@marknotton/svgenius-core/shapes"
 import { fmtNum, getAttr, parseLength, parseViewBox, rootTag, type ViewBox } from "@marknotton/svgenius-core/svgRoot"
@@ -10,6 +10,7 @@ import { IconChevronLeft, IconChevronRight, IconCopy, IconRedo, IconReset, IconU
 import { useCommands } from "../lib/commands"
 import { GridGuides } from "./GridGuides"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
+import { Segmented } from "./Segmented"
 import { ShapeGuide, ShapeOptions } from "./ShapeGuide"
 
 // ── Quickview ─────────────────────────────────────────────────────────────────
@@ -48,17 +49,33 @@ export interface QuickviewProps {
   notify: (text: string, tone?: "info" | "success" | "error") => void
   /** Closes, saying which file it ended on */
   onClose: (lastId: string) => void
+  /** Sets many files' tuning at once (Apply to all). Without it, each file is set in turn */
+  onAdjustMany?: (changes: Array<{ id: string, adjust: ArtAdjust | undefined }>) => void
+  /** Whether the files are the selected ones or everything listed, for the wording */
+  scope?: "selected" | "listed"
+  /** The host's confirm dialog. Without it Quickview asks in its own */
+  confirm?: (opts: { title: string, body: ReactNode, confirmLabel: string }) => Promise<boolean>
 }
 
 /** Another dialog (Design principles, say) is open on top */
 const covered = () => document.querySelectorAll(".modal").length > 1
 
-interface Entry { id: string, before: ArtAdjust, after: ArtAdjust, kind: string, t: number }
+interface Change { id: string, before: ArtAdjust, after: ArtAdjust }
+interface Entry { changes: Change[], kind: string, t: number }
+
+type Box = { x: number, y: number, w: number, h: number }
+
+/** Remembers whether the shortcuts footer is open, per viewer */
+const keysStore = {
+  get: () => { try { return localStorage.getItem("svgenius:quickview-keys") !== "closed" } catch { return true } },
+  set: (open: boolean) => { try { localStorage.setItem("svgenius:quickview-keys", open ? "open" : "closed") } catch { /* unavailable */ } }
+}
 
 const STEPS = [1, 0.1, 0.01]
 const own = (item: SvgItem | undefined) => item?.adjust ?? IDENTITY
-const tidy = (a: ArtAdjust): ArtAdjust => ({ scale: +a.scale.toFixed(6), x: +a.x.toFixed(4), y: +a.y.toFixed(4) })
-const same = (a: ArtAdjust, b: ArtAdjust) => a.scale === b.scale && a.x === b.x && a.y === b.y
+const tidy = (a: ArtAdjust): ArtAdjust => makeAdjust(+a.scale.toFixed(6), +syOf(a).toFixed(6), +a.x.toFixed(4), +a.y.toFixed(4))
+const same = (a: ArtAdjust, b: ArtAdjust) => a.scale === b.scale && syOf(a) === syOf(b) && a.x === b.x && a.y === b.y
+const describe = (a: ArtAdjust) => `X ${fmtNum(a.x, 3)}, Y ${fmtNum(a.y, 3)}, scale ×${fmtNum(a.scale, 4)}${a.sy !== undefined ? ` × ${fmtNum(a.sy, 4)}` : ""}`
 
 function viewBoxOf(svg: string | undefined): ViewBox | null {
   const tag = svg ? rootTag(svg) : null
@@ -76,6 +93,7 @@ export function Quickview(p: QuickviewProps) {
   const item = p.items[index] as SvgItem | undefined
   const [peek, setPeek] = useState(false)
   const [hideOverlay, setHideOverlay] = useState(false)
+  const [keysOpen, setKeysOpen] = useState(keysStore.get)
   const [customStep, setCustomStep] = useState(() => (STEPS.includes(p.step) ? "" : String(p.step)))
 
   // Latest props for the key handler and timers
@@ -108,17 +126,27 @@ export function Quickview(p: QuickviewProps) {
     if (!it) return
     const before = own(it)
     const after = tidy(fn(before))
-    if (!(after.scale > 0) || same(before, after)) return
+    if (!(after.scale > 0 && syOf(after) > 0) || same(before, after)) return
     const now = Date.now()
     setHistory((h) => {
       const last = h.undo[h.undo.length - 1]
-      if (last && last.id === it.id && last.kind === kind && kind !== "set" && now - last.t < 700) {
-        return { undo: [...h.undo.slice(0, -1), { ...last, after, t: now }], redo: [] }
+      if (last && last.changes.length === 1 && last.changes[0].id === it.id && last.kind === kind && kind !== "set" && now - last.t < 700) {
+        return { undo: [...h.undo.slice(0, -1), { ...last, changes: [{ ...last.changes[0], after }], t: now }], redo: [] }
       }
-      return { undo: [...h.undo.slice(-199), { id: it.id, before, after, kind, t: now }], redo: [] }
+      return { undo: [...h.undo.slice(-199), { changes: [{ id: it.id, before, after }], kind, t: now }], redo: [] }
     })
     commit(it.id, after)
   }, [commit])
+
+  /** Sets many files at once, as one undo step */
+  const commitMany = useCallback((list: Array<{ id: string, a: ArtAdjust }>) => {
+    const p = live.current
+    if (p.onAdjustMany) p.onAdjustMany(list.map(({ id, a }) => ({ id, adjust: isIdentity(a) ? undefined : a })))
+    else for (const { id, a } of list) p.onAdjust(id, isIdentity(a) ? undefined : a)
+    // Only the file on screen re-runs now; the rest catch up as the list shows them
+    const here = itemRef.current?.id
+    if (here && list.some((c) => c.id === here)) schedule(here)
+  }, [schedule])
 
   const travel = useCallback((back: boolean) => {
     const h = historyRef.current
@@ -127,11 +155,17 @@ export function Quickview(p: QuickviewProps) {
     setHistory(back
       ? { undo: h.undo.slice(0, -1), redo: [...h.redo, entry] }
       : { undo: [...h.undo, entry], redo: h.redo.slice(0, -1) })
-    commit(entry.id, back ? entry.before : entry.after)
-    // Show the file the step belongs to
-    if (entry.id !== itemRef.current?.id && live.current.items.some((i) => i.id === entry.id)) { setDir(null); setId(entry.id) }
+    if (entry.changes.length === 1) {
+      const c = entry.changes[0]
+      commit(c.id, back ? c.before : c.after)
+      // Show the file the step belongs to
+      if (c.id !== itemRef.current?.id && live.current.items.some((i) => i.id === c.id)) { setDir(null); setId(c.id) }
+    } else {
+      commitMany(entry.changes.map((c) => ({ id: c.id, a: back ? c.before : c.after })))
+      live.current.notify(`${back ? "Undid" : "Redid"} the change to ${entry.changes.length} files`, "info")
+    }
     return true
-  }, [commit])
+  }, [commit, commitMany])
 
   useCommands((cmd) => {
     if (covered()) return false
@@ -154,24 +188,115 @@ export function Quickview(p: QuickviewProps) {
 
   // ── Moves ──────────────────────────────────────────────────────────────────
   const step = p.step
-  const [artSize, setArtSize] = useState<number | null>(null)
+  // The artwork's bounds in the last result, and the tuning baked into it
+  const [measured, setMeasured] = useState<{ id: string, box: Box, baked: ArtAdjust, vb: ViewBox } | null>(null)
+  const measuredRef = useRef(measured)
+  measuredRef.current = measured
+  /** The artwork's box before this file's own tuning (variations included), or null until measured */
+  const baseBox = useCallback((): { box: Box, vb: ViewBox } | null => {
+    const m = measuredRef.current, it = itemRef.current
+    if (!m || !it || m.id !== it.id) return null
+    const cx = m.vb.x + m.vb.w / 2, cy = m.vb.y + m.vb.h / 2
+    const raw = unapplyAdjustToBox(m.baked, m.box, cx, cy)
+    return { box: applyAdjustToBox(live.current.baseFor(it), raw, cx, cy), vb: m.vb }
+  }, [])
   const move = useCallback((dx: number, dy: number, mult = 1) => {
     const s = live.current.step * mult
     change((a) => ({ ...a, x: a.x + dx * s, y: a.y + dy * s }), "move")
   }, [change])
-  /** Grows or shrinks the artwork by the step, in viewBox units of its longest side */
-  const artRef = useRef<number | null>(null)
+  /** Grows or shrinks the artwork by the step, in viewBox units of its longest side (stretching is kept) */
   const scaleBy = useCallback((sign: 1 | -1, mult = 1) => {
     const s = live.current.step * mult
     const it = itemRef.current
+    const bb = baseBox()
     const vb = viewBoxOf(it?.result?.output ?? it?.source)
     // The artwork's size before this file's own tuning
-    const base = artRef.current ?? (vb ? Math.max(vb.w, vb.h) : 100)
+    const base = bb ? Math.max(bb.box.w, bb.box.h) : vb ? Math.max(vb.w, vb.h) : 100
     change((a) => {
-      const size = base * a.scale
-      return { ...a, scale: Math.max(0.01, a.scale * Math.max(size * 0.01, size + sign * s) / size) }
+      const size = base * Math.max(a.scale, syOf(a))
+      const k = Math.max(0.01, Math.max(size * 0.01, size + sign * s) / size)
+      return makeAdjust(a.scale * k, syOf(a) * k, a.x, a.y)
     }, "scale")
-  }, [change])
+  }, [change, baseBox])
+
+  // ── Fit and align ──────────────────────────────────────────────────────────
+  const [fitTo, setFitTo] = useState<"canvas" | "live">("live")
+  const [stretch, setStretch] = useState(false)
+  /** Where fit and align aim: the whole viewBox, or the design principle's live area mapped onto it */
+  const targetBox = useCallback((vb: ViewBox): Box => {
+    const it = itemRef.current
+    const dp = it ? live.current.principleFor(it) : null
+    if (fitTo === "canvas" || !dp) return { x: vb.x, y: vb.y, w: vb.w, h: vb.h }
+    const k = Math.min(vb.w / dp.width, vb.h / dp.height)
+    const ox = vb.x + (vb.w - dp.width * k) / 2, oy = vb.y + (vb.h - dp.height * k) / 2
+    return { x: ox + dp.padding * k, y: oy + dp.padding * k, w: Math.max(1e-6, (dp.width - dp.padding * 2) * k), h: Math.max(1e-6, (dp.height - dp.padding * 2) * k) }
+  }, [fitTo])
+  /** The tuning that puts the base box at (x, y) with scales sx, sy */
+  const placing = (b: Box, vb: ViewBox, sx: number, sy: number, x: number, y: number) => {
+    const cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2
+    return makeAdjust(sx, sy, x - cx - sx * (b.x - cx), y - cy - sy * (b.y - cy))
+  }
+  const notMeasured = () => live.current.notify("Still measuring this file. Try again in a moment", "info")
+  const fit = useCallback((mode: "w" | "h" | "both") => {
+    const bb = baseBox()
+    if (!bb || !(bb.box.w > 0 && bb.box.h > 0)) { notMeasured(); return }
+    const { box: b, vb } = bb
+    const T = targetBox(vb)
+    change((a) => {
+      const kw = T.w / b.w, kh = T.h / b.h
+      let sx: number, sy: number
+      if (stretch) {
+        sx = mode === "h" ? a.scale : kw
+        sy = mode === "w" ? syOf(a) : kh
+      } else {
+        sx = sy = mode === "w" ? kw : mode === "h" ? kh : Math.min(kw, kh)
+      }
+      // The fitted sides line up with the target; the others keep their centre
+      const now = applyAdjustToBox(a, b, vb.x + vb.w / 2, vb.y + vb.h / 2)
+      const w = b.w * sx, h = b.h * sy
+      const x = mode === "h" ? now.x + (now.w - w) / 2 : T.x + (T.w - w) / 2
+      const y = mode === "w" ? now.y + (now.h - h) / 2 : T.y + (T.h - h) / 2
+      return placing(b, vb, sx, sy, x, y)
+    }, "set")
+  }, [baseBox, targetBox, stretch, change])  // eslint-disable-line react-hooks/exhaustive-deps
+  /** -1, 0 or 1 on each axis: left, centre or right; top, middle or bottom */
+  const align = useCallback((h: -1 | 0 | 1, v: -1 | 0 | 1) => {
+    const bb = baseBox()
+    if (!bb) { notMeasured(); return }
+    const { box: b, vb } = bb
+    const T = targetBox(vb)
+    change((a) => {
+      const w = b.w * a.scale, hh = b.h * syOf(a)
+      const x = h < 0 ? T.x : h > 0 ? T.x + T.w - w : T.x + (T.w - w) / 2
+      const y = v < 0 ? T.y : v > 0 ? T.y + T.h - hh : T.y + (T.h - hh) / 2
+      return placing(b, vb, a.scale, syOf(a), x, y)
+    }, "set")
+  }, [baseBox, targetBox, change])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Apply to all ───────────────────────────────────────────────────────────
+  const [asking, setAsking] = useState<{ title: string, body: ReactNode, confirmLabel: string, resolve: (ok: boolean) => void } | null>(null)
+  const applyAll = useCallback(async () => {
+    const it = itemRef.current
+    if (!it) return
+    const a = own(it)
+    const list = live.current.items
+    const others = list.filter((i) => i.id !== it.id && !same(own(i), a))
+    const n = list.length
+    const which = live.current.scope === "selected" ? "selected" : "listed"
+    const opts = {
+      title: `Apply to all ${n} ${which} SVGs?`,
+      body: <p>Applying {describe(a)} to all {n} {which} SVG{n === 1 ? "" : "s"}{others.length < n - 1 ? ` (${n - 1 - others.length} already match)` : ""}. Their own position and scale are replaced. ⌘Z undoes it.</p>,
+      confirmLabel: `Apply to ${n}`
+    }
+    const ok = live.current.confirm
+      ? await live.current.confirm(opts)
+      : await new Promise<boolean>((resolve) => setAsking({ ...opts, resolve }))
+    if (!ok || !others.length) return
+    const changes = others.map((i) => ({ id: i.id, before: own(i), after: a }))
+    setHistory((h) => ({ undo: [...h.undo.slice(-199), { changes, kind: "all", t: Date.now() }], redo: [] }))
+    commitMany(changes.map((c) => ({ id: c.id, a })))
+    live.current.notify(`Applied to ${others.length} SVG${others.length === 1 ? "" : "s"}`, "success")
+  }, [commitMany])
 
   const reset = useCallback(() => change(() => IDENTITY, "set"), [change])
   const previous = index > 0 ? p.items[index - 1] : null
@@ -286,16 +411,16 @@ export function Quickview(p: QuickviewProps) {
     return () => { cancelled = true }
   }, [src])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The artwork's size before this file's tuning, for the px readout and scale steps
+  // The artwork's bounds in the result, for the px readout, scale steps, fit and align
   useEffect(() => {
-    if (!output || !item) { artRef.current = null; setArtSize(null); return }
+    if (!output || !item) { setMeasured(null); return }
     let cancelled = false
-    const scaleNow = (item.result?.adjust ?? IDENTITY).scale
+    const bakedNow = item.result?.adjust ?? IDENTITY
+    const vbNow = viewBoxOf(output)
+    const idNow = item.id
     artworkBounds(output).then((b) => {
       if (cancelled) return
-      const size = b ? Math.max(b.w, b.h) / scaleNow : null
-      artRef.current = size
-      setArtSize(size)
+      setMeasured(b && vbNow ? { id: idNow, box: b, baked: bakedNow, vb: vbNow } : null)
     }).catch(() => {})
     return () => { cancelled = true }
   }, [output])  // eslint-disable-line react-hooks/exhaustive-deps
@@ -309,12 +434,14 @@ export function Quickview(p: QuickviewProps) {
   const vb = showing?.vb ?? viewBoxOf(svg)
   const ratio = vb && vb.w > 0 && vb.h > 0 ? vb.w / vb.h : 1
   const transform = vb && !isIdentity(delta)
-    ? `translate(${(delta.x / vb.w) * 100}%, ${(delta.y / vb.h) * 100}%) scale(${delta.scale})`
+    ? `translate(${(delta.x / vb.w) * 100}%, ${(delta.y / vb.h) * 100}%) scale(${delta.scale}, ${syOf(delta)})`
     : undefined
   const dp = p.principleFor(item)
   const overlay = p.overlay && !hideOverlay ? p.overlay : null
   const artMask = p.clip && p.overlay ? { WebkitMaskImage: shapeMaskUrl(p.overlay), maskImage: shapeMaskUrl(p.overlay) } as CSSProperties : undefined
-  const total = composeAdjust(base, mine)
+  // The artwork's size on screen now, in viewBox units
+  const bbNow = baseBox()
+  const now = bbNow ? applyAdjustToBox(mine, bbNow.box, bbNow.vb.x + bbNow.vb.w / 2, bbNow.vb.y + bbNow.vb.h / 2) : null
 
   return (
     <div className="modal-backdrop quickview-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) p.onClose(item.id) }}>
@@ -366,29 +493,29 @@ export function Quickview(p: QuickviewProps) {
           </div>
 
           <aside className="quickview__side">
-            <Group title="Move" keys="Arrows or numpad 8 4 6 2">
+            <Group title="Move">
               <div className="dpad">
                 <span />
-                <button className="btn btn--secondary dpad__btn" aria-label="Move up" title="Up (↑ or 8)" onClick={() => move(0, -1)}>↑</button>
+                <button className="btn btn--secondary dpad__btn" aria-label="Move up" onClick={() => move(0, -1)}>↑</button>
                 <span />
-                <button className="btn btn--secondary dpad__btn" aria-label="Move left" title="Left (← or 4)" onClick={() => move(-1, 0)}>←</button>
-                <button className="btn btn--secondary dpad__btn" aria-label="Reset" title="Back to where it started (R)" onClick={reset}><IconReset /></button>
-                <button className="btn btn--secondary dpad__btn" aria-label="Move right" title="Right (→ or 6)" onClick={() => move(1, 0)}>→</button>
+                <button className="btn btn--secondary dpad__btn" aria-label="Move left" onClick={() => move(-1, 0)}>←</button>
+                <button className="btn btn--secondary dpad__btn" aria-label="Reset" title="Back to where it started" onClick={reset}><IconReset /></button>
+                <button className="btn btn--secondary dpad__btn" aria-label="Move right" onClick={() => move(1, 0)}>→</button>
                 <span />
-                <button className="btn btn--secondary dpad__btn" aria-label="Move down" title="Down (↓ or 2)" onClick={() => move(0, 1)}>↓</button>
+                <button className="btn btn--secondary dpad__btn" aria-label="Move down" onClick={() => move(0, 1)}>↓</button>
                 <span />
               </div>
             </Group>
 
-            <Group title="Scale" keys="+ and −">
+            <Group title="Scale">
               <div className="quickview__scale">
-                <button className="btn btn--secondary dpad__btn" aria-label="Smaller" title="Smaller (−)" onClick={() => scaleBy(-1)}>−</button>
-                <button className="btn btn--secondary dpad__btn" aria-label="Bigger" title="Bigger (+)" onClick={() => scaleBy(1)}>+</button>
-                <span className="text-3">{artSize ? `${fmtNum(artSize * total.scale, 3)} px artwork` : ""}</span>
+                <button className="btn btn--secondary dpad__btn" aria-label="Smaller" onClick={() => scaleBy(-1)}>−</button>
+                <button className="btn btn--secondary dpad__btn" aria-label="Bigger" onClick={() => scaleBy(1)}>+</button>
+                <span className="text-3">{now ? `${fmtNum(now.w, 3)} × ${fmtNum(now.h, 3)} px` : ""}</span>
               </div>
             </Group>
 
-            <Group title="Step" keys="Shift × 10">
+            <Group title="Step">
               <div className="pills">
                 {STEPS.map((s) => (
                   <button key={s} className={`pill-btn${step === s && !customStep ? " is-on" : ""}`} onClick={() => { setCustomStep(""); p.onStep(s) }}>{s}</button>
@@ -405,45 +532,114 @@ export function Quickview(p: QuickviewProps) {
               <p className="text-3 quickview__note">In viewBox units ({vb ? `${fmtNum(vb.w, 2)} × ${fmtNum(vb.h, 2)}` : "unknown"}). Scale steps grow the artwork's longest side.</p>
             </Group>
 
+            <Group title="Fit">
+              <div className="quickview__fit">
+                <button className="btn btn--secondary btn--sm" title="Make the artwork as wide as the target" onClick={() => fit("w")}><IconFitW /> Width</button>
+                <button className="btn btn--secondary btn--sm" title="Make the artwork as tall as the target" onClick={() => fit("h")}><IconFitH /> Height</button>
+                <button className="btn btn--secondary btn--sm" title={stretch ? "Stretch the artwork to fill the target" : "Fit the artwork inside the target"} onClick={() => fit("both")}><IconFitBoth /> Both</button>
+              </div>
+              <div className="quickview__fit-opts">
+                <Segmented<"keep" | "stretch"> label="Aspect ratio" value={stretch ? "stretch" : "keep"} onChange={(v) => setStretch(v === "stretch")}
+                  options={[{ value: "keep", label: "Keep ratio", title: "Scale evenly, keeping the artwork's shape" }, { value: "stretch", label: "Stretch", title: "Scale width and height separately" }]} />
+                <Segmented<"canvas" | "live"> label="Fit and align to" value={dp ? fitTo : "canvas"} onChange={setFitTo}
+                  options={[{ value: "canvas", label: "Canvas", title: "The whole viewBox" }, { value: "live", label: "Live area", title: dp ? `${dp.name}'s live area, inside its padding` : "Pick a design principle for its live area" }]} />
+              </div>
+            </Group>
+
+            <Group title="Align">
+              <div className="align-grid" role="group" aria-label={`Align to the ${dp && fitTo === "live" ? "live area" : "canvas"}`}>
+                {([-1, 0, 1] as const).flatMap((v) => ([-1, 0, 1] as const).map((h) => (
+                  <button key={`${h}${v}`} className="btn btn--secondary align-grid__btn" onClick={() => align(h, v)}
+                    aria-label={ALIGN_NAMES[`${v}${h}`]} title={ALIGN_NAMES[`${v}${h}`]}>
+                    <span className="align-grid__dot" style={{ justifySelf: h < 0 ? "start" : h > 0 ? "end" : "center", alignSelf: v < 0 ? "start" : v > 0 ? "end" : "center" }} />
+                  </button>
+                )))}
+              </div>
+            </Group>
+
             <Group title="This file">
               <div className="quickview__values">
                 <Value label="X" value={mine.x} onSet={(x) => change((a) => ({ ...a, x }), "set")} />
                 <Value label="Y" value={mine.y} onSet={(y) => change((a) => ({ ...a, y }), "set")} />
-                <Value label="Scale ×" value={mine.scale} min={0.0001} onSet={(scale) => change((a) => ({ ...a, scale }), "set")} />
+                {mine.sy === undefined ? (
+                  <Value label="Scale ×" value={mine.scale} min={0.0001} onSet={(scale) => change((a) => makeAdjust(scale, scale, a.x, a.y), "set")} />
+                ) : <>
+                  <Value label="Scale X ×" value={mine.scale} min={0.0001} onSet={(scale) => change((a) => makeAdjust(scale, syOf(a), a.x, a.y), "set")} />
+                  <Value label="Scale Y ×" value={mine.sy} min={0.0001} onSet={(sy) => change((a) => makeAdjust(a.scale, sy, a.x, a.y), "set")} />
+                </>}
               </div>
-              {!isIdentity(base) && <p className="text-3 quickview__note">Plus the design principle's variation: ×{fmtNum(base.scale, 4)}, {fmtNum(base.x, 3)}, {fmtNum(base.y, 3)}.</p>}
+              {!isIdentity(base) && <p className="text-3 quickview__note">Plus the design principle's variation: {describe(base)}.</p>}
               <div className="quickview__actions">
-                <button className="btn btn--ghost btn--sm" title="Undo (⌘Z)" disabled={!history.undo.length} onClick={() => travel(true)}><IconUndo /> Undo</button>
-                <button className="btn btn--ghost btn--sm" title="Redo (⇧⌘Z)" disabled={!history.redo.length} onClick={() => travel(false)}><IconRedo /> Redo</button>
-                <button className="btn btn--ghost btn--sm" title="Back to where it started (R)" disabled={isIdentity(mine)} onClick={reset}><IconReset /> Reset</button>
+                <button className="btn btn--ghost btn--sm" disabled={!history.undo.length} onClick={() => travel(true)}><IconUndo /> Undo</button>
+                <button className="btn btn--ghost btn--sm" disabled={!history.redo.length} onClick={() => travel(false)}><IconRedo /> Redo</button>
+                <button className="btn btn--ghost btn--sm" disabled={isIdentity(mine)} onClick={reset}><IconReset /> Reset</button>
               </div>
               <div className="quickview__actions">
                 <button className="btn btn--ghost btn--sm" disabled={!previous} onClick={copyPrevious}
                   title={previous ? `Use ${previous.name}'s position and scale` : "This is the first file"}>Copy from previous</button>
+                <button className="btn btn--ghost btn--sm" onClick={copyText}><IconCopy /> Copy</button>
+                <button className="btn btn--ghost btn--sm" onClick={pasteFromClipboard}>Paste</button>
               </div>
-              <div className="quickview__actions">
-                <button className="btn btn--ghost btn--sm" title="Copy this file's position and scale as JSON (⌘C)" onClick={copyText}><IconCopy /> Copy</button>
-                <button className="btn btn--ghost btn--sm" title="Paste a position and scale (⌘V)" onClick={pasteFromClipboard}>Paste</button>
-              </div>
+              <button className="btn btn--secondary btn--sm quickview__apply" disabled={p.items.length < 2} onClick={applyAll}
+                title={`Give every ${p.scope === "selected" ? "selected" : "listed"} SVG this file's position and scale`}>
+                Apply to all {p.scope === "selected" ? "selected" : ""} <span className="run-group__count">{p.items.length}</span>
+              </button>
             </Group>
-
-            <ul className="quickview__keys text-3">
-              <li><kbd>Q</kbd> <kbd>W</kbd> previous and next</li>
-              <li>Hold <kbd>E</kbd> to see it before tuning</li>
-              <li>Hold <kbd>T</kbd> to hide the overlay</li>
-              <li><kbd>R</kbd> resets, <kbd>⌘Z</kbd> undoes</li>
-            </ul>
           </aside>
         </div>
+
+        <footer className={`quickview__foot${keysOpen ? " is-open" : ""}`}>
+          <button className="link quickview__foot-toggle" aria-expanded={keysOpen} onClick={() => { setKeysOpen(!keysOpen); keysStore.set(!keysOpen) }}>
+            {keysOpen ? "Hide shortcuts" : "Keyboard shortcuts"}
+          </button>
+          {keysOpen && (
+            <ul className="quickview__keys text-3">
+              <li><kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> or numpad <kbd>4</kbd><kbd>8</kbd><kbd>6</kbd><kbd>2</kbd> move</li>
+              <li><kbd>+</kbd> <kbd>−</kbd> scale</li>
+              <li><kbd>Shift</kbd> with either: ten steps</li>
+              <li><kbd>Q</kbd> <kbd>W</kbd> previous and next file</li>
+              <li><kbd>R</kbd> reset this file</li>
+              <li>Hold <kbd>E</kbd> to see it before tuning</li>
+              <li>Hold <kbd>T</kbd> to hide the overlay</li>
+              <li><kbd>⌘Z</kbd> undo, <kbd>⇧⌘Z</kbd> redo</li>
+              <li><kbd>⌘C</kbd> <kbd>⌘V</kbd> copy and paste the position and scale</li>
+              <li><kbd>Esc</kbd> close</li>
+            </ul>
+          )}
+        </footer>
+
+        {asking && (
+          <div className="modal-backdrop quickview__confirm" role="alertdialog" aria-modal="true"
+            onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); asking.resolve(false); setAsking(null) } }}>
+            <div className="modal">
+              <h2 className="modal__title">{asking.title}</h2>
+              <div className="modal__body">{asking.body}</div>
+              <div className="modal__actions">
+                <button className="btn btn--ghost" onClick={() => { asking.resolve(false); setAsking(null) }}>Cancel</button>
+                <button className="btn btn--primary" autoFocus onClick={() => { asking.resolve(true); setAsking(null) }}>{asking.confirmLabel}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function Group({ title, keys, children }: { title: string, keys?: string, children: ReactNode }) {
+const ALIGN_NAMES: Record<string, string> = {
+  "-1-1": "Top left", "-10": "Top", "-11": "Top right",
+  "0-1": "Left", "00": "Centre", "01": "Right",
+  "1-1": "Bottom left", "10": "Bottom", "11": "Bottom right"
+}
+
+const IconFitW = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M1.5 3v10M14.5 3v10M4 8h8M6 6 4 8l2 2M10 6l2 2-2 2" /></svg>
+const IconFitH = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M3 1.5h10M3 14.5h10M8 4v8M6 6l2-2 2 2M6 10l2 2 2-2" /></svg>
+const IconFitBoth = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" /><rect x="5" y="5" width="6" height="6" rx="1" /></svg>
+
+function Group({ title, children }: { title: string, children: ReactNode }) {
   return (
     <section className="quickview__group">
-      <div className="quickview__group-head"><span className="panel__label">{title}</span>{keys && <span className="text-3">{keys}</span>}</div>
+      <div className="quickview__group-head"><span className="panel__label">{title}</span></div>
       {children}
     </section>
   )

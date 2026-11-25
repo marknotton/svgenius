@@ -72,6 +72,8 @@ export interface TrimSettings {
 export interface ArtTransform {
   /** Scales the artwork inside its viewBox, around the centre */
   scale: number
+  /** Vertical scale, when it differs (stretching). Missing = scale */
+  scaleY?: number
   /** Moves the artwork, as % of the viewBox width/height */
   offsetX: number
   offsetY: number
@@ -79,9 +81,12 @@ export interface ArtTransform {
 
 /** Per-file fine-tuning (Quickview): scales around the viewBox centre, then moves, in viewBox units */
 export interface ArtAdjust {
+  /** Horizontal scale, and vertical too unless sy is set */
   scale: number
   x: number
   y: number
+  /** Vertical scale when the artwork is stretched. Missing = the same as scale */
+  sy?: number
 }
 
 /** A reference shape on a design principle's grid, in canvas units, centred */

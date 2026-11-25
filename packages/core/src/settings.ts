@@ -156,7 +156,7 @@ export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const art = t.artUnit === "px" ? ["px", t.artSide ?? "height", t.artSizePx ?? 0] : t.artScale
   const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.sizeUnit === "px" ? [t.sizeSide, t.sizePx] : t.scale, art, t.offsetX, t.offsetY]
   // Only when present, so keys made before design principles existed stay the same
-  const extra = settings.grid || (settings.adjust && !(settings.adjust.scale === 1 && settings.adjust.x === 0 && settings.adjust.y === 0))
+  const extra = settings.grid || (settings.adjust && !(settings.adjust.scale === 1 && (settings.adjust.sy ?? 1) === 1 && settings.adjust.x === 0 && settings.adjust.y === 0))
     ? [settings.grid ?? null, settings.adjust ?? null]
     : []
   return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths, settings.flattenTransforms, settings.opticalCentre && settings.opticalStrength, settings.autoPrecision && settings.autoTolerance, settings.cutOutStrokes, settings.cutOutShapes.filter((m) => m.enabled && m.value.trim()).map((m) => [m.kind, m.value.trim()]), ...extra])

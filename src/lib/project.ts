@@ -53,8 +53,9 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object
 const str = (v: unknown) => (typeof v === "string" ? v : undefined)
 const readAdjust = (v: unknown): SvgItem["adjust"] => {
   if (!isObj(v)) return undefined
-  const scale = Number(v.scale), x = Number(v.x), y = Number(v.y)
-  return [scale, x, y].every(Number.isFinite) && scale > 0 && !(scale === 1 && x === 0 && y === 0) ? { scale, x, y } : undefined
+  const scale = Number(v.scale), x = Number(v.x), y = Number(v.y), sy = v.sy === undefined ? scale : Number(v.sy)
+  if (![scale, sy, x, y].every(Number.isFinite) || scale <= 0 || sy <= 0 || (scale === 1 && sy === 1 && x === 0 && y === 0)) return undefined
+  return sy === scale ? { scale, x, y } : { scale, sy, x, y }
 }
 
 /**

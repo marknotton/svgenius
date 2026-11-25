@@ -19,12 +19,11 @@ const f = (n: number) => String(Math.round(n * 1000) / 1000)
 
 type Pt = [number, number]
 
-/** A polygon with every corner rounded to radius r (clamped so corners never overlap) */
-export function roundedPolygon(points: Pt[], r: number) {
+/** Where each corner's arc sits: its centre and radius (clamped so corners never overlap) */
+function corners(points: Pt[], r: number) {
   const n = points.length
-  let d = ""
-  for (let i = 0; i < n; i++) {
-    const prev = points[(i - 1 + n) % n], p = points[i], next = points[(i + 1) % n]
+  return points.map((p, i) => {
+    const prev = points[(i - 1 + n) % n], next = points[(i + 1) % n]
     const v1: Pt = [prev[0] - p[0], prev[1] - p[1]], v2: Pt = [next[0] - p[0], next[1] - p[1]]
     const l1 = Math.hypot(...v1), l2 = Math.hypot(...v2)
     const angle = Math.acos(Math.max(-1, Math.min(1, (v1[0] * v2[0] + v1[1] * v2[1]) / (l1 * l2))))
@@ -33,10 +32,34 @@ export function roundedPolygon(points: Pt[], r: number) {
     const rr = t * Math.tan(angle / 2)
     const a: Pt = [p[0] + (v1[0] / l1) * t, p[1] + (v1[1] / l1) * t]
     const b: Pt = [p[0] + (v2[0] / l2) * t, p[1] + (v2[1] / l2) * t]
+    // The arc's centre lies along the bisector, rr / sin(angle / 2) in from the corner
+    const bx = v1[0] / l1 + v2[0] / l2, by = v1[1] / l1 + v2[1] / l2, bl = Math.hypot(bx, by) || 1
+    const k = rr / Math.sin(angle / 2)
+    const c: Pt = [p[0] + (bx / bl) * k, p[1] + (by / bl) * k]
     const sweep = v1[0] * v2[1] - v1[1] * v2[0] < 0 ? 1 : 0
-    d += `${i === 0 ? "M" : "L"}${f(a[0])} ${f(a[1])}A${f(rr)} ${f(rr)} 0 0 ${sweep} ${f(b[0])} ${f(b[1])}`
-  }
-  return `${d}Z`
+    return { a, b, c, rr, sweep }
+  })
+}
+
+/** A polygon with every corner rounded to radius r */
+export function roundedPolygon(points: Pt[], r: number) {
+  return corners(points, r).map(({ a, b, rr, sweep }, i) =>
+    `${i === 0 ? "M" : "L"}${f(a[0])} ${f(a[1])}A${f(rr)} ${f(rr)} 0 0 ${sweep} ${f(b[0])} ${f(b[1])}`).join("") + "Z"
+}
+
+/**
+ * A rounded polygon scaled and centred so its real outline (after rounding,
+ * which pulls sharp corners in) fills a square of side s around (cx, cy).
+ * Without this a rounded triangle sits visibly low
+ */
+function fittedRoundedPolygon(points: Pt[], r: number, cx: number, cy: number, s: number) {
+  const cs = corners(points, r)
+  // Each corner's extreme is its arc centre ± its radius; straight edges never go further out
+  const x0 = Math.min(...cs.map((c) => c.c[0] - c.rr)), x1 = Math.max(...cs.map((c) => c.c[0] + c.rr))
+  const y0 = Math.min(...cs.map((c) => c.c[1] - c.rr)), y1 = Math.max(...cs.map((c) => c.c[1] + c.rr))
+  const k = Math.min(s / (x1 - x0), s / (y1 - y0))
+  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2
+  return roundedPolygon(points.map(([x, y]) => [cx + (x - mx) * k, cy + (y - my) * k]), r * k)
 }
 
 /** |x|^n + |y|^n = 1, sampled finely enough to look smooth at any size */
@@ -66,15 +89,14 @@ export function shapePath(shape: GuideShape, box = { x: 0, y: 0, w: 100, h: 100 
     case "roundedTriangle": {
       // Equilateral, as wide as the box, centred on its bounding box
       const h = (s * Math.sqrt(3)) / 2
-      const top = cy - h / 2
-      return roundedPolygon([[cx, top], [cx + r, top + h], [cx - r, top + h]], s * 0.1)
+      return fittedRoundedPolygon([[cx, cy - h / 2], [cx + r, cy + h / 2], [cx - r, cy + h / 2]], s * 0.1, cx, cy, s)
     }
     case "roundedHexagon": {
       const pts: Pt[] = Array.from({ length: 6 }, (_, i) => {
         const a = -Math.PI / 2 + (i * Math.PI) / 3
         return [cx + r * Math.cos(a), cy + r * Math.sin(a)]
       })
-      return roundedPolygon(pts, s * 0.08)
+      return fittedRoundedPolygon(pts, s * 0.08, cx, cy, s)
     }
     default:
       return `M${f(cx - r)} ${f(cy)}A${f(r)} ${f(r)} 0 1 0 ${f(cx + r)} ${f(cy)}A${f(r)} ${f(r)} 0 1 0 ${f(cx - r)} ${f(cy)}Z`

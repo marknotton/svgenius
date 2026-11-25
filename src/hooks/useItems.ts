@@ -190,6 +190,11 @@ export function useItems() {
   const setConfig = useCallback((id: string, config: SvgoSettings | undefined) => patch(id, { config }), [patch])
   /** Quickview's fine-tuning; undefined clears it */
   const setAdjust = useCallback((id: string, adjust: ArtAdjust | undefined) => patch(id, { adjust }), [patch])
+  /** Many files' tuning in one go (Quickview's Apply to all) */
+  const setAdjustMany = useCallback((changes: Array<{ id: string, adjust: ArtAdjust | undefined }>) => {
+    const byId = new Map(changes.map((c) => [c.id, c.adjust]))
+    setItems((list) => list.map((i) => (byId.has(i.id) ? { ...i, adjust: byId.get(i.id) } : i)))
+  }, [])
 
   /**
    * Optimises the given items. Already up-to-date results are skipped unless
@@ -232,5 +237,5 @@ export function useItems() {
     return results
   }, [patch])
 
-  return { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, optimise, reloadFromDisk, forceRender }
+  return { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, setAdjustMany, optimise, reloadFromDisk, forceRender }
 }

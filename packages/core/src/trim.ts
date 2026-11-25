@@ -244,7 +244,8 @@ export function resizeSvg(svg: string, side: "width" | "height", px: number, pre
 
 /** Wraps the artwork in a <g> that scales around the viewBox centre and offsets it */
 export function transformSvg(svg: string, b: ArtTransform) {
-  if (b.scale === 1 && b.offsetX === 0 && b.offsetY === 0) return svg
+  const sy = b.scaleY ?? b.scale
+  if (b.scale === 1 && sy === 1 && b.offsetX === 0 && b.offsetY === 0) return svg
   const tag = rootTag(svg)
   if (!tag) return svg
   const vb = parseViewBox(getAttr(tag, "viewBox"))
@@ -259,7 +260,7 @@ export function transformSvg(svg: string, b: ArtTransform) {
   const dx = (vb.w * b.offsetX) / 100
   const dy = (vb.h * b.offsetY) / 100
   const f = (n: number) => fmtNum(n, 4)
-  const t = `translate(${f(cx + dx)} ${f(cy + dy)}) scale(${f(b.scale)}) translate(${f(-cx)} ${f(-cy)})`
+  const t = `translate(${f(cx + dx)} ${f(cy + dy)}) scale(${f(b.scale)}${sy !== b.scale ? ` ${f(sy)}` : ""}) translate(${f(-cx)} ${f(-cy)})`
   const start = svg.indexOf(tag) + tag.length
   const end = svg.lastIndexOf("</svg>")
   if (end < start || tag.endsWith("/>")) return svg
@@ -336,7 +337,7 @@ export function adjustSvg(svg: string, a: ArtAdjust | null | undefined) {
   if (!a || isIdentity(a)) return svg
   const vb = viewBoxOf(svg)
   if (!vb) return svg
-  return transformSvg(svg, { scale: a.scale, offsetX: (a.x / vb.w) * 100, offsetY: (a.y / vb.h) * 100 })
+  return transformSvg(svg, { scale: a.scale, scaleY: a.sy, offsetX: (a.x / vb.w) * 100, offsetY: (a.y / vb.h) * 100 })
 }
 
 /** Adds raw markup just before the closing </svg> */

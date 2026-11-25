@@ -15,11 +15,13 @@ export const HISTORY: Release[] = [
     date: "25 November 2026",
     notes: [
       "Quickview (Space, the Quickview button or right-click): one file at a time, big, over a design principle's grid. Arrows or numpad 8 4 6 2 move it, + and − scale it, Q and W page with a slide, R resets, hold E to see it before tuning, hold T to hide the overlay",
+      "Quickview Fit: make the artwork as wide, as tall or both as the canvas or live area, keeping its ratio or stretching. Align it to any of nine spots. Apply to all copies one file's position and scale to every selected (or listed) SVG, after a confirm, as one undo step",
+      "Quickview's shortcuts sit in a footer you can hide",
       "Quickview steps of 1, 0.1 or 0.01 (or your own), Shift for ten times. D-pad and scale buttons, undo and redo, copy from the previous file, and ⌘C / ⌘V to copy and paste a position and scale as JSON",
       "Design principles (Settings, or Manage… in the Config tab): a brand's canvas, live area, keylines, stroke and radius, with per-file variations by name or handle. Starts with Material Design (MUI), Material Symbols, Lucide (shadcn/ui), Font Awesome, Meta and an app icon squircle. Import and export as JSON",
       "Presets can fit every file to a design principle: centred and scaled into its live area or the keyline that matches the icon's shape",
       "Edit contents: Scale takes px as well as ×, like Edit viewBox. Pick W or H and the artwork is sized exactly",
-      "Shape guide: circle, squircle, rounded square, rounded triangle or rounded hexagon, for the guide and clip everywhere (list, editor and Quickview)"
+      "Shape guide: circle, squircle, rounded square, rounded triangle (now truly centred) or rounded hexagon, for the guide and clip everywhere (list, editor and Quickview)"
     ]
   },
   {

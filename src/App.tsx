@@ -73,7 +73,7 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, optimise, reloadFromDisk, forceRender } = useItems()
+  const { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, setAdjustMany, optimise, reloadFromDisk, forceRender } = useItems()
   // Once there are files, get the code editor ready before anyone opens it
   const hasItems = items.length > 0
   useEffect(() => { if (hasItems) preloadMonaco() }, [hasItems])
@@ -1193,6 +1193,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             onPrincipleChoice={(quickviewDpId) => update((s) => ({ ...s, quickviewDpId }))}
             onManagePrinciples={() => setPrinciplesOpen({ id: settings.quickviewDpId && settings.quickviewDpId !== "none" ? settings.quickviewDpId : null })}
             onAdjust={setAdjust}
+            onAdjustMany={setAdjustMany}
+            scope={selection.size > 1 ? "selected" : "listed"}
             onRun={(id) => { optimise([id], resolve) }}
             overlay={settings.circleOverlay ? guideShape : null}
             onOverlay={(shape) => update((s) => (shape ? { ...s, circleOverlay: true, guideShape: shape } : { ...s, circleOverlay: false }))}

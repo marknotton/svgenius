@@ -27,8 +27,8 @@ export function fileTags(item: SvgItem, settings: SvgoSettings, customOn: number
   if (settings.grid && settings.grid.fit !== "none") tags.push({ label: `Grid ${fmtNum(settings.grid.width, 2)}×${fmtNum(settings.grid.height, 2)}`, title: "Fitted to a design principle's canvas and live area" })
   if (t.artUnit === "px") tags.push({ label: `Artwork ${t.artSide === "width" ? "W" : "H"} ${fmtNum(t.artSizePx ?? 0, 2)}px`, title: "Artwork scaled to an exact size inside the viewBox" })
   else if (t.artScale !== 1) tags.push({ label: `Artwork ×${fmtNum(t.artScale, 4)}`, title: "Artwork scaled inside the viewBox" })
-  if (item.adjust && (item.adjust.scale !== 1 || item.adjust.x || item.adjust.y)) {
-    tags.push({ label: "Tuned", title: `Fine-tuned in Quickview: ×${fmtNum(item.adjust.scale, 4)}, moved ${fmtNum(item.adjust.x, 3)} across, ${fmtNum(item.adjust.y, 3)} down`, tone: "accent" })
+  if (item.adjust && (item.adjust.scale !== 1 || (item.adjust.sy ?? 1) !== 1 || item.adjust.x || item.adjust.y)) {
+    tags.push({ label: "Tuned", title: `Fine-tuned in Quickview: ×${fmtNum(item.adjust.scale, 4)}${item.adjust.sy !== undefined ? ` × ${fmtNum(item.adjust.sy, 4)}` : ""}, moved ${fmtNum(item.adjust.x, 3)} across, ${fmtNum(item.adjust.y, 3)} down`, tone: "accent" })
   }
   if (t.offsetX || t.offsetY) {
     tags.push({ label: "Artwork moved", title: `Moved ${fmtNum(t.offsetX, 2)}% across, ${fmtNum(t.offsetY, 2)}% down` })

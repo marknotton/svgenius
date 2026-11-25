@@ -9,17 +9,36 @@ import type { ArtAdjust, DesignPrinciple, DpVariation, GridFit, GridSpec, Keylin
 const id = () => crypto.randomUUID()
 
 export const IDENTITY: ArtAdjust = { scale: 1, x: 0, y: 0 }
-export const isIdentity = (a: ArtAdjust | null | undefined) => !a || (a.scale === 1 && a.x === 0 && a.y === 0)
+/** The vertical scale (the same as scale unless stretched) */
+export const syOf = (a: ArtAdjust) => a.sy ?? a.scale
+export const isIdentity = (a: ArtAdjust | null | undefined) => !a || (a.scale === 1 && syOf(a) === 1 && a.x === 0 && a.y === 0)
+
+/** Drops sy when it matches scale, so uniform adjustments stay uniform */
+export function makeAdjust(scale: number, sy: number, x: number, y: number): ArtAdjust {
+  return Math.abs(sy - scale) < 1e-9 ? { scale, x, y } : { scale, sy, x, y }
+}
 
 /** b after a: both scale around the same centre, offsets in the same units */
 export function composeAdjust(a: ArtAdjust, b: ArtAdjust): ArtAdjust {
-  return { scale: a.scale * b.scale, x: b.x + b.scale * a.x, y: b.y + b.scale * a.y }
+  return makeAdjust(a.scale * b.scale, syOf(a) * syOf(b), b.x + b.scale * a.x, b.y + syOf(b) * a.y)
 }
 
 /** What turns a into b (d after a = b) */
 export function diffAdjust(a: ArtAdjust, b: ArtAdjust): ArtAdjust {
-  const scale = b.scale / a.scale
-  return { scale, x: b.x - scale * a.x, y: b.y - scale * a.y }
+  const sx = b.scale / a.scale, sy = syOf(b) / syOf(a)
+  return makeAdjust(sx, sy, b.x - sx * a.x, b.y - sy * a.y)
+}
+
+/** Where a box lands after an adjustment around centre (cx, cy) */
+export function applyAdjustToBox(a: ArtAdjust, box: { x: number, y: number, w: number, h: number }, cx: number, cy: number) {
+  const sy = syOf(a)
+  return { x: cx + a.x + a.scale * (box.x - cx), y: cy + a.y + sy * (box.y - cy), w: box.w * a.scale, h: box.h * sy }
+}
+
+/** Undoes an adjustment on a box */
+export function unapplyAdjustToBox(a: ArtAdjust, box: { x: number, y: number, w: number, h: number }, cx: number, cy: number) {
+  const sy = syOf(a)
+  return { x: cx + (box.x - cx - a.x) / a.scale, y: cy + (box.y - cy - a.y) / sy, w: box.w / a.scale, h: box.h / sy }
 }
 
 /** The four classic keylines, centred in the canvas */
@@ -219,15 +238,16 @@ export function pickKeyline(lines: Keyline[], w: number, h: number) {
 }
 
 /** JSON for copying a file's tuning to the clipboard */
-export const adjustToText = (a: ArtAdjust) => JSON.stringify({ svgenius: "adjust", scale: +a.scale.toFixed(6), x: +a.x.toFixed(4), y: +a.y.toFixed(4) })
+export const adjustToText = (a: ArtAdjust) => JSON.stringify({ svgenius: "adjust", scale: +a.scale.toFixed(6), ...(a.sy !== undefined && { sy: +a.sy.toFixed(6) }), x: +a.x.toFixed(4), y: +a.y.toFixed(4) })
 
 export function adjustFromText(text: string): ArtAdjust | null {
   try {
     const raw = JSON.parse(text)
     if (!isObj(raw)) return null
     const scale = Number(raw.scale ?? 1), x = Number(raw.x ?? 0), y = Number(raw.y ?? 0)
-    if (![scale, x, y].every(Number.isFinite) || scale <= 0 || (raw.scale === undefined && raw.x === undefined && raw.y === undefined)) return null
-    return { scale, x, y }
+    const sy = raw.sy === undefined ? scale : Number(raw.sy)
+    if (![scale, sy, x, y].every(Number.isFinite) || scale <= 0 || sy <= 0 || (raw.scale === undefined && raw.x === undefined && raw.y === undefined)) return null
+    return makeAdjust(scale, sy, x, y)
   } catch {
     return null
   }
