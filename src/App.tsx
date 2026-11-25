@@ -460,7 +460,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
 
   // Export writes the results already on screen; the footer only enables it
   // once every target is up to date
-  const doExport = async (clearAfter = false) => {
+  const doExport = async (clearAfter = false, zip = false) => {
     const list = targets
     const ready = list.filter(isFresh)
     const results = new Map(ready.map((i) => [i.id, i.result]))
@@ -485,7 +485,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       const written = await exportSvgs(plan.map(({ item, relPath }) => ({
         relPath,
         contents: (results.get(item.id)?.output) ?? ""
-      })), `Export ${plural(ready.length, "file")} to…`, confirmReplace)
+      })), zip ? `Save ${plural(ready.length, "file")} as a zip` : `Export ${plural(ready.length, "file")} to…`, confirmReplace, zip)
       if (!written) return
       const skipped = list.length - ready.length
       // Job done: only the exported files leave the list, failures stay to fix
