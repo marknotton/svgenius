@@ -1,6 +1,8 @@
 import type { Config } from "svgo/browser"
 import { PLUGINS, PLUGIN_NAMES } from "./plugins"
 import { CASES, defaultRename } from "./rename"
+import { builtInPrinciples, sanitisePrinciples } from "./designPrinciples"
+import { isGuideShape } from "./shapes"
 import type { RenameSettings, AppSettings, AttrRule, CustomPlugin, CutMatcher, CustomRun, Preset, Replacement, RunSpec, SvgoSettings } from "./types"
 
 // ── Defaults ──────────────────────────────────────────────────────────────────
@@ -15,7 +17,8 @@ export function defaultSvgoSettings(): SvgoSettings {
     plugins: Object.fromEntries(PLUGINS.map((p) => [p.name, p.defaultOn])),
     replacements: [],
     attrRules: [],
-    trim: { enabled: false, padding: 0, unit: "%", aspect: "fit", scale: 1, sizeUnit: "%", sizeSide: "height", sizePx: 100, artScale: 1, offsetX: 0, offsetY: 0 },
+    trim: { enabled: false, padding: 0, unit: "%", aspect: "fit", scale: 1, sizeUnit: "%", sizeSide: "height", sizePx: 100, artScale: 1, offsetX: 0, offsetY: 0, artUnit: "x", artSide: "height", artSizePx: 20 },
+    designPrincipleId: null,
     appendMarkup: "",
     mergePaths: false,
     flattenTransforms: false,
@@ -71,6 +74,11 @@ export function defaultAppSettings(): AppSettings {
     advanced: false,
     editorToolbar: "top",
     circleColour: null,
+    guideShape: "circle",
+    designPrinciples: builtInPrinciples(),
+    quickviewDpId: null,
+    quickviewStep: 1,
+    quickviewGuides: true,
     ...defaultLayout()
   }
 }
@@ -145,8 +153,13 @@ export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const rules = activeReplacements(settings).map(({ id: _id, enabled: _e, ...r }) => r)
   const attrs = settings.attrRules.filter((r) => r.enabled).map(({ id: _id, enabled: _e, ...r }) => r)
   const t = settings.trim
-  const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.sizeUnit === "px" ? [t.sizeSide, t.sizePx] : t.scale, t.artScale, t.offsetX, t.offsetY]
-  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths, settings.flattenTransforms, settings.opticalCentre && settings.opticalStrength, settings.autoPrecision && settings.autoTolerance, settings.cutOutStrokes, settings.cutOutShapes.filter((m) => m.enabled && m.value.trim()).map((m) => [m.kind, m.value.trim()])])
+  const art = t.artUnit === "px" ? ["px", t.artSide ?? "height", t.artSizePx ?? 0] : t.artScale
+  const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.sizeUnit === "px" ? [t.sizeSide, t.sizePx] : t.scale, art, t.offsetX, t.offsetY]
+  // Only when present, so keys made before design principles existed stay the same
+  const extra = settings.grid || (settings.adjust && !(settings.adjust.scale === 1 && settings.adjust.x === 0 && settings.adjust.y === 0))
+    ? [settings.grid ?? null, settings.adjust ?? null]
+    : []
+  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths, settings.flattenTransforms, settings.opticalCentre && settings.opticalStrength, settings.autoPrecision && settings.autoTolerance, settings.cutOutStrokes, settings.cutOutShapes.filter((m) => m.enabled && m.value.trim()).map((m) => [m.kind, m.value.trim()]), ...extra])
 }
 
 export function runSpec(settings: SvgoSettings, plugins: CustomPlugin[]): RunSpec {
@@ -207,8 +220,12 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
       sizePx: clampNum(trimRaw.sizePx, 0.01, 1e5, 100),
       artScale: validScale(trimRaw.artScale) ?? 1,
       offsetX: clampNum(trimRaw.offsetX, -1e4, 1e4, 0),
-      offsetY: clampNum(trimRaw.offsetY, -1e4, 1e4, 0)
+      offsetY: clampNum(trimRaw.offsetY, -1e4, 1e4, 0),
+      artUnit: trimRaw.artUnit === "px" ? "px" : "x",
+      artSide: trimRaw.artSide === "width" ? "width" : "height",
+      artSizePx: clampNum(trimRaw.artSizePx, 0.01, 1e5, 20)
     },
+    designPrincipleId: typeof raw.designPrincipleId === "string" && raw.designPrincipleId ? raw.designPrincipleId : null,
     appendMarkup: typeof raw.appendMarkup === "string" ? raw.appendMarkup : "",
     mergePaths: raw.mergePaths === true,
     flattenTransforms: raw.flattenTransforms === true,
@@ -368,7 +385,12 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     sidebarWidth: clampNum(raw.sidebarWidth, SIDEBAR.min, SIDEBAR.max, SIDEBAR.default),
     circleOverlay: raw.circleOverlay === true,
     circleClip: raw.circleClip === true,
-    liveUpdates: raw.liveUpdates !== false
+    liveUpdates: raw.liveUpdates !== false,
+    guideShape: isGuideShape(raw.guideShape) ? raw.guideShape : "circle",
+    designPrinciples: sanitisePrinciples(raw.designPrinciples),
+    quickviewDpId: typeof raw.quickviewDpId === "string" ? raw.quickviewDpId : null,
+    quickviewStep: clampNum(raw.quickviewStep, 0.0001, 1e4, 1),
+    quickviewGuides: raw.quickviewGuides !== false
   }
 }
 

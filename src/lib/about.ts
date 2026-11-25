@@ -11,6 +11,18 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "1.4.0",
+    date: "25 November 2026",
+    notes: [
+      "Quickview (Space, the Quickview button or right-click): one file at a time, big, over a design principle's grid. Arrows or numpad 8 4 6 2 move it, + and − scale it, Q and W page with a slide, R resets, hold E to see it before tuning, hold T to hide the overlay",
+      "Quickview steps of 1, 0.1 or 0.01 (or your own), Shift for ten times. D-pad and scale buttons, undo and redo, copy from the previous file, and ⌘C / ⌘V to copy and paste a position and scale as JSON",
+      "Design principles (Settings, or Manage… in the Config tab): a brand's canvas, live area, keylines, stroke and radius, with per-file variations by name or handle. Starts with Material Design (MUI), Material Symbols, Lucide (shadcn/ui), Font Awesome, Meta and an app icon squircle. Import and export as JSON",
+      "Presets can fit every file to a design principle: centred and scaled into its live area or the keyline that matches the icon's shape",
+      "Edit contents: Scale takes px as well as ×, like Edit viewBox. Pick W or H and the artwork is sized exactly",
+      "Shape guide: circle, squircle, rounded square, rounded triangle or rounded hexagon, for the guide and clip everywhere (list, editor and Quickview)"
+    ]
+  },
+  {
     version: "1.3.0",
     date: "23 November 2026",
     notes: [

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { IconEye, IconEyeOff, IconLock, IconUnlock, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircle, IconClip, IconZoomIn, IconZoomOut, IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconMagnet, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
+import { IconEye, IconEyeOff, IconLock, IconUnlock, IconChevronDown, IconChevronLeft, IconChevronRight, IconZoomIn, IconZoomOut, IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconMagnet, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
+import { ShapeIcon } from "./ShapeGuide"
 import { Resizer } from "./Resizer"
 import { elementRanges, rangeAt } from "@marknotton/svgenius-core/markupMap"
 import { moveElement, pasteAfter, removeElement, setAttr, setAttrs, translateAttrs, type DropPlace } from "@marknotton/svgenius-core/markupEdit"
@@ -680,11 +681,11 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             <button className="btn btn--secondary btn--sm edit-toolbar__btn" onClick={() => stepZoom(1)} title="Zoom in (⌘+)" aria-label="Zoom in"><IconZoomIn width={14} height={14} /></button>
           </div>
           {circle && (
-            <div className="btn-join" role="group" aria-label="Circle guide">
+            <div className="btn-join" role="group" aria-label="Shape guide">
               <button className={`btn btn--secondary btn--sm edit-toolbar__btn${circle.on ? " is-on" : ""}`} aria-pressed={circle.on} onClick={circle.onToggle}
-                title="Circle guide: shows what survives a circular crop, e.g. avatars" aria-label="Circle guide"><IconCircle width={14} height={14} /></button>
+                title="Shape guide: shows what survives the crop, e.g. avatars and app icons" aria-label="Shape guide"><ShapeIcon size={14} dashed /></button>
               <button className={`btn btn--secondary btn--sm edit-toolbar__btn${circle.clip ? " is-on" : ""}`} aria-pressed={circle.clip} onClick={circle.onClip}
-                title="Clip the preview to a circle" aria-label="Clip to a circle"><IconClip width={14} height={14} /></button>
+                title="Clip the preview to the guide's shape" aria-label="Clip to the shape"><ShapeIcon size={14} /></button>
             </div>
           )}
           <CanvasBackground />

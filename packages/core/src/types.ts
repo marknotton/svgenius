@@ -1,3 +1,5 @@
+import type { GuideShape } from "./shapes"
+
 // ── Settings ──────────────────────────────────────────────────────────────────
 
 export type Backdrop = "light" | "dark"
@@ -59,6 +61,11 @@ export interface TrimSettings {
   /** Moves the artwork, as % of the viewBox width/height */
   offsetX: number
   offsetY: number
+  /** "x" scales by artScale; "px" scales the artwork so one side measures artSizePx (viewBox units). Missing = "x" */
+  artUnit?: "x" | "px"
+  /** Which side of the artwork artSizePx sets */
+  artSide?: "width" | "height"
+  artSizePx?: number
 }
 
 /** Scale and move the artwork inside its viewBox */
@@ -69,6 +76,63 @@ export interface ArtTransform {
   offsetX: number
   offsetY: number
 }
+
+/** Per-file fine-tuning (Quickview): scales around the viewBox centre, then moves, in viewBox units */
+export interface ArtAdjust {
+  scale: number
+  x: number
+  y: number
+}
+
+/** A reference shape on a design principle's grid, in canvas units, centred */
+export interface Keyline {
+  id: string
+  kind: "circle" | "square" | "portrait" | "landscape"
+  w: number
+  h: number
+}
+
+/** A small, file-specific tweak inside a design principle, picked by file name or handle */
+export interface DpVariation {
+  id: string
+  enabled: boolean
+  /** name = the file name without .svg; handle = the host's handle, else the root id, else the file name */
+  by: "name" | "handle"
+  /** Glob: * matches anything, ? one character. Comma separated for several. Case-insensitive */
+  match: string
+  scale: number
+  x: number
+  y: number
+  note: string
+}
+
+/** How a design principle places the artwork on its canvas */
+export type GridFit = "none" | "centre" | "contain" | "keylines"
+
+/** A brand's icon rules: canvas, live area, keylines and per-file variations */
+export interface DesignPrinciple {
+  id: string
+  name: string
+  description: string
+  /** Where the rules come from */
+  source: string
+  /** The canvas, in px (dp) */
+  width: number
+  height: number
+  /** Space kept clear inside the canvas edge, so the live area is width - padding × 2 */
+  padding: number
+  fit: GridFit
+  keylines: Keyline[]
+  /** Reference stroke weight and corner radius, for the guides and the report */
+  stroke: number
+  radius: number
+  /** The mask shape the icons are seen in, if any (app icons, avatars) */
+  shape: GuideShape | null
+  variations: DpVariation[]
+}
+
+/** What the pipeline needs from a design principle */
+export type GridSpec = Pick<DesignPrinciple, "width" | "height" | "padding" | "fit" | "keylines">
 
 /** Everything that decides how SVGO treats a file. */
 export interface SvgoSettings {
@@ -100,6 +164,12 @@ export interface SvgoSettings {
   cutOutShapes: CutMatcher[]
   /** Custom plugin id → on/off and its params as JSON text */
   custom: Record<string, { on: boolean, params: string }>
+  /** The design principle files are fitted to, if any */
+  designPrincipleId?: string | null
+  /** Filled in by the host at run time (never saved): the design principle's grid */
+  grid?: GridSpec | null
+  /** Filled in by the host at run time (never saved): variations plus the file's own Quickview tuning */
+  adjust?: ArtAdjust | null
 }
 
 /** A third-party SVGO plugin loaded from a .js/.mjs file */
@@ -182,6 +252,16 @@ export interface AppSettings {
   circleColour: string | null
   circleClip: boolean
   liveUpdates: boolean
+  /** The shape the guide and the clip use. Missing = circle */
+  guideShape?: GuideShape
+  /** Brand icon rules, managed in Design principles */
+  designPrinciples?: DesignPrinciple[]
+  /** The design principle Quickview shows when a file's preset doesn't name one */
+  quickviewDpId?: string | null
+  /** Quickview's move step, in viewBox units */
+  quickviewStep?: number
+  /** Quickview's guides: grid, live area and keylines */
+  quickviewGuides?: boolean
 }
 
 // ── Files ─────────────────────────────────────────────────────────────────────
@@ -206,6 +286,8 @@ export type PrecisionTolerance = "strict" | "balanced" | "loose"
 export interface OptimiseResult {
   output: string
   size: number
+  /** The fine-tuning baked into this output, so previews can show changes before the re-run lands */
+  adjust?: ArtAdjust
   /** How many find & replace matches and attribute rule changes were made */
   replaced: number
   /** Beta geometry steps that actually changed something */
@@ -240,6 +322,10 @@ export interface SvgItem extends ScannedFile {
   heavy?: string
   /** Render and optimise it anyway */
   forceRender?: boolean
+  /** Quickview's fine-tuning, applied last */
+  adjust?: ArtAdjust
+  /** A host's own name for the file (Symbols' handle), for design principle variations */
+  handle?: string
 }
 
 /** Editor commands that the host's menu or shortcuts can send */

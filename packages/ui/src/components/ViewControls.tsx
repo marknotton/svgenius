@@ -1,4 +1,6 @@
-import { IconCircle, IconClip } from "../icons"
+import type { GuideShape } from "@marknotton/svgenius-core/shapes"
+import { GUIDE_SHAPES } from "@marknotton/svgenius-core/shapes"
+import { ShapeIcon, ShapeOptions } from "./ShapeGuide"
 import { CanvasBackground } from "./CanvasBackground"
 
 interface Props {
@@ -14,9 +16,15 @@ interface Props {
   cssOpen: boolean
   cssActive: boolean
   onCssToggle: () => void
+  /** The guide and clip shape; without onShape there's no shape picker */
+  shape?: GuideShape
+  onShape?: (shape: GuideShape) => void
+  /** Opens Quickview on the current file */
+  onQuickview?: () => void
 }
 
-export function ViewControls({ size, sizeRange, onSize, details, onDetails, circle, onCircle, clip, onClip, cssOpen, cssActive, onCssToggle }: Props) {
+export function ViewControls({ size, sizeRange, onSize, details, onDetails, circle, onCircle, clip, onClip, cssOpen, cssActive, onCssToggle, shape, onShape, onQuickview }: Props) {
+  const name = (GUIDE_SHAPES.find((s) => s.value === shape)?.label ?? "Circle").toLowerCase()
   return (
     <div className="view-controls">
       <label className="view-size" title={`Preview size: ${size}px. Double-click to reset`}>
@@ -36,14 +44,26 @@ export function ViewControls({ size, sizeRange, onSize, details, onDetails, circ
       <CanvasBackground />
       <div className="btn-join">
         <button type="button" className={`flag flag--lg${circle ? " is-on" : ""}`} aria-pressed={circle}
-          title="Circle guide: shows what survives a circular crop, e.g. avatars" onClick={onCircle}>
-          <IconCircle />
+          title={`Shape guide: shows what survives a ${name} crop, e.g. avatars and app icons`} onClick={onCircle}>
+          <ShapeIcon shape={shape} dashed />
         </button>
         <button type="button" className={`flag flag--lg${clip ? " is-on" : ""}`} aria-pressed={clip}
-          title="Clip previews to a circle, ignoring any whitespace outside it" onClick={onClip}>
-          <IconClip />
+          title={`Clip previews to the ${name}, ignoring any whitespace outside it`} onClick={onClip}>
+          <ShapeIcon shape={shape} />
         </button>
+        {onShape && (
+          <select className="flag flag--lg shape-select" aria-label="Guide shape" title="The shape the guide and clip use, everywhere"
+            value={shape ?? "circle"} onChange={(e) => onShape(e.target.value as GuideShape)}>
+            <ShapeOptions />
+          </select>
+        )}
       </div>
+      {onQuickview && (
+        <button type="button" className="flag flag--lg" onClick={onQuickview}
+          title="Quickview: fine-tune each file's position and scale against a design principle's grid (Space)">
+          Quickview
+        </button>
+      )}
       <button type="button" className={`flag flag--lg${cssOpen ? " is-on" : ""}`} aria-pressed={cssOpen}
         title="Preview CSS: style the previews, e.g. set custom properties" onClick={onCssToggle}>
         Inject CSS{cssActive && <span className="flag__dot" />}

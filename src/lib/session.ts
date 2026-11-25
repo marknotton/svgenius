@@ -5,7 +5,7 @@ import type { SvgItem } from "@marknotton/svgenius-core/types"
 // flags, own settings) is kept in IndexedDB and comes back after a refresh.
 // Optimised output isn't stored: it's quick to make again.
 
-export type Saved = Pick<SvgItem, "id" | "path" | "name" | "relPath" | "size" | "source" | "fileSource" | "presetId" | "config" | "flag">
+export type Saved = Pick<SvgItem, "id" | "path" | "name" | "relPath" | "size" | "source" | "fileSource" | "presetId" | "config" | "flag" | "adjust">
 
 const DB = "svgenius", STORE = "session", KEY = "items"
 
@@ -43,7 +43,7 @@ export async function loadSession(): Promise<SvgItem[]> {
 /** The parts of each file worth keeping: markup, edits, flags and own settings */
 export const toSaved = (items: SvgItem[]): Saved[] => items
   .filter((i) => typeof i.source === "string")
-  .map(({ id, path, name, relPath, size, source, fileSource, presetId, config, flag }) => ({ id, path, name, relPath, size, source, fileSource, presetId, config, flag }))
+  .map(({ id, path, name, relPath, size, source, fileSource, presetId, config, flag, adjust }) => ({ id, path, name, relPath, size, source, fileSource, presetId, config, flag, adjust }))
 
 export async function saveSession(items: SvgItem[]): Promise<void> {
   const saved = toSaved(items)

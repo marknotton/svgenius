@@ -4,6 +4,7 @@ import { svgSize } from "@marknotton/svgenius-core/svgRoot"
 import { allAnchors, geometry, pointAt, pointKey, serialisePath, shiftPoints, type PointKind, type PointRef, type Seg } from "@marknotton/svgenius-core/pathData"
 import { deletePoints, toggleCorner } from "@marknotton/svgenius-core/pathPoints"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
+import { ShapeGuide } from "./ShapeGuide"
 
 // ── Inspectable preview ───────────────────────────────────────────────────────
 // Renders the SVG inline (scripts and event handlers stripped) so elements can
@@ -524,6 +525,7 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
           onPick(i > 0 ? i : -1, e.shiftKey || e.metaKey || e.ctrlKey)
         }}
         onContextMenu={(e) => { if (onContextMenu) { const i = indexOf(e); onContextMenu(i > 0 ? i : -1, e) } }} />
+      <ShapeGuide />
       {boxes.hov && <div className="inspect__box inspect__box--hover" style={rect(boxes.hov)} />}
       {!path && boxes.sel.map((b, k) => <div key={k} className="inspect__box" style={shifted(rect(b), shift)} />)}
       {showXf && union && (

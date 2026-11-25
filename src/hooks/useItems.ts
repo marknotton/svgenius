@@ -7,7 +7,7 @@ import { loadSession, saveSession } from "../lib/session"
 import { postProcess } from "@marknotton/svgenius-core/trim"
 import { optimiseAutoPrecision } from "@marknotton/svgenius-core/precision"
 import { assessComplexity, isBlocked } from "@marknotton/svgenius-core/complexity"
-import type { GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "@marknotton/svgenius-core/types"
+import type { ArtAdjust, GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "@marknotton/svgenius-core/types"
 
 // ── File list + optimisation queue ────────────────────────────────────────────
 
@@ -188,6 +188,8 @@ export function useItems() {
 
   /** Give a file its own settings (or undefined to go back to its preset) */
   const setConfig = useCallback((id: string, config: SvgoSettings | undefined) => patch(id, { config }), [patch])
+  /** Quickview's fine-tuning; undefined clears it */
+  const setAdjust = useCallback((id: string, adjust: ArtAdjust | undefined) => patch(id, { adjust }), [patch])
 
   /**
    * Optimises the given items. Already up-to-date results are skipped unless
@@ -219,7 +221,7 @@ export function useItems() {
         const effects: GeometryEffect[] = []
         const output = await postProcess(data, precision === undefined ? spec.svgo : { ...spec.svgo, floatPrecision: precision }, effects)
         if (runs.current.get(item.id) !== run) return
-        const result = { output, size: byteLength(output), replaced, effects, precision, key: spec.key }
+        const result = { output, size: byteLength(output), replaced, effects, precision, key: spec.key, adjust: spec.svgo.adjust ?? undefined }
         results.set(item.id, result)
         patch(item.id, { status: "done", result, errorKey: undefined })
       } catch (e) {
@@ -230,5 +232,5 @@ export function useItems() {
     return results
   }, [patch])
 
-  return { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, optimise, reloadFromDisk, forceRender }
+  return { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, optimise, reloadFromDisk, forceRender }
 }

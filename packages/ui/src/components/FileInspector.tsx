@@ -6,7 +6,7 @@ import { formatBytes, formatSaving, plural, savingPercent } from "@marknotton/sv
 import { PREVIEW_PX } from "@marknotton/svgenius-core/settings"
 import type { FileTag } from "@marknotton/svgenius-core/tags"
 import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "@marknotton/svgenius-core/svgRoot"
-import type { Backdrop, CustomPlugin, Preset, SvgItem, SvgoSettings } from "@marknotton/svgenius-core/types"
+import type { Backdrop, CustomPlugin, DesignPrinciple, Preset, SvgItem, SvgoSettings } from "@marknotton/svgenius-core/types"
 import { PresetSelect } from "./PresetSelect"
 import { PresetEditor } from "./PresetEditor"
 import { SliderField } from "./SliderField"
@@ -48,6 +48,9 @@ interface Props {
   /** Previous and next file, for the editor's arrows */
   nav?: { pos: number, total: number, go: (step: 1 | -1) => void }
   circle?: { on: boolean, clip: boolean, onToggle: () => void, onClip: () => void }
+  /** Design principles the file's own settings can fit it to */
+  designPrinciples?: DesignPrinciple[]
+  onManagePrinciples?: () => void
 }
 
 function viewBoxOf(svg?: string) {
@@ -163,7 +166,8 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             </summary>
             {item.config && (
               <PresetEditor settings={item.config} edit={p.onConfig} customPlugins={p.customPlugins}
-                onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} advanced={p.advanced} />
+                onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} advanced={p.advanced}
+                designPrinciples={p.designPrinciples} onManagePrinciples={p.onManagePrinciples} />
             )}
           </details>
         )}

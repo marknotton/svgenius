@@ -7,6 +7,8 @@ import type { AppSettings, Backdrop, ThemeChoice } from "@marknotton/svgenius-co
 import { Modal } from "./Dialogs"
 import { Segmented } from "./Segmented"
 import { Toggle } from "./Toggle"
+import { ShapeOptions } from "./ShapeGuide"
+import type { GuideShape } from "@marknotton/svgenius-core/shapes"
 
 // ── App settings (⌘,) ─────────────────────────────────────────────────────────
 
@@ -20,6 +22,8 @@ interface Props {
   onExport: () => void
   onResetLayout: () => void
   onClose: () => void
+  /** Opens the design principles manager */
+  onDesignPrinciples?: () => void
 }
 
 export function SettingsDialog({ settings, update, actions, usage, ...p }: Props) {
@@ -78,6 +82,16 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
           )}
         </section>
 
+        {p.onDesignPrinciples && (
+          <section className="settings__section">
+            <h3 className="settings__title">Design principles</h3>
+            <p className="settings__desc text-3">Brand icon rules: canvas, live area, keylines and per-file variations. Presets can fit files to one, and Quickview draws its guides.</p>
+            <div className="settings__actions">
+              <button className="btn btn--ghost btn--sm" onClick={p.onDesignPrinciples}>Manage design principles… <span className="text-3">{plural(settings.designPrinciples?.length ?? 0, "principle")}</span></button>
+            </div>
+          </section>
+        )}
+
         <section className="settings__section">
           <h3 className="settings__title">Working</h3>
           <p className="settings__desc text-3">How files are run and exported.</p>
@@ -114,17 +128,25 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
           </div>
           <Toggle label="List view" hint="Compact rows with dimensions, tags and presets. Off shows big before/after previews"
             checked={settings.showDetails} onChange={(v) => set("showDetails", v)} />
-          <Toggle label="Circle guide" checked={settings.circleOverlay} onChange={(v) => set("circleOverlay", v)} />
+          <Toggle label="Shape guide" hint="Shows what survives a crop to the shape, e.g. avatars and app icons"
+            checked={settings.circleOverlay} onChange={(v) => set("circleOverlay", v)} />
           <div className="field-row">
-            <span>Circle guide colour</span>
+            <span>Guide shape</span>
+            <select className="input input--sm" aria-label="Guide shape" value={settings.guideShape ?? "circle"}
+              onChange={(e) => set("guideShape", e.target.value as GuideShape)}>
+              <ShapeOptions />
+            </select>
+          </div>
+          <div className="field-row">
+            <span>Guide colour</span>
             <span className="settings__colour">
-              <input type="color" aria-label="Circle guide colour" value={settings.circleColour ?? "#af307d"} onChange={(e) => set("circleColour", e.target.value)} />
+              <input type="color" aria-label="Guide colour" value={settings.circleColour ?? "#af307d"} onChange={(e) => set("circleColour", e.target.value)} />
               {settings.circleColour
                 ? <button className="link" onClick={() => set("circleColour", null)} title="Back to the brand colour">Reset</button>
                 : <span className="text-3">Brand colour</span>}
             </span>
           </div>
-          <Toggle label="Clip previews to a circle" checked={settings.circleClip} onChange={(v) => set("circleClip", v)} />
+          <Toggle label="Clip previews to the shape" checked={settings.circleClip} onChange={(v) => set("circleClip", v)} />
           <div className="settings__actions">
             <button className="btn btn--ghost btn--sm" onClick={p.onResetLayout} title="Sidebar width, preview sizes and toggles back to normal">Reset layout</button>
           </div>

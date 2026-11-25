@@ -1,4 +1,6 @@
-import type { CustomPlugin, PrecisionTolerance, SvgoSettings } from "@marknotton/svgenius-core/types"
+import type { CustomPlugin, DesignPrinciple, PrecisionTolerance, SvgoSettings } from "@marknotton/svgenius-core/types"
+import { fmtNum } from "@marknotton/svgenius-core/svgRoot"
+import { FIT_LABELS } from "./DesignPrinciplesDialog"
 import { AttrRuleList } from "./AttrRuleList"
 import { CustomPluginList } from "./CustomPluginList"
 import { host } from "../host"
@@ -20,9 +22,12 @@ interface Props {
   onRemovePlugin: (p: CustomPlugin) => void
   /** Off: just the output options. Everything else still applies, just hidden */
   advanced: boolean
+  /** Design principles a preset can fit its files to. Without them the section is hidden */
+  designPrinciples?: DesignPrinciple[]
+  onManagePrinciples?: () => void
 }
 
-export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, onRemovePlugin, advanced }: Props) {
+export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, onRemovePlugin, advanced, designPrinciples, onManagePrinciples }: Props) {
   // Trim, viewBox and the beta geometry tools need a browser, so a host that
   // applies presets on a server (Symbols) leaves them out
   const geometry = host().capabilities.geometryPresets
@@ -59,6 +64,10 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
       </section>
 
       {advanced && <>
+      {geometry && designPrinciples && <section className="panel__section" data-nav="principle" data-nav-title="Design principle">
+        <PrincipleField id={s.designPrincipleId ?? null} list={designPrinciples} onManage={onManagePrinciples}
+          onChange={(designPrincipleId) => edit((x) => ({ ...x, designPrincipleId }))} />
+      </section>}
       {geometry && <>
       <section className="panel__section" data-nav="contents" data-nav-title="Edit contents">
         <EditContents trim={s.trim} onChange={trim}
@@ -142,6 +151,32 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
       </>}
       {!advanced && (
         <p className="panel__simple text-3">Switch on <strong>Advanced</strong> at the top for the viewBox and contents tools, rules, custom plugins and Beta tools.</p>
+      )}
+    </>
+  )
+}
+
+/** Picks the design principle a preset fits its files to */
+function PrincipleField({ id, list, onChange, onManage }: { id: string | null, list: DesignPrinciple[], onChange: (id: string | null) => void, onManage?: () => void }) {
+  const dp = id ? list.find((p) => p.id === id) : undefined
+  return (
+    <>
+      <div className="plugins__head">
+        <span className="panel__label">Design principle</span>
+        {onManage && <button className="link" onClick={onManage} title="Add, edit, import and export design principles">Manage…</button>}
+      </div>
+      <p className="rules__empty text-3">Fits every file to a brand's icon grid: its canvas, live area and keylines. Edit contents and Quickview tuning apply on top.</p>
+      <select className="input input--sm principle-select" aria-label="Design principle" value={dp ? dp.id : ""}
+        onChange={(e) => onChange(e.target.value || null)}>
+        <option value="">None</option>
+        {list.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </select>
+      {id && !dp && <p className="text-3">The design principle this preset used has gone. Pick another, or None.</p>}
+      {dp && (
+        <p className="text-3 principle-summary">
+          {fmtNum(dp.width, 2)} × {fmtNum(dp.height, 2)} canvas, {fmtNum(dp.width - dp.padding * 2, 2)} × {fmtNum(dp.height - dp.padding * 2, 2)} live area. {FIT_LABELS[dp.fit].hint}
+          {dp.variations.some((v) => v.enabled && v.match.trim()) && ` ${dp.variations.filter((v) => v.enabled && v.match.trim()).length} file variations.`}
+        </p>
       )}
     </>
   )

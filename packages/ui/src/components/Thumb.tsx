@@ -3,6 +3,7 @@ import { svgDataUrl } from "@marknotton/svgenius-core/format"
 import { svgSize } from "@marknotton/svgenius-core/svgRoot"
 import type { Backdrop } from "@marknotton/svgenius-core/types"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
+import { ShapeGuide } from "./ShapeGuide"
 
 interface Props {
   svg?: string
@@ -34,6 +35,7 @@ export const Thumb = memo(function Thumb({ svg, size, backdrop, label, pending, 
           <img key={src.length} src={src} alt={label ?? ""} draggable={false}
             onError={(e) => { e.currentTarget.style.visibility = "hidden" }} />
         )}
+        <ShapeGuide />
         {pending && <span className="thumb__loading" />}
         {svg === undefined && !pending && placeholder && <span className="thumb__note" title={placeholder}>{size >= 90 ? placeholder : "Not optimised"}</span>}
       </div>

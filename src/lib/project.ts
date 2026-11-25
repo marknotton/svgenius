@@ -1,5 +1,6 @@
 import { APP_VERSION } from "./about"
 import { mergeImport, sanitiseRename, sanitiseSvgoSettings } from "@marknotton/svgenius-core/settings"
+import { mergePrinciples } from "@marknotton/svgenius-core/designPrinciples"
 import type { Saved } from "./session"
 import type { AppSettings, SvgItem } from "@marknotton/svgenius-core/types"
 
@@ -15,7 +16,7 @@ export interface ProjectFile {
   version: 1
   savedAt: string
   appVersion: string
-  settings: Pick<AppSettings, "defaultPresetId" | "presets" | "customPlugins" | "rename" | "keepStructure" | "previewCss" | "previewCssEnabled">
+  settings: Pick<AppSettings, "defaultPresetId" | "presets" | "customPlugins" | "rename" | "keepStructure" | "previewCss" | "previewCssEnabled" | "designPrinciples">
   files: Saved[]
   /** The file that was open in the sidebar */
   focusId: string | null
@@ -24,7 +25,7 @@ export interface ProjectFile {
 export function buildProject(settings: AppSettings, items: SvgItem[], focusId: string | null): ProjectFile {
   const files: Saved[] = items
     .filter((i) => typeof i.source === "string")
-    .map(({ id, path, name, relPath, size, source, fileSource, presetId, config, flag }) => ({ id, path, name, relPath, size, source, fileSource, presetId, config, flag }))
+    .map(({ id, path, name, relPath, size, source, fileSource, presetId, config, flag, adjust }) => ({ id, path, name, relPath, size, source, fileSource, presetId, config, flag, adjust }))
   return {
     app: "SVGenius",
     kind: "project",
@@ -38,7 +39,10 @@ export function buildProject(settings: AppSettings, items: SvgItem[], focusId: s
       rename: settings.rename,
       keepStructure: settings.keepStructure,
       previewCss: settings.previewCss,
-      previewCssEnabled: settings.previewCssEnabled
+      previewCssEnabled: settings.previewCssEnabled,
+      // Only the ones the presets use, so a project doesn't carry the whole library
+      designPrinciples: (settings.designPrinciples ?? []).filter((d) => settings.presets.some((p) => p.settings.designPrincipleId === d.id)
+        || files.some((f) => f.config?.designPrincipleId === d.id))
     },
     files,
     focusId: focusId && files.some((f) => f.id === focusId) ? focusId : null
@@ -47,6 +51,11 @@ export function buildProject(settings: AppSettings, items: SvgItem[], focusId: s
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v)
 const str = (v: unknown) => (typeof v === "string" ? v : undefined)
+const readAdjust = (v: unknown): SvgItem["adjust"] => {
+  if (!isObj(v)) return undefined
+  const scale = Number(v.scale), x = Number(v.x), y = Number(v.y)
+  return [scale, x, y].every(Number.isFinite) && scale > 0 && !(scale === 1 && x === 0 && y === 0) ? { scale, x, y } : undefined
+}
 
 /**
  * Reads a project file. The files come back ready for the list, and the
@@ -66,6 +75,9 @@ export function readProject(text: string, current: AppSettings): { files: SvgIte
   if (typeof s.keepStructure === "boolean") settings = { ...settings, keepStructure: s.keepStructure }
   if (typeof s.previewCss === "string") settings = { ...settings, previewCss: s.previewCss }
   if (typeof s.previewCssEnabled === "boolean") settings = { ...settings, previewCssEnabled: s.previewCssEnabled }
+  if (Array.isArray(s.designPrinciples) && s.designPrinciples.length) {
+    try { settings = { ...settings, designPrinciples: mergePrinciples(settings.designPrinciples ?? [], s.designPrinciples).next } } catch { /* none usable */ }
+  }
 
   const list = Array.isArray(raw.files) ? raw.files : []
   const files: SvgItem[] = list.flatMap((f): SvgItem[] => {
@@ -83,6 +95,7 @@ export function readProject(text: string, current: AppSettings): { files: SvgIte
       presetId: presetId && presetIds.has(presetId) ? presetId : null,
       config: isObj(f.config) ? sanitiseSvgoSettings(f.config) : undefined,
       flag: str(f.flag) as SvgItem["flag"],
+      adjust: readAdjust(f.adjust),
       status: "idle",
       rev: 0
     }]

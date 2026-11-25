@@ -76,21 +76,40 @@ export function EditViewBox({ trim, onChange }: Props) {
 }
 
 export function EditContents({ trim, onChange, markup, onMarkup }: Props & { markup: string, onMarkup: (v: string) => void }) {
-  const pristine = trim.artScale === 1 && trim.offsetX === 0 && trim.offsetY === 0 && !markup.trim()
+  const px = trim.artUnit === "px"
+  const side = trim.artSide ?? "height"
+  const pristine = trim.artScale === 1 && !px && trim.offsetX === 0 && trim.offsetY === 0 && !markup.trim()
   return (
     <>
       <div className="plugins__head">
         <span className="panel__label">Edit contents</span>
         <button className="link" disabled={pristine} title="Artwork back to normal, extra markup cleared"
-          onClick={() => { onChange({ artScale: 1, offsetX: 0, offsetY: 0 }); onMarkup("") }}>Reset</button>
+          onClick={() => { onChange({ artScale: 1, artUnit: "x", offsetX: 0, offsetY: 0 }); onMarkup("") }}>Reset</button>
       </div>
       <p className="rules__empty text-3">The drawing inside the viewBox. The SVG's size stays the same, unless Trim is on: trimming happens after these, so the viewBox still hugs the artwork.</p>
-      <ArtworkFields scale={trim.artScale} x={trim.offsetX} y={trim.offsetY}
-        onChange={(p) => onChange({
-          ...(p.scale !== undefined && { artScale: p.scale }),
-          ...(p.x !== undefined && { offsetX: p.x }),
-          ...(p.y !== undefined && { offsetY: p.y })
-        })} />
+      {px ? (
+        <SliderField label={side === "width" ? "Width" : "Height"} value={trim.artSizePx ?? 20} min={1} max={512} step={0.5} suffix="px"
+          accept={(n) => n > 0 && n <= 1e5}
+          hint={`The artwork is scaled so its visible ${side} is exactly this, in viewBox units (px on a 24 × 24 icon). The ${side === "width" ? "height" : "width"} follows. Click the number to type any value.`}
+          onChange={(artSizePx) => { if (artSizePx > 0) onChange({ artSizePx }) }} />
+      ) : (
+        <SliderField label="Scale" value={trim.artScale} min={0.05} max={3} step={0.01} suffix="×" accept={isScale}
+          hint="Scales the artwork inside the viewBox, around its centre. The SVG's size stays the same. Click the number to type any value."
+          onChange={(v) => { if (isScale(v)) onChange({ artScale: v }) }} />
+      )}
+      <div className="trim-unit">
+        <span className="text-3">{px ? `Exact artwork ${side}, the other side follows` : "× the artwork's own size"}</span>
+        {px && (
+          <Segmented label="Sized side" value={side} onChange={(artSide) => onChange({ artSide })}
+            options={[{ value: "width", label: "W", title: "Size the artwork by its width" }, { value: "height", label: "H", title: "Size the artwork by its height" }]} />
+        )}
+        <Segmented label="Scale unit" value={px ? "px" : "x"} onChange={(u) => onChange({ artUnit: u as "x" | "px" })}
+          options={[{ value: "x", label: "×", title: "Scale by a factor" }, { value: "px", label: "px", title: "Scale to an exact size" }]} />
+      </div>
+      <SliderField label="X" value={trim.offsetX} min={-50} max={50} step={0.5} suffix="%" hint="Moves the artwork left/right, as % of the viewBox width"
+        onChange={(offsetX) => onChange({ offsetX })} />
+      <SliderField label="Y" value={trim.offsetY} min={-50} max={50} step={0.5} suffix="%" hint="Moves the artwork up/down, as % of the viewBox height"
+        onChange={(offsetY) => onChange({ offsetY })} />
       <label className="append-markup">
         <span className="range__label">Add markup</span>
         <textarea className="input input--mono" spellCheck={false} rows={3} value={markup}

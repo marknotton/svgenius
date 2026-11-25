@@ -20,6 +20,8 @@ interface Props {
   onExport: () => void
   onLoadPlugin: () => void
   onRemovePlugin: (p: CustomPlugin) => void
+  /** Opens the design principles manager; with it, presets can pick a design principle */
+  onManagePrinciples?: () => void
 }
 
 export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
@@ -71,7 +73,8 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
 
       <div className="panel__scroll" ref={scrollRef}>
         <PresetEditor settings={s} edit={edit} customPlugins={settings.customPlugins}
-          onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} advanced={settings.advanced} />
+          onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} advanced={settings.advanced}
+          designPrinciples={p.onManagePrinciples ? settings.designPrinciples ?? [] : undefined} onManagePrinciples={p.onManagePrinciples} />
       </div>
       <SectionNav scroller={scrollRef} />
     </aside>

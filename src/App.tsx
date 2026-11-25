@@ -44,7 +44,12 @@ import { listenForCommands, textFocus, useCommands } from "@marknotton/svgenius-
 import { useFileWatch } from "./hooks/useFileWatch"
 import { AddDialog, type AddMode } from "@marknotton/svgenius-ui/components/AddDialog"
 import { looksLikeSvg } from "@marknotton/svgenius-core/svgImport"
-import type { AppSettings, CustomPlugin, SvgItem, SvgoSettings } from "@marknotton/svgenius-core/types"
+import type { AppSettings, ArtAdjust, CustomPlugin, DesignPrinciple, SvgItem, SvgoSettings } from "@marknotton/svgenius-core/types"
+import { buildPrinciplesExport, composeAdjust, gridOf, IDENTITY, isIdentity, mergePrinciples, variationAdjust } from "@marknotton/svgenius-core/designPrinciples"
+import { shapeMaskUrl, type GuideShape } from "@marknotton/svgenius-core/shapes"
+import { Quickview } from "@marknotton/svgenius-ui/components/Quickview"
+import { DesignPrinciplesDialog } from "@marknotton/svgenius-ui/components/DesignPrinciplesDialog"
+import { GuideShapeContext } from "@marknotton/svgenius-ui/components/ShapeGuide"
 
 /** Where the last page load left off: the open file and whether its editor was up */
 const lastView: { focusId?: string | null, sidebarTab?: "preset" | "names" | "file", markupOpen?: boolean } = (() => {
@@ -68,7 +73,7 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, optimise, reloadFromDisk, forceRender } = useItems()
+  const { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, optimise, reloadFromDisk, forceRender } = useItems()
   // Once there are files, get the code editor ready before anyone opens it
   const hasItems = items.length > 0
   useEffect(() => { if (hasItems) preloadMonaco() }, [hasItems])
@@ -112,15 +117,34 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     () => new Map(settings.presets.map((p) => [p.id, runSpec(p.settings, settings.customPlugins)])),
     [settings.presets, settings.customPlugins]
   )
-  /** The settings a file actually runs with: its own, or its preset's */
-  const settingsFor = useCallback((item: SvgItem): SvgoSettings => item.config ?? presetFor(item).settings, [presetFor])
+  // ── Design principles ─────────────────────────────────────────────────────
+  const principles = useMemo(() => settings.designPrinciples ?? [], [settings.designPrinciples])
+  const guideShape: GuideShape = settings.guideShape ?? "circle"
+  const principleById = useCallback((id: string | null | undefined): DesignPrinciple | null => (id ? principles.find((d) => d.id === id) ?? null : null), [principles])
+  /** The grid and the tuning (design principle variations, then Quickview's) a file runs with, if any */
+  const extrasFor = useCallback((item: SvgItem, s: SvgoSettings) => {
+    const dp = principleById(s.designPrincipleId)
+    const adjust = composeAdjust(dp ? variationAdjust(dp, item) : IDENTITY, item.adjust ?? IDENTITY)
+    if (!dp && isIdentity(adjust)) return null
+    return { ...s, grid: dp ? gridOf(dp) : null, adjust: isIdentity(adjust) ? null : adjust }
+  }, [principleById])
+
+  /** The settings a file actually runs with: its own, or its preset's, plus its grid and tuning */
+  const settingsFor = useCallback((item: SvgItem): SvgoSettings => {
+    const s = item.config ?? presetFor(item).settings
+    return extrasFor(item, s) ?? s
+  }, [presetFor, extrasFor])
   // Per-file spec: the file's own settings or its preset's, plus any in-app edits
   const resolve = useCallback((item: SvgItem) => {
-    const base = item.config
-      ? runSpec(item.config, settings.customPlugins)
-      : specs.get(presetFor(item).id) ?? runSpec(presetFor(item).settings, settings.customPlugins)
+    const own = item.config ?? presetFor(item).settings
+    const extra = extrasFor(item, own)
+    const base = extra
+      ? runSpec(extra, settings.customPlugins)
+      : item.config
+        ? runSpec(item.config, settings.customPlugins)
+        : specs.get(presetFor(item).id) ?? runSpec(presetFor(item).settings, settings.customPlugins)
     return { ...base, key: `${base.key}|r${item.rev}` }
-  }, [specs, presetFor, settings.customPlugins])
+  }, [specs, presetFor, extrasFor, settings.customPlugins])
   const tagsFor = useCallback((item: SvgItem) => {
     const s = settingsFor(item)
     return fileTags(item, s, activeCustom(s, settings.customPlugins).length)
@@ -774,6 +798,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       y: e.clientY,
       items: [
         { label: "Open in editor", run: () => openMarkup(id) },
+        { label: "Quickview    Space", run: () => openQuickviewRef.current(id), disabled: item.source === undefined },
         { label: "Export optimised SVG…", run: () => exportOneRef.current(id), disabled: item.source === undefined || isBlocked(item) },
         ...(canReveal && !isPasted(item.path) ? [
           { label: "Open in default app", run: () => openInDefaultApp(item.path) },
@@ -868,6 +893,9 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       cssOpen={cssOpen}
       cssActive={!!wantedCss.trim()}
       onCssToggle={() => setCssOpen((o) => !o)}
+      shape={guideShape}
+      onShape={(guideShape) => update((s) => ({ ...s, guideShape }))}
+      onQuickview={() => openQuickview()}
     />
   )
   // Selectors that match the original but nothing once SVGO is done with it
@@ -891,13 +919,80 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     />
   )
 
+  // ── Quickview and design principles ────────────────────────────────────────
+
+  const [quickviewId, setQuickviewId] = useState<string | null>(null)
+  const [principlesOpen, setPrinciplesOpen] = useState<{ id: string | null } | null>(null)
+  // Pages through the selected files, or else everything listed
+  const quickviewItems = useMemo(() => {
+    const list = selection.size > 1 ? shownItems.filter((i) => selection.has(i.id)) : shownItems
+    return list.filter((i) => i.source !== undefined)
+  }, [selection, shownItems])
+  const openQuickview = useCallback((id?: string) => {
+    const list = quickviewItems
+    if (!list.length) { push({ tone: "info", text: "Add some SVGs first" }); return }
+    const start = [id, focusIdRef.current].find((x) => x && list.some((i) => i.id === x)) ?? list[0].id
+    setMenu(null)
+    setQuickviewId(start)
+  }, [quickviewItems, push])
+  const openQuickviewRef = useRef(openQuickview)
+  openQuickviewRef.current = openQuickview
+  // Space opens it, like Quick Look
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== " " || e.metaKey || e.ctrlKey || e.altKey || e.repeat) return
+      const t = e.target as HTMLElement
+      if (t.closest("input, textarea, select, button, [contenteditable], .monaco-editor") || document.querySelector(".modal")) return
+      e.preventDefault()
+      openQuickviewRef.current()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
+  const ownSettings = useCallback((item: SvgItem) => item.config ?? presetFor(item).settings, [presetFor])
+  const quickviewBase = useCallback((item: SvgItem): ArtAdjust => {
+    const dp = principleById(ownSettings(item).designPrincipleId)
+    return dp ? variationAdjust(dp, item) : IDENTITY
+  }, [principleById, ownSettings])
+  const quickviewPrinciple = useCallback((item: SvgItem) => {
+    const choice = settings.quickviewDpId ?? null
+    if (choice === "none") return null
+    return choice ? principleById(choice) : principleById(ownSettings(item).designPrincipleId)
+  }, [settings.quickviewDpId, principleById, ownSettings])
+
+  const exportPrinciples = async (list: DesignPrinciple[]) => {
+    try {
+      const name = list.length === 1 ? `${list[0].name.replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase() || "design-principle"}.json` : "svgenius-design-principles.json"
+      const ok = await saveJson(name, JSON.stringify(buildPrinciplesExport(list), null, 2))
+      if (ok) push({ tone: "success", text: `Exported ${list.length === 1 ? list[0].name : plural(list.length, "design principle")}` })
+    } catch (e) {
+      push({ tone: "error", text: `Couldn't export: ${errorMessage(e)}` })
+    }
+  }
+  const importPrinciples = async () => {
+    try {
+      const text = await openJson()
+      if (text === null) return
+      let raw: unknown
+      try { raw = JSON.parse(text) } catch { throw new Error("That file isn't valid JSON") }
+      const { next, added, updated } = mergePrinciples(settings.designPrinciples ?? [], raw)
+      update((s) => ({ ...s, designPrinciples: next }))
+      push({ tone: "success", text: `Imported ${[added && `${plural(added, "design principle")} added`, updated && `${updated} updated`].filter(Boolean).join(", ")}` })
+    } catch (e) {
+      push({ tone: "error", text: `Couldn't import: ${errorMessage(e)}` })
+    }
+  }
+  const principleUsage = useCallback((id: string) => settings.presets.filter((p) => p.settings.designPrincipleId === id).length, [settings.presets])
+  const managePrinciples = useCallback((id?: string | null) => { setSettingsOpen(false); setPrinciplesOpen({ id: id ?? null }) }, [])
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <PreviewCssContext.Provider value={appliedCss}>
     <RenderAnywayContext.Provider value={forceRender}>
     <CanvasBgContext.Provider value={canvasBg}>
-      <div className={`app${narrow ? " is-narrow" : ""}${canvasBg.value.checker ? "" : " no-checker"}${canvasBg.value.colour ? " has-colour" : ""}${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px`, "--drawer-h": `${drawerH}px`, "--canvas-solid": solid ?? undefined, "--circle": settings.circleColour ?? undefined, "--circle-tint": settings.circleColour ? `color-mix(in srgb, ${settings.circleColour} 22%, transparent)` : undefined } as CSSProperties}>
+    <GuideShapeContext.Provider value={guideShape}>
+      <div className={`app${guideShape !== "circle" ? " has-shape-mask" : ""}${narrow ? " is-narrow" : ""}${canvasBg.value.checker ? "" : " no-checker"}${canvasBg.value.colour ? " has-colour" : ""}${settings.circleOverlay ? " show-circle" : ""}${settings.circleClip ? " show-clip" : ""}`} style={{ "--panel-w": `${sidebarWidth}px`, "--drawer-h": `${drawerH}px`, "--canvas-solid": solid ?? undefined, "--circle": settings.circleColour ?? undefined, "--circle-tint": settings.circleColour ? `color-mix(in srgb, ${settings.circleColour} 22%, transparent)` : undefined, "--shape-mask": guideShape !== "circle" ? shapeMaskUrl(guideShape) : undefined } as CSSProperties}>
         <AppBar />
         <div className="workspace">
           <main className="workspace__main">
@@ -994,6 +1089,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 customPlugins={settings.customPlugins}
                 onLoadPlugin={loadPlugin}
                 onRemovePlugin={removePlugin}
+                designPrinciples={principles}
+                onManagePrinciples={() => managePrinciples(focused.config?.designPrincipleId)}
                 advanced={settings.advanced}
                 editorToolbar={settings.editorToolbar}
                 markupOpen={markupOpen}
@@ -1032,6 +1129,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onExport={exportPresets}
                 onLoadPlugin={loadPlugin}
                 onRemovePlugin={removePlugin}
+                onManagePrinciples={() => managePrinciples(editing.settings.designPrincipleId)}
               />
             )}
           </aside>
@@ -1073,6 +1171,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             onExport={exportPresets}
             onResetLayout={resetLayout}
             onClose={() => setSettingsOpen(false)}
+            onDesignPrinciples={() => managePrinciples()}
           />
         )}
         {adding && (
@@ -1082,8 +1181,46 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         {dragging && <DropOverlay />}
         {dialogs.node}
         <Toasts toasts={toasts} dismiss={dismiss} />
+        {quickviewId && (
+          <Quickview
+            items={quickviewItems}
+            startId={quickviewId}
+            backdrop={settings.backdrop}
+            baseFor={quickviewBase}
+            principleFor={quickviewPrinciple}
+            principles={principles}
+            principleChoice={settings.quickviewDpId ?? null}
+            onPrincipleChoice={(quickviewDpId) => update((s) => ({ ...s, quickviewDpId }))}
+            onManagePrinciples={() => setPrinciplesOpen({ id: settings.quickviewDpId && settings.quickviewDpId !== "none" ? settings.quickviewDpId : null })}
+            onAdjust={setAdjust}
+            onRun={(id) => { optimise([id], resolve) }}
+            overlay={settings.circleOverlay ? guideShape : null}
+            onOverlay={(shape) => update((s) => (shape ? { ...s, circleOverlay: true, guideShape: shape } : { ...s, circleOverlay: false }))}
+            clip={settings.circleClip}
+            onClip={(circleClip) => update((s) => ({ ...s, circleClip }))}
+            guides={settings.quickviewGuides !== false}
+            onGuides={(quickviewGuides) => update((s) => ({ ...s, quickviewGuides }))}
+            step={settings.quickviewStep ?? 1}
+            onStep={(quickviewStep) => update((s) => ({ ...s, quickviewStep }))}
+            notify={(text, tone = "info") => push({ tone, text })}
+            onClose={(lastId) => { setQuickviewId(null); setFocusId(lastId) }}
+          />
+        )}
+        {principlesOpen && (
+          <DesignPrinciplesDialog
+            principles={principles}
+            onChange={(designPrinciples) => update((s) => ({ ...s, designPrinciples }))}
+            usage={principleUsage}
+            files={items}
+            initialId={principlesOpen.id}
+            onImport={importPrinciples}
+            onExport={exportPrinciples}
+            onClose={() => setPrinciplesOpen(null)}
+          />
+        )}
         <FastTips />
       </div>
+    </GuideShapeContext.Provider>
     </CanvasBgContext.Provider>
     </RenderAnywayContext.Provider>
     </PreviewCssContext.Provider>
