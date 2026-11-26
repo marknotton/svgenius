@@ -31,9 +31,11 @@ interface Props {
   count: number
   onMenu: (menu: MenuState) => void
   side: "top" | "left"
+  /** A design principle's live area and keylines, to align to as well */
+  areas?: { id: string, label: string }[]
 }
 
-export function ArrangeTools({ all, applies, run, count, onMenu, side }: Props) {
+export function ArrangeTools({ all, applies, run, count, onMenu, side, areas = [] }: Props) {
   const [open, setOpen] = useState<Group | null>(null)
   const [pins, setPins] = useState<Group[]>(readPins)
   const togglePin = (g: Group) => {
@@ -65,12 +67,23 @@ export function ArrangeTools({ all, applies, run, count, onMenu, side }: Props) 
     onMenu({ x: side === "left" ? r.right + 4 : r.left, y: side === "left" ? r.top : r.bottom + 4, items })
   }
   const [target, setTargetState] = useState(alignTarget.get)
-  const setTarget = (t: "selection" | "canvas") => { alignTarget.set(t); setTargetState(t) }
+  const setTarget = (t: string) => { alignTarget.set(t); setTargetState(t) }
+  const area = areas.find((a) => a.id === target)
   // One element has nothing else to line up with, so it always uses the viewBox
-  const toCanvas = count === 1 || target === "canvas"
+  const toCanvas = !area && (count === 1 || target === "canvas")
   const none = count === 0
 
-  const alignTo = (
+  // With a design principle there's more to pick from than fits a switch
+  const alignTo = areas.length ? (
+    <select className="select select--sm arrange__to" aria-label="Align relative to" value={area ? area.id : toCanvas ? "canvas" : "selection"}
+      title="What to line things up with" onChange={(e) => setTarget(e.target.value)}>
+      <option value="canvas">viewBox</option>
+      <option value="selection" disabled={count === 1}>Selection</option>
+      <optgroup label="Design principle">
+        {areas.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+      </optgroup>
+    </select>
+  ) : (
     <div className="segmented segmented--xs" role="radiogroup" aria-label="Align relative to">
       <button type="button" role="radio" aria-checked={toCanvas} className={`segmented__opt${toCanvas ? " is-active" : ""}`}
         title="Line things up with the edges and centre of the viewBox" onClick={() => setTarget("canvas")}>viewBox</button>

@@ -18,6 +18,8 @@ export interface ActionContext {
   elements: Element[]
   /** Selected indices, sorted, with anything inside another selected element left out */
   selection: number[]
+  /** Align to this box (viewBox units) instead: a design principle's live area or keyline */
+  alignArea?: { x: number, y: number, w: number, h: number } | null
 }
 
 export interface ActionResult {
@@ -232,7 +234,7 @@ ACTIONS.push(
     id: `align-${a.mode}`, label: a.label, group: "arrange", panel: "align",
     hint: `${a.label}. One element lines up with the canvas, several with each other`,
     applies: (ctx) => picked(ctx).length > 0,
-    run: (ctx) => applyMoves(ctx, alignMoves(ctx.markup, picked(ctx), a.mode))
+    run: (ctx) => applyMoves(ctx, alignMoves(ctx.markup, picked(ctx), a.mode, ctx.alignArea))
   })),
   ...DISTRIBUTE.map((d): EditorAction => ({
     id: `distribute-${d.mode}`, label: d.label, group: "arrange", panel: "distribute", hint: d.hint,

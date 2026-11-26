@@ -5,7 +5,8 @@ import { allAnchors, geometry, pointAt, pointKey, serialisePath, shiftPoints, ty
 import { deletePoints, toggleCorner } from "@marknotton/svgenius-core/pathPoints"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 import { ShapeGuide } from "./ShapeGuide"
-import { checkerSize } from "./GridGuides"
+import { checkerSize, gridStep, GridGuides } from "./GridGuides"
+import { dpAreas } from "@marknotton/svgenius-core/designPrinciples"
 
 // ── Inspectable preview ───────────────────────────────────────────────────────
 // Renders the SVG inline (scripts and event handlers stripped) so elements can
@@ -43,8 +44,38 @@ interface Props {
   onZoom?: (zoom: number) => void
   /** The zoom that shows the artwork at its real size (100%) */
   onActual?: (zoom: number) => void
-  /** The design principle whose grid the checkerboard follows */
+  /** The design principle whose grid the checkerboard follows, and whose guides can be drawn and snapped to */
   checker?: DesignPrinciple | null
+  /** Draw (and snap to) the principle's grid, and its live area and keylines */
+  dpGrid?: boolean
+  dpKeylines?: boolean
+}
+
+/** What a design principle adds to snapping */
+interface DpSnap { dp: DesignPrinciple, grid: boolean, keylines: boolean }
+
+/** A design principle's grid lines and keyline edges, on screen, fitted to the svg like GridGuides draws them */
+function dpLines(svg: Element, s: DpSnap) {
+  const r = svg.getBoundingClientRect()
+  const W = s.dp.width, H = s.dp.height
+  const k = Math.min(r.width / W, r.height / H)
+  const ox = r.left + (r.width - W * k) / 2, oy = r.top + (r.height - H * k) / 2
+  const x: number[] = [], y: number[] = []
+  const grid = { x: [] as number[], y: [] as number[], gap: 0 }
+  if (s.grid) {
+    const step = gridStep(Math.max(W, H))
+    for (let u = 0; u <= W + 1e-9; u += step) grid.x.push(ox + u * k)
+    for (let u = 0; u <= H + 1e-9; u += step) grid.y.push(oy + u * k)
+    grid.gap = step * k
+  }
+  if (s.keylines) {
+    for (const a of dpAreas(s.dp)) {
+      x.push(ox + a.x * k, ox + (a.x + a.w) * k)
+      y.push(oy + a.y * k, oy + (a.y + a.h) * k)
+    }
+    x.push(ox + (W / 2) * k); y.push(oy + (H / 2) * k)
+  }
+  return { x, y, grid }
 }
 
 export const ZOOM_MIN = 0.1, ZOOM_MAX = 64
@@ -78,8 +109,10 @@ const outerBox = (rs: DOMRect[]) => rs.length ? rs.reduce((u, r) => {
  * an up-and-down one to its column) until you pull clear. Returns the snapped
  * screen distance and the guide lines to draw, in stage pixels
  */
-function snapper(shadow: ShadowRoot, skip: Element[], moving: DOMRect | null, base: DOMRect) {
+function snapper(shadow: ShadowRoot, skip: Element[], moving: DOMRect | null, base: DOMRect, dp?: DpSnap | null) {
   const lines = { x: [] as number[], y: [] as number[] }
+  // The design principle's grid: always pulls (from up to half a cell away), after anything closer has had its chance
+  let grid = { x: [] as number[], y: [] as number[], gap: 0 }
   if (moving) {
     const add = (r: DOMRect) => {
       if (r.width + r.height <= 0 && !(r.width === 0 && r.height === 0)) return
@@ -88,6 +121,7 @@ function snapper(shadow: ShadowRoot, skip: Element[], moving: DOMRect | null, ba
     }
     const svg = shadow.querySelector("svg")
     if (svg) add(svg.getBoundingClientRect())
+    if (svg && dp && (dp.grid || dp.keylines)) { const d = dpLines(svg, dp); lines.x.push(...d.x); lines.y.push(...d.y); grid = d.grid }
     for (const other of shadow.querySelectorAll(PICKABLE)) {
       if (other.closest(UNPAINTED) || skip.some((x) => x === other || x.contains(other))) continue
       if (getComputedStyle(other).pointerEvents === "none" || getComputedStyle(other).display === "none") continue
@@ -99,13 +133,13 @@ function snapper(shadow: ShadowRoot, skip: Element[], moving: DOMRect | null, ba
   return (dx: number, dy: number, on: boolean) => {
     const gx: number[] = [], gy: number[] = []
     if (moving && on) {
-      const pull = (own: number[], to: number[], d: number, hit: number[]) => {
+      const pull = (own: number[], to: number[], d: number, hit: number[], reach = SNAP_PX): number => {
         let best: number | null = null
         for (const o of own) for (const t of to) {
           const diff = t - (o + d)
-          if (Math.abs(diff) <= SNAP_PX && (best === null || Math.abs(diff) < Math.abs(best))) best = diff
+          if (Math.abs(diff) <= reach && (best === null || Math.abs(diff) < Math.abs(best))) best = diff
         }
-        if (best === null) return d
+        if (best === null) return reach === SNAP_PX && grid.gap > 0 ? pull(own, to === lines.x ? grid.x : grid.y, d, hit, grid.gap / 2 + 0.5) : d
         const nd = d + best
         for (const o of own) for (const t of to) if (Math.abs(t - (o + nd)) < 0.5 && !hit.includes(t)) hit.push(t)
         return nd
@@ -153,15 +187,16 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked, hidden, snap = true, zoom = 1, onZoom, onActual, checker }: Props) {
+export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked, hidden, snap = true, zoom = 1, onZoom, onActual, checker, dpGrid = false, dpKeylines = false }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
   const swallowClick = useRef(false)
   const [boxes, setBoxes] = useState<{ sel: DOMRect[], hov: DOMRect | null }>({ sel: [], hov: null })
   const [marquee, setMarquee] = useState<{ x0: number, y0: number, x1: number, y1: number } | null>(null)
-  const live = useRef({ selection, path, readOnly, onSelect, onMoveBy, snap })
-  live.current = { selection, path, readOnly, onSelect, onMoveBy, snap }
+  const dpSnap: DpSnap | null = checker && (dpGrid || dpKeylines) ? { dp: checker, grid: dpGrid, keylines: dpKeylines } : null
+  const live = useRef({ selection, path, readOnly, onSelect, onMoveBy, snap, dpSnap })
+  live.current = { selection, path, readOnly, onSelect, onMoveBy, snap, dpSnap }
   // While items are dragged: how far they've gone on screen, so their boxes
   // go with them, and the snap guides to draw (stage coordinates)
   const [shift, setShift] = useState<{ x: number, y: number } | null>(null)
@@ -369,7 +404,7 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
         let moved = false
 
         const moving = outerBox(els.filter((x): x is SVGGraphicsElement => !!x).map((x) => x.getBoundingClientRect()))
-        const snapTo = snapper(shadow, els.filter((x): x is SVGGraphicsElement => !!x), moving, base)
+        const snapTo = snapper(shadow, els.filter((x): x is SVGGraphicsElement => !!x), moving, base, live.current.dpSnap)
         const snapped = (ev: PointerEvent) =>
           snapTo(ev.clientX - e.clientX, ev.clientY - e.clientY, live.current.snap && !ev.metaKey && !ev.ctrlKey)
         const delta = (s: { dx: number, dy: number }, ev: PointerEvent, k: number) => {
@@ -529,6 +564,7 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
         }}
         onContextMenu={(e) => { if (onContextMenu) { const i = indexOf(e); onContextMenu(i > 0 ? i : -1, e) } }} />
       <ShapeGuide />
+      {dpSnap && <GridGuides dp={dpSnap.dp} grid={dpGrid} keylines={dpKeylines} alignment={dpKeylines} />}
       {boxes.hov && <div className="inspect__box inspect__box--hover" style={rect(boxes.hov)} />}
       {!path && boxes.sel.map((b, k) => <div key={k} className="inspect__box" style={shifted(rect(b), shift)} />)}
       {showXf && union && (
@@ -541,7 +577,7 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
       {guides.y.map((y) => <div key={`y${y}`} className="inspect__guide inspect__guide--h" style={{ top: y }} />)}
       {marquee && <div className="inspect__marquee" style={{ left: Math.min(marquee.x0, marquee.x1), top: Math.min(marquee.y0, marquee.y1), width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0) }} />}
       {path && root && <PathOverlay stage={stage} box={box} root={root} edit={path} swallowClick={swallowClick}
-        snap={() => live.current.snap} onGuides={setGuides} />}
+        snap={() => live.current.snap} dpSnap={() => live.current.dpSnap} onGuides={setGuides} />}
       </div>
       {!root && <p className="inspect__error text-3">This markup doesn't parse, so it can't be previewed.</p>}
     </div>
@@ -562,6 +598,7 @@ interface Marquee { pointer: number, x0: number, y0: number, x1: number, y1: num
 interface OverlayProps {
   /** Snapping on (and not held off with ⌘), and where to draw its guides */
   snap: () => boolean
+  dpSnap: () => DpSnap | null
   onGuides: (g: { x: number[], y: number[] }) => void
   stage: React.RefObject<HTMLDivElement | null>
   box: React.RefObject<HTMLDivElement | null>
@@ -575,7 +612,7 @@ const isTyping = (t: EventTarget | null) => {
   return !!el?.closest?.("input, textarea, select, [contenteditable=true], .monaco-editor")
 }
 
-function PathOverlay({ stage, box, root, edit, swallowClick, snap, onGuides }: OverlayProps) {
+function PathOverlay({ stage, box, root, edit, swallowClick, snap, dpSnap, onGuides }: OverlayProps) {
   // Maps the path's own coordinates to the stage's pixels
   const [ctm, setCtm] = useState<DOMMatrix | null>(null)
   const [draft, setDraft] = useState<Seg[] | null>(null)
@@ -631,7 +668,7 @@ function PathOverlay({ stage, box, root, edit, swallowClick, snap, onGuides }: O
     const m0 = live.current.ctm
     const pointRect = d.grab && m0 && stageBox ? (() => { const q = new DOMPoint(d.grab![0], d.grab![1]).matrixTransform(m0); return new DOMRect(q.x + stageBox.x, q.y + stageBox.y, 0, 0) })() : null
     const snapTo = shadow && stageBox
-      ? snapper(shadow, whole && self ? [self] : [], whole ? self?.getBoundingClientRect() ?? null : pointRect, stageBox)
+      ? snapper(shadow, whole && self ? [self] : [], whole ? self?.getBoundingClientRect() ?? null : pointRect, stageBox, dpSnap())
       : null
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== d.pointer) return

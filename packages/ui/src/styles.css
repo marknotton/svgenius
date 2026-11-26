@@ -1185,6 +1185,10 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 /* Tools: Select (whole objects) and Direct select (points) */
 .tool-switch .btn { padding-inline: 6px; }
 .tool-switch .btn.is-on { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
+/* The editor's design principle guides: Grid and Keylines */
+.dp-switch .btn.is-on { background: var(--accent-soft); color: var(--accent-ink); }
+.arrange__to { max-width: 240px; }
+.arrange__head > .text-3 { white-space: nowrap; }
 
 /* Preview background: sun, moon, checkerboard, ink drop */
 .canvas-bg { margin-left: auto; flex: none; }

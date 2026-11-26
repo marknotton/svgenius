@@ -1283,7 +1283,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
               <FileInspector
                 item={focused}
                 frame={frameFor(focused)}
-                checker={listGuidesFor(focused)}
+                principle={listGuidesFor(focused)}
                 presets={settings.presets}
                 defaultPreset={defaultPreset}
                 backdrop={settings.backdrop}

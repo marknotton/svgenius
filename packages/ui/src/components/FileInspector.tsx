@@ -23,8 +23,8 @@ import { revertSection, settingsDiff } from "@marknotton/svgenius-core/settingsD
 
 interface Props {
   item: SvgItem
-  /** The design principle whose grid the checkerboard follows, in the after preview and the editor */
-  checker?: DesignPrinciple | null
+  /** The file's design principle: the after preview's checkerboard follows its grid, and the editor shows, snaps and aligns to it */
+  principle?: DesignPrinciple | null
   presets: Preset[]
   defaultPreset: Preset
   backdrop: Backdrop
@@ -135,7 +135,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             <figcaption className="text-2">Before</figcaption>
           </figure>
           <figure className="pane">
-            <Thumb svg={out} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : "Not optimised yet. Click Optimise, or turn on Live preview"} size={previewPx} backdrop={backdrop} label={`${item.name} after`} frame={p.frame} checker={p.checker} />
+            <Thumb svg={out} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : "Not optimised yet. Click Optimise, or turn on Live preview"} size={previewPx} backdrop={backdrop} label={`${item.name} after`} frame={p.frame} checker={p.principle} />
             <figcaption className="text-2">After{item.status === "running" && <span className="spinner spinner--xs" />}</figcaption>
           </figure>
         </div>}
@@ -225,7 +225,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
         {!p.advanced && item.status === "error" && <section className="panel__section"><p className="rule__error">{item.error}</p></section>}
         {p.markupOpen && !isBlocked(item) && (
           // Keyed by file: each one gets its own undo history and selection
-          <MarkupDialog key={item.id} item={item} tab={tab} onTab={setTab} nav={p.nav} circle={p.circle} checker={p.checker}
+          <MarkupDialog key={item.id} item={item} tab={tab} onTab={setTab} nav={p.nav} circle={p.circle} principle={p.principle}
             backdrop={backdrop} toolbarSide={p.editorToolbar} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => p.onMarkupOpen(false)}
             onQuickEdit={p.onQuickEdit ? () => p.onQuickEdit?.(item.id) : undefined} />
         )}

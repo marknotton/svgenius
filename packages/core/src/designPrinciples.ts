@@ -676,3 +676,31 @@ export function lineStyle(a: GuideLineStyle, kind: keyof typeof LINE_DEFAULTS = 
   }
 }
 export const alignmentStyle = (a: AlignmentKeyline) => lineStyle(a, "alignment")
+
+// ── Areas to align to ─────────────────────────────────────────────────────────
+
+/** A box in the design principle's own units, for aligning artwork to */
+export interface DpArea { id: string, label: string, x: number, y: number, w: number, h: number }
+
+const KEYLINE_LABELS: Record<Keyline["kind"], string> = { square: "Square", circle: "Circle", portrait: "Portrait", landscape: "Landscape" }
+
+/** The live area, each keyline, and the boxed alignment keylines (circles, rectangles), centred like GridGuides draws them */
+export function dpAreas(dp: Pick<DesignPrinciple, "width" | "height" | "padding" | "keylines" | "alignmentKeylines">): DpArea[] {
+  const W = dp.width, H = dp.height, n = (v: number) => String(+v.toFixed(2))
+  const centred = (id: string, label: string, w: number, h: number): DpArea => ({ id, label, x: (W - w) / 2, y: (H - h) / 2, w, h })
+  const out: DpArea[] = []
+  if (dp.padding > 0) out.push(centred("live", `Live area (${n(W - dp.padding * 2)} × ${n(H - dp.padding * 2)})`, W - dp.padding * 2, H - dp.padding * 2))
+  for (const k of dp.keylines) out.push(centred(`key:${k.id}`, `${KEYLINE_LABELS[k.kind]} keyline (${k.w === k.h ? n(k.w) : `${n(k.w)} × ${n(k.h)}`})`, k.w, k.h))
+  for (const a of dp.alignmentKeylines ?? []) {
+    if (!a.enabled || (a.kind !== "circle" && a.kind !== "rect")) continue
+    out.push(centred(`align:${a.id}`, `${a.name || ALIGNMENT_LABELS[a.kind]} (${a.w === a.h ? n(a.w) : `${n(a.w)} × ${n(a.h)}`})`, a.w, a.h))
+  }
+  return out
+}
+
+/** Design principle units → a viewBox's units: the principle's canvas fitted in the middle, shorter side, as GridGuides draws it */
+export function dpToViewBox(dp: Pick<DesignPrinciple, "width" | "height">, vb: { x: number, y: number, w: number, h: number }) {
+  const k = Math.min(vb.w / dp.width, vb.h / dp.height)
+  const ox = vb.x + (vb.w - dp.width * k) / 2, oy = vb.y + (vb.h - dp.height * k) / 2
+  return { k, x: (u: number) => ox + u * k, y: (u: number) => oy + u * k }
+}

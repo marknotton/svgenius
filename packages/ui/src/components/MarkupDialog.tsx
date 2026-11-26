@@ -15,6 +15,9 @@ import { CodeEditor } from "./CodeEditor"
 import { adapter } from "../host"
 import { CanvasBackground } from "./CanvasBackground"
 import { ArrangeTools } from "./ArrangePanel"
+import { dpAreas, dpToViewBox } from "@marknotton/svgenius-core/designPrinciples"
+import { alignTarget } from "@marknotton/svgenius-core/arrange"
+import { parseViewBox } from "@marknotton/svgenius-core/svgRoot"
 import { PaintTools } from "./PaintTools"
 import { applyGradient, applyPaint, readPaint, type Gradient } from "@marknotton/svgenius-core/paint"
 import { InspectPreview, type ElementMove, type ElementTransform } from "./InspectPreview"
@@ -55,8 +58,8 @@ interface Props {
   actions?: React.ReactNode
   /** Switches to Quick Edit on this file */
   onQuickEdit?: () => void
-  /** The design principle whose grid the checkerboard follows */
-  checker?: DesignPrinciple | null
+  /** The file's design principle: the checkerboard follows its grid, and its grid and keylines can be shown, snapped and aligned to */
+  principle?: DesignPrinciple | null
 }
 
 // Zoom steps for + and −, and the zoom menu's presets (as real-size percentages)
@@ -106,7 +109,7 @@ const LOCKS = new Map<string, LockRef[]>()
 /** Layers hidden in the editor, kept the same way. The file isn't changed */
 const HIDES = new Map<string, LockRef[]>()
 
-export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose, nav, circle, actions: hostActions, onQuickEdit, checker }: Props) {
+export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose, nav, circle, actions: hostActions, onQuickEdit, principle }: Props) {
   // Switching files paints an empty editor first, then fills it in on the next
   // frame, so the arrows feel instant even when a big file takes a moment
   const [ready, setReady] = useState(false)
@@ -318,8 +321,20 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
   }
 
   // ── Actions on the selection ──────────────────────────────────────────────
+  // A design principle's live area and keylines to align to, in this file's viewBox units
+  const areas = useMemo(() => (principle ? dpAreas(principle) : []), [principle])
+  const alignArea = () => {
+    const a = areas.find((x) => x.id === alignTarget.get())
+    const root = elements?.[0]
+    if (!a || !principle || !root) return null
+    const vb = parseViewBox(root.getAttribute("viewBox"))
+      ?? { x: 0, y: 0, w: Number.parseFloat(root.getAttribute("width") ?? "") || 0, h: Number.parseFloat(root.getAttribute("height") ?? "") || 0 }
+    if (!(vb.w > 0 && vb.h > 0)) return null
+    const f = dpToViewBox(principle, vb)
+    return { x: f.x(a.x), y: f.y(a.y), w: a.w * f.k, h: a.h * f.k }
+  }
   const ctx = (): ActionContext | null => elements && editable
-    ? { markup, ranges, elements, selection: topLevel(selection, elements) }
+    ? { markup, ranges, elements, selection: topLevel(selection, elements), alignArea: alignArea() }
     : null
   const available = (pick = selection) => {
     if (!elements || !editable) return []
@@ -395,6 +410,11 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
   // Snapping while dragging, remembered on this device
   const [snap, setSnapState] = useState(() => { try { return localStorage.getItem("svgenius:snap") !== "0" } catch { return true } })
   const setSnap = (v: boolean) => { setSnapState(v); try { localStorage.setItem("svgenius:snap", v ? "1" : "0") } catch { /* unavailable */ } }
+  // The design principle's grid and keylines over the canvas. Shown ones are snapped to as well
+  const [dpGrid, setDpGridState] = useState(() => { try { return localStorage.getItem("svgenius:editor-dp-grid") !== "0" } catch { return true } })
+  const [dpKeylines, setDpKeylinesState] = useState(() => { try { return localStorage.getItem("svgenius:editor-dp-keylines") !== "0" } catch { return true } })
+  const setDpGrid = (v: boolean) => { setDpGridState(v); try { localStorage.setItem("svgenius:editor-dp-grid", v ? "1" : "0") } catch { /* unavailable */ } }
+  const setDpKeylines = (v: boolean) => { setDpKeylinesState(v); try { localStorage.setItem("svgenius:editor-dp-keylines", v ? "1" : "0") } catch { /* unavailable */ } }
 
   // Right-click on points: change their type, add or remove points
   const pointMenu = (points: PointRef[], e: React.MouseEvent) => {
@@ -659,7 +679,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             <PaintTools paint={paint} mixed={{ fill: differs("fill"), stroke: differs("stroke") }} onPaint={setPaint} onGradient={setGradient} side={toolbarSide} />
             <span className="edit-toolbar__sep" />
             <ArrangeTools all={ACTIONS.filter((a) => a.panel)} applies={(a) => actions.includes(a)} run={(a) => run(a)}
-              count={selection.filter((i) => i > 0).length} onMenu={setMenu} side={toolbarSide} />
+              count={selection.filter((i) => i > 0).length} onMenu={setMenu} side={toolbarSide} areas={areas} />
             <span className="edit-toolbar__sep" />
             {/* Delete goes last. A disabled button still says what it does, and why it's off */}
             {[...ACTIONS.filter((a) => a.toolbar && a.id !== "delete"), ...ACTIONS.filter((a) => a.toolbar && a.id === "delete")].map((a) => {
@@ -678,6 +698,14 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
               title={snap ? "Snapping on: dragged items line up with other items and the viewBox. Hold ⌘ to drag freely" : "Snapping off. Click to snap dragged items to other items and the viewBox"}
               aria-label="Snapping"><IconMagnet width={14} height={14} /></button>
           </>}
+          {principle && (
+            <div className="btn-join dp-switch" role="group" aria-label={`${principle.name} guides`}>
+              <button className={`btn btn--secondary btn--sm${dpGrid ? " is-on" : ""}`} aria-pressed={dpGrid} onClick={() => setDpGrid(!dpGrid)}
+                title={`${principle.name} grid${editable ? ". While it shows, dragged shapes and points snap to it" : ""}`}>Grid</button>
+              <button className={`btn btn--secondary btn--sm${dpKeylines ? " is-on" : ""}`} aria-pressed={dpKeylines} onClick={() => setDpKeylines(!dpKeylines)}
+                title={`${principle.name} live area and keylines${editable ? ". While they show, dragged shapes and points snap to their edges" : ""}`}>Keylines</button>
+            </div>
+          )}
           <span className="edit-toolbar__spacer" />
           <div className="btn-join zoom-control" role="group" aria-label="Zoom">
             <button className="btn btn--secondary btn--sm edit-toolbar__btn" onClick={() => stepZoom(-1)} title="Zoom out (⌘−). ⌘ and the wheel, or a pinch, zooms at the pointer" aria-label="Zoom out"><IconZoomOut width={14} height={14} /></button>
@@ -740,7 +768,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             {/* Floats over the canvas, so it never pushes the preview down */}
             {editable && <EditStatus tool={tool} count={selection.length} note={note} />}
             {peekMarkup !== null && <span className="peek-badge">After</span>}
-            <InspectPreview markup={peekMarkup ?? markup} backdrop={backdrop} checker={checker} selection={peekMarkup !== null ? [] : selection} locked={ownLocked} hidden={peekMarkup !== null ? undefined : ownHidden} snap={snap}
+            <InspectPreview markup={peekMarkup ?? markup} backdrop={backdrop} checker={principle} dpGrid={!!principle && dpGrid} dpKeylines={!!principle && dpKeylines} selection={peekMarkup !== null ? [] : selection} locked={ownLocked} hidden={peekMarkup !== null ? undefined : ownHidden} snap={snap}
               zoom={zoom} onZoom={setZoom} onActual={setActual}
               onPick={(i, add) => { (document.activeElement as HTMLElement | null)?.blur?.(); pick(i, add ? "add" : "only") }}
               onSelect={(found, add) => setSelection((s) => (add ? [...s, ...found.filter((i) => !s.includes(i))] : found))}

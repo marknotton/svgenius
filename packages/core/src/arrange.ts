@@ -17,9 +17,20 @@ export interface Move { index: number, dx: number, dy: number }
 // One element lines up with the canvas; several line up with each other,
 // unless "Align to canvas" is on
 const TARGET_KEY = "svgenius:align-to"
+/** "selection", "canvas", or a design principle area's id ("live", "key:…", "align:…") */
+export type AlignTarget = string
 export const alignTarget = {
-  get: (): "selection" | "canvas" => { try { return localStorage.getItem(TARGET_KEY) === "canvas" ? "canvas" : "selection" } catch { return "selection" } },
-  set: (v: "selection" | "canvas") => { try { localStorage.setItem(TARGET_KEY, v) } catch { /* unavailable */ } }
+  get: (): AlignTarget => { try { return localStorage.getItem(TARGET_KEY) || "selection" } catch { return "selection" } },
+  set: (v: AlignTarget) => { try { localStorage.setItem(TARGET_KEY, v) } catch { /* unavailable */ } }
+}
+
+/** A box in the viewBox's units, as a screen box */
+function areaBox(root: SVGSVGElement, a: { x: number, y: number, w: number, h: number }): Box | null {
+  const m = root.getScreenCTM()
+  if (!m) return null
+  const p = new DOMPoint(a.x, a.y).matrixTransform(toDOM(m))
+  const q = new DOMPoint(a.x + a.w, a.y + a.h).matrixTransform(toDOM(m))
+  return boxOf({ left: Math.min(p.x, q.x), top: Math.min(p.y, q.y), right: Math.max(p.x, q.x), bottom: Math.max(p.y, q.y) })
 }
 
 /** Renders the markup off screen for measuring. Call done() afterwards */
@@ -70,15 +81,17 @@ function measure(markup: string, indices: number[]) {
   return { ...m, items, canvas: canvasBox(m.root) }
 }
 
-export function alignMoves(markup: string, indices: number[], mode: AlignMode): Move[] {
+/** area: a box in viewBox units (a design principle's live area or keyline) to line everything up with instead */
+export function alignMoves(markup: string, indices: number[], mode: AlignMode, area?: { x: number, y: number, w: number, h: number } | null): Move[] {
   const m = measure(markup, indices)
   if (!m) return []
   try {
+    const toArea = area ? areaBox(m.root, area) : null
     const toCanvas = m.items.length === 1 || alignTarget.get() === "canvas"
-    const u = toCanvas ? m.canvas : boxOf({
+    const u = toArea ?? (toCanvas ? m.canvas : boxOf({
       left: Math.min(...m.items.map((x) => x.box.left)), top: Math.min(...m.items.map((x) => x.box.top)),
       right: Math.max(...m.items.map((x) => x.box.right)), bottom: Math.max(...m.items.map((x) => x.box.bottom))
-    })
+    }))
     return m.items.map(({ index, el, box: b }) => {
       const sx = mode === "left" ? u.left - b.left : mode === "hcentre" ? u.cx - b.cx : mode === "right" ? u.right - b.right : 0
       const sy = mode === "top" ? u.top - b.top : mode === "vmiddle" ? u.cy - b.cy : mode === "bottom" ? u.bottom - b.bottom : 0
