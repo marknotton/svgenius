@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { Backdrop, DesignPrinciple } from "@marknotton/svgenius-core/types"
 import { svgSize } from "@marknotton/svgenius-core/svgRoot"
-import { allAnchors, geometry, pointAt, pointKey, serialisePath, shiftPoints, type PointKind, type PointRef, type Seg } from "@marknotton/svgenius-core/pathData"
+import { allAnchors, geometry, parsePath, pointAt, pointKey, serialisePath, shiftPoints, type PointKind, type PointRef, type Seg } from "@marknotton/svgenius-core/pathData"
 import { deletePoints, toggleCorner } from "@marknotton/svgenius-core/pathPoints"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 import { ShapeGuide } from "./ShapeGuide"
@@ -31,6 +31,10 @@ interface Props {
   hover?: number
   /** The selected path's points, drawn as draggable handles */
   path?: PathEdit | null
+  /** Direct select: a box picks points across every path it covers */
+  onPointPick?: (picked: Map<number, PointRef[]>, add: boolean) => void
+  /** Points picked in several paths at once, moved together */
+  multi?: MultiEdit | null
   /** Locked elements: clicks and boxes go straight through them */
   locked?: Set<number>
   /** Hidden in the editor only (the eye in the layers) */
@@ -180,6 +184,39 @@ function snapper(shadow: ShadowRoot, skip: Element[], moving: DOMRect | null, ba
   }
 }
 
+/** Points picked across several paths (element index → its points) */
+export interface MultiEdit {
+  picked: Map<number, PointRef[]>
+  readOnly: boolean
+  onPick: (picked: Map<number, PointRef[]>) => void
+  /** A drag or nudge finished: each path's new segments */
+  onCommit: (changes: { index: number, segs: Seg[] }[]) => void
+}
+
+/** Every visible path's anchors inside a screen box, by element index */
+function pointsInBox(shadow: ShadowRoot, l: number, t: number, r: number, b: number) {
+  const out = new Map<number, PointRef[]>()
+  for (const el of shadow.querySelectorAll("path")) {
+    if (el.closest(UNPAINTED)) continue
+    const cs = getComputedStyle(el)
+    if (cs.pointerEvents === "none" || cs.display === "none" || cs.visibility === "hidden") continue
+    const m = (el as SVGGraphicsElement).getScreenCTM?.()
+    if (!m) continue
+    let segs: Seg[]
+    try { segs = parsePath(el.getAttribute("d") ?? "") } catch { continue }
+    const geo = geometry(segs)
+    const mm = new DOMMatrix([m.a, m.b, m.c, m.d, m.e, m.f])
+    const inside = allAnchors(segs).filter((p) => {
+      const q = pointAt(geo, p)
+      if (!q) return false
+      const sp = new DOMPoint(q[0], q[1]).matrixTransform(mm)
+      return sp.x >= l && sp.x <= r && sp.y >= t && sp.y <= b
+    })
+    if (inside.length) out.set(Number(el.getAttribute(ATTR)), inside)
+  }
+  return out
+}
+
 export interface PathEdit {
   index: number
   segs: Seg[]
@@ -191,6 +228,8 @@ export interface PathEdit {
   onCommit: (segs: Seg[]) => void
   /** Right-click on a point: the points it applies to (the selection, if it's in it) */
   onPointMenu?: (points: PointRef[], e: React.MouseEvent) => void
+  /** Points to pick when this path opens (a box that only caught this path) */
+  seed?: { points: PointRef[], n: number }
 }
 
 /** More than this and only the outline is drawn, handles would be a carpet */
@@ -216,7 +255,7 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked, hidden, snap = true, zoom = 1, onZoom, onActual, checker, dpGrid = false, dpKeylines = false, snapTo = SNAP_DEFAULTS }: Props) {
+export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked, hidden, snap = true, zoom = 1, onZoom, onActual, checker, dpGrid = false, dpKeylines = false, snapTo = SNAP_DEFAULTS, onPointPick, multi }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
@@ -226,8 +265,8 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
   const snapCfg: SnapCfg = { ...snapTo, dp: checker ?? null }
   /** Snapping for this pointer event: on, or Shift held. ⌘ (Ctrl) always drags freely */
   const snapping = (ev: { shiftKey: boolean, metaKey: boolean, ctrlKey: boolean }) => (live.current.snap || ev.shiftKey) && !ev.metaKey && !ev.ctrlKey
-  const live = useRef({ selection, path, readOnly, onSelect, onMoveBy, snap, snapCfg })
-  live.current = { selection, path, readOnly, onSelect, onMoveBy, snap, snapCfg }
+  const live = useRef({ selection, path, readOnly, onSelect, onMoveBy, snap, snapCfg, onPointPick, multi })
+  live.current = { selection, path, readOnly, onSelect, onMoveBy, snap, snapCfg, onPointPick, multi }
   // While items are dragged: how far they've gone on screen, so their boxes
   // go with them, and the snap guides to draw (stage coordinates)
   const [shift, setShift] = useState<{ x: number, y: number } | null>(null)
@@ -403,8 +442,8 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
       const base = stage.current?.getBoundingClientRect()
       if (!shadow || !base) return
       const t = e.composedPath()[0] as Element | undefined
-      // The transform box's handles run their own drags
-      if (t?.closest?.(".xf")) return
+      // The transform box's handles and the points overlay run their own drags
+      if (t?.closest?.(".xf, .po__anchor, .po__ctrl")) return
       const hit = t?.closest?.(`[${ATTR}]`)
       const index = hit ? Number(hit.getAttribute(ATTR)) : -1
       const listen = (move: (ev: PointerEvent) => void, up: (ev: PointerEvent) => void) => {
@@ -479,6 +518,8 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
         swallow()
         const l = Math.min(box1.x0, box1.x1) + base.x, r = Math.max(box1.x0, box1.x1) + base.x
         const tp = Math.min(box1.y0, box1.y1) + base.y, b = Math.max(box1.y0, box1.y1) + base.y
+        // Direct select: the points inside, across every path
+        if (cur.onPointPick) { cur.onPointPick(pointsInBox(shadow, l, tp, r, b), e.shiftKey); return }
         const found = [...shadow.querySelectorAll(PICKABLE)].filter((el) => {
           if (el.closest(UNPAINTED)) return false
           // Locked: pointer-events are off on it or a group it's in
@@ -613,7 +654,9 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
       {guides.x.map((x) => <div key={`x${x}`} className="inspect__guide inspect__guide--v" style={{ left: x }} />)}
       {guides.y.map((y) => <div key={`y${y}`} className="inspect__guide inspect__guide--h" style={{ top: y }} />)}
       {marquee && <div className="inspect__marquee" style={{ left: Math.min(marquee.x0, marquee.x1), top: Math.min(marquee.y0, marquee.y1), width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0) }} />}
-      {path && root && <PathOverlay stage={stage} box={box} root={root} edit={path} swallowClick={swallowClick}
+      {!path && multi && root && multi.picked.size > 0 && <MultiOverlay stage={stage} root={root} multi={multi} swallowClick={swallowClick}
+        snap={snapping} snapCfg={() => live.current.snapCfg} onGuides={setGuides} />}
+      {path && root && <PathOverlay stage={stage} box={box} root={root} edit={path} swallowClick={swallowClick} onPointPick={() => live.current.onPointPick}
         snap={snapping} snapCfg={() => live.current.snapCfg} onGuides={setGuides} />}
       </div>
       {!root && <p className="inspect__error text-3">This markup doesn't parse, so it can't be previewed.</p>}
@@ -642,6 +685,8 @@ interface OverlayProps {
   root: Element
   edit: PathEdit
   swallowClick: React.MutableRefObject<boolean>
+  /** A box that catches other paths' points hands them all over */
+  onPointPick: () => ((picked: Map<number, PointRef[]>, add: boolean) => void) | undefined
 }
 
 const isTyping = (t: EventTarget | null) => {
@@ -649,7 +694,7 @@ const isTyping = (t: EventTarget | null) => {
   return !!el?.closest?.("input, textarea, select, [contenteditable=true], .monaco-editor")
 }
 
-function PathOverlay({ stage, box, root, edit, swallowClick, snap, snapCfg, onGuides }: OverlayProps) {
+function PathOverlay({ stage, box, root, edit, swallowClick, snap, snapCfg, onGuides, onPointPick }: OverlayProps) {
   // Maps the path's own coordinates to the stage's pixels
   const [ctm, setCtm] = useState<DOMMatrix | null>(null)
   const [draft, setDraft] = useState<Seg[] | null>(null)
@@ -664,6 +709,8 @@ function PathOverlay({ stage, box, root, edit, swallowClick, snap, snapCfg, onGu
   useEffect(() => setDraft(null), [edit.segs])
   // A different path, a different set of points
   useEffect(() => setPicked([]), [edit.index])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (edit.seed) setPicked(edit.seed.points) }, [edit.seed?.n])
   useEffect(() => setPicked((p) => p.filter((x) => x.seg < edit.segs.length)), [edit.segs.length])
 
   useEffect(() => {
@@ -789,6 +836,17 @@ function PathOverlay({ stage, box, root, edit, swallowClick, snap, snapCfg, onGu
         if (!mat) return
         const left = Math.min(m.x0, m.x1), right = Math.max(m.x0, m.x1)
         const top = Math.min(m.y0, m.y1), bottom = Math.max(m.y0, m.y1)
+        // Caught other paths' points too: hand the lot over, they move together
+        const hand = onPointPick()
+        const sh = stage.current?.shadowRoot
+        if (hand && sh) {
+          const all = pointsInBox(sh, left + base.x, top + base.y, right + base.x, bottom + base.y)
+          if ([...all.keys()].some((i) => i !== live.current.edit.index)) {
+            if (m.add && live.current.picked.length && !all.has(live.current.edit.index)) all.set(live.current.edit.index, live.current.picked)
+            hand(all, false)
+            return
+          }
+        }
         const geo = geometry(now)
         const inside = allAnchors(now).filter((p) => {
           const q = pointAt(geo, p)
@@ -932,6 +990,149 @@ function PathOverlay({ stage, box, root, edit, swallowClick, snap, snapCfg, onGu
             ? `${picked.length} ${picked.length === 1 ? "point" : "points"} selected. Drag or use the arrow keys to move (Shift for 10), Esc to let go`
             : "Drag across points to select them, or press on the path to move all of it"}
         </p>
+      )}
+    </>
+  )
+}
+
+// ── Points across several paths ───────────────────────────────────────────────
+// What a Direct select box leaves picked when it covers more than one path.
+// Drag any picked point and they all move; arrow keys nudge; Esc lets go.
+
+interface MultiItem { index: number, segs: Seg[], ctm: DOMMatrix }
+
+function MultiOverlay({ stage, root, multi, swallowClick, snap, snapCfg, onGuides }: {
+  stage: React.RefObject<HTMLDivElement | null>, root: Element, multi: MultiEdit, swallowClick: React.MutableRefObject<boolean>
+  snap: OverlayProps["snap"], snapCfg: OverlayProps["snapCfg"], onGuides: OverlayProps["onGuides"]
+}) {
+  const [items, setItems] = useState<MultiItem[]>([])
+  const live = useRef({ items, multi })
+  live.current = { items, multi }
+  const el = (i: number) => stage.current?.shadowRoot?.querySelector(`[${ATTR}="${i}"]`) as SVGGraphicsElement | null
+
+  // Each path's points and how they map onto the stage
+  const keys = [...multi.picked.keys()].join(",")
+  useEffect(() => {
+    const measure = () => {
+      const base = stage.current?.getBoundingClientRect()
+      if (!base) return
+      const out: MultiItem[] = []
+      for (const index of live.current.multi.picked.keys()) {
+        const e = el(index)
+        const m = e?.getScreenCTM?.()
+        if (!e || !m) continue
+        try { out.push({ index, segs: parsePath(e.getAttribute("d") ?? ""), ctm: new DOMMatrix([m.a, m.b, m.c, m.d, m.e - base.x, m.f - base.y]) }) } catch { /* unparseable */ }
+      }
+      setItems(out)
+    }
+    const raf = requestAnimationFrame(measure)
+    const ro = new ResizeObserver(measure)
+    if (stage.current) ro.observe(stage.current)
+    return () => { cancelAnimationFrame(raf); ro.disconnect() }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [root, keys])
+
+  const swallow = () => { swallowClick.current = true; setTimeout(() => { swallowClick.current = false }, 0) }
+  /** Screen distance → each path's own units */
+  const toUnits = (it: MultiItem, dx: number, dy: number) => new DOMPoint(dx, dy).matrixTransform(new DOMMatrix([it.ctm.a, it.ctm.b, it.ctm.c, it.ctm.d, 0, 0]).inverse())
+  const moved = (its: MultiItem[], f: (it: MultiItem) => [number, number]) =>
+    its.map((it) => { const [ux, uy] = f(it); return { index: it.index, segs: shiftPoints(it.segs, live.current.multi.picked.get(it.index) ?? [], ux, uy) } })
+
+  const startDrag = (e: React.PointerEvent, grab: [number, number]) => {
+    const shadow = stage.current?.shadowRoot, base = stage.current?.getBoundingClientRect()
+    if (!shadow || !base || live.current.multi.readOnly) return
+    ;(document.activeElement as HTMLElement | null)?.blur?.()
+    const its = live.current.items
+    const snapTo = snapper(shadow, [], new DOMRect(grab[0] + base.x, grab[1] + base.y, 0, 0), base, snapCfg())
+    let last: { index: number, segs: Seg[] }[] | null = null
+    const move = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return
+      if (!last && Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 2) return
+      const sn = snapTo(ev.clientX - e.clientX, ev.clientY - e.clientY, snap(ev))
+      onGuides({ x: sn.gx, y: sn.gy })
+      last = moved(its, (it) => { const u = toUnits(it, sn.dx, sn.dy); return [u.x, u.y] })
+      // Straight onto the preview, the markup catches up on release
+      for (const c of last) el(c.index)?.setAttribute("d", serialisePath(c.segs))
+      setItems(its.map((it) => ({ ...it, segs: last!.find((c) => c.index === it.index)?.segs ?? it.segs })))
+    }
+    const up = (ev: PointerEvent) => {
+      if (ev.pointerId !== e.pointerId) return
+      onGuides({ x: [], y: [] })
+      window.removeEventListener("pointermove", move)
+      window.removeEventListener("pointerup", up)
+      window.removeEventListener("pointercancel", up)
+      if (!last) return
+      swallow()
+      live.current.multi.onCommit(last)
+    }
+    window.addEventListener("pointermove", move)
+    window.addEventListener("pointerup", up)
+    window.addEventListener("pointercancel", up)
+  }
+
+  const down = (e: React.PointerEvent, index: number, ref: PointRef, at: [number, number]) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.stopPropagation()
+    const cur = live.current.multi.picked
+    const has = (cur.get(index) ?? []).some((p) => pointKey(p) === pointKey(ref))
+    if (e.shiftKey) {
+      // Shift flips one point in or out
+      const next = new Map(cur)
+      const list = (next.get(index) ?? []).filter((p) => pointKey(p) !== pointKey(ref))
+      if (!has) list.push(ref)
+      if (list.length) next.set(index, list); else next.delete(index)
+      swallow()
+      multi.onPick(next)
+      return
+    }
+    if (!has) { swallow(); multi.onPick(new Map([[index, [ref]]])); return }
+    startDrag(e, at)
+  }
+
+  // Arrow keys nudge every picked point (Shift for 10, Alt for 0.1), Esc lets go
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      const { items: its, multi: mu } = live.current
+      if (isTyping(e.target) || e.metaKey || e.ctrlKey) return
+      if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); mu.onPick(new Map()); return }
+      const dir: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
+      const d = dir[e.key]
+      if (!d || mu.readOnly || !its.length) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      const step = e.shiftKey ? 10 : e.altKey ? 0.1 : 1
+      mu.onCommit(moved(its, () => [d[0] * step, d[1] * step]))
+    }
+    window.addEventListener("keydown", key, true)
+    return () => window.removeEventListener("keydown", key, true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const count = [...multi.picked.values()].reduce((n, l) => n + l.length, 0)
+  return (
+    <>
+      <svg className="po">
+        {items.map((it) => {
+          const matrix = `matrix(${it.ctm.a} ${it.ctm.b} ${it.ctm.c} ${it.ctm.d} ${it.ctm.e} ${it.ctm.f})`
+          const geo = geometry(it.segs)
+          const keys = new Set((multi.picked.get(it.index) ?? []).map(pointKey))
+          return (
+            <g key={it.index}>
+              <path className="po__outline" d={serialisePath(it.segs)} transform={matrix} />
+              {it.segs.length <= MAX_HANDLES && allAnchors(it.segs).map((ref) => {
+                const q = pointAt(geo, ref)
+                if (!q) return null
+                const sp = new DOMPoint(q[0], q[1]).matrixTransform(it.ctm)
+                return <rect key={ref.seg} className={`po__anchor${keys.has(pointKey(ref)) ? " is-picked" : ""}`} x={sp.x - 4} y={sp.y - 4} width={8} height={8}
+                  onPointerDown={(e) => down(e, it.index, ref, [sp.x, sp.y])} />
+              })}
+            </g>
+          )
+        })}
+      </svg>
+      {!multi.readOnly && (
+        <p className="po__hint text-3">{`${count} ${count === 1 ? "point" : "points"} in ${multi.picked.size} paths selected. Drag one to move them all, or use the arrow keys (Shift for 10), Esc to let go`}</p>
       )}
     </>
   )

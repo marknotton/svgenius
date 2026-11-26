@@ -313,6 +313,44 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ranges, selected, markup])
 
+  // ── Direct select across paths ────────────────────────────────────────────
+  // A box that catches points in several paths keeps them all picked, so they
+  // move together. One path's worth opens that path with those points picked
+  const [multiPicked, setMultiPicked] = useState<Map<number, PointRef[]> | null>(null)
+  const [pointSeed, setPointSeed] = useState<{ index: number, points: PointRef[], n: number } | null>(null)
+  const pointPick = (found: Map<number, PointRef[]>, add: boolean) => {
+    let next = found
+    if (add && multiPicked) {
+      next = new Map(multiPicked)
+      for (const [i, refs] of found) {
+        const have = new Set((next.get(i) ?? []).map((p) => `${p.seg}:${p.kind}`))
+        next.set(i, [...(next.get(i) ?? []), ...refs.filter((p) => !have.has(`${p.seg}:${p.kind}`))])
+      }
+    }
+    if (next.size === 0) { if (!add) { setMultiPicked(null); setSelection([]) } return }
+    if (next.size === 1) {
+      const [[i, points]] = [...next]
+      setMultiPicked(null)
+      setSelected(i)
+      setPointSeed({ index: i, points, n: Date.now() })
+      return
+    }
+    setSelection([...next.keys()].sort((a, b) => a - b))
+    setMultiPicked(next)
+  }
+  // Only while the selection is still those paths
+  const multiOn = !!multiPicked && tool === "direct" && selection.length === multiPicked.size && selection.every((i) => multiPicked.has(i))
+  useEffect(() => { if (multiPicked && !multiOn) setMultiPicked(null) }, [multiOn, multiPicked])
+  const writePaths = (changes: { index: number, segs: Seg[] }[]) => {
+    // Last in the file first, so the earlier ranges still line up
+    let next = markup
+    for (const c of [...changes].sort((a, b) => (ranges[b.index]?.start ?? 0) - (ranges[a.index]?.start ?? 0))) {
+      const r = ranges[c.index]
+      if (r) next = setAttr(next, r, "d", serialisePath(c.segs))
+    }
+    if (next !== markup) commit(next)
+  }
+
   // Selects whatever now starts at `start` in the new markup
   const commitAndSelect = (next: { markup: string, start: number } | null) => {
     if (!next) return
@@ -782,7 +820,9 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
               onMoveBy={moveBy} onContextMenu={openMenu} readOnly={!editable || peekMarkup !== null}
               onHover={setHover} hover={hover}
               onTransform={tool === "select" && editable ? transformBy : undefined}
-              path={segs && tool === "direct" && peekMarkup === null ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath, onPointMenu: pointMenu } : null} />
+              path={segs && tool === "direct" && peekMarkup === null ? { index: selected, segs, readOnly: !editable, active, onActive: setActive, onCommit: writePath, onPointMenu: pointMenu, seed: pointSeed?.index === selected ? pointSeed : undefined } : null}
+              onPointPick={tool === "direct" && editable && peekMarkup === null ? pointPick : undefined}
+              multi={multiOn && multiPicked && peekMarkup === null ? { picked: multiPicked, readOnly: !editable, onPick: (m) => pointPick(m, false), onCommit: writePaths } : null} />
             {/* Unaffiliated pointer to a free, fuller vector editor: this one tidies markup, it isn't an art tool */}
             {!nodDismissed && (
               <p className="markup-dialog__nod">
