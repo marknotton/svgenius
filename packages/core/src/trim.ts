@@ -5,8 +5,8 @@ import { cutOutFakeClipping } from "./cutOuts"
 import { geometryBounds } from "./geomBounds"
 import { activeCutMatchers } from "./settings"
 import { fmtNum, getAttr, parseLength, parseViewBox, replaceRoot, rootTag, setAttr, type ViewBox } from "./svgRoot"
-import { isIdentity, pickKeyline } from "./designPrinciples"
-import type { ArtAdjust, ArtTransform, GeometryEffect, GridSpec, SvgoSettings, TrimSettings } from "./types"
+import { DEFAULT_SQUARE_TOLERANCE, invertAffine, isIdentity, magicTarget, smartPick, pickKeyline, scalesOf, toAffine, type Affine } from "./designPrinciples"
+import type { ArtAdjust, ArtTransform, GeometryEffect, GridSpec, MagicKeylines, MagicPick, SvgoSettings, TrimSettings } from "./types"
 
 // ── Trim whitespace ───────────────────────────────────────────────────────────
 // Renders the SVG to a canvas and scans for visible pixels, so strokes, filters
@@ -244,8 +244,7 @@ export function resizeSvg(svg: string, side: "width" | "height", px: number, pre
 
 /** Wraps the artwork in a <g> that scales around the viewBox centre and offsets it */
 export function transformSvg(svg: string, b: ArtTransform) {
-  const sy = b.scaleY ?? b.scale
-  if (b.scale === 1 && sy === 1 && b.offsetX === 0 && b.offsetY === 0) return svg
+  if (b.scale === 1 && b.offsetX === 0 && b.offsetY === 0) return svg
   const tag = rootTag(svg)
   if (!tag) return svg
   const vb = parseViewBox(getAttr(tag, "viewBox"))
@@ -260,7 +259,7 @@ export function transformSvg(svg: string, b: ArtTransform) {
   const dx = (vb.w * b.offsetX) / 100
   const dy = (vb.h * b.offsetY) / 100
   const f = (n: number) => fmtNum(n, 4)
-  const t = `translate(${f(cx + dx)} ${f(cy + dy)}) scale(${f(b.scale)}${sy !== b.scale ? ` ${f(sy)}` : ""}) translate(${f(-cx)} ${f(-cy)})`
+  const t = `translate(${f(cx + dx)} ${f(cy + dy)}) scale(${f(b.scale)}) translate(${f(-cx)} ${f(-cy)})`
   const start = svg.indexOf(tag) + tag.length
   const end = svg.lastIndexOf("</svg>")
   if (end < start || tag.endsWith("/>")) return svg
@@ -300,8 +299,9 @@ function wrapContent(svg: string, tag: string, transform: string) {
  * 0 0 width height, and the artwork is centred and, depending on the fit,
  * scaled into the live area or the keyline that matches its shape
  */
-export async function fitToGrid(svg: string, grid: GridSpec) {
-  if (grid.fit === "none") return svg
+export async function fitToGrid(svg: string, grid: GridSpec, magic?: MagicKeylines | null, picked?: (pick: MagicPick) => void) {
+  const useMagic = !!magic?.enabled
+  if (grid.fit === "none" && !useMagic) return svg
   const tag = rootTag(svg)
   const vb = viewBoxOf(svg)
   if (!tag || !vb) return svg
@@ -310,18 +310,35 @@ export async function fitToGrid(svg: string, grid: GridSpec) {
   const W = grid.width, H = grid.height
   const liveW = Math.max(1e-3, W - grid.padding * 2), liveH = Math.max(1e-3, H - grid.padding * 2)
   let s: number
-  if (grid.fit === "centre") s = Math.min(W / vb.w, H / vb.h)
+  /** Only when stretching: a different scale down */
+  let sy: number | null = null
+  if (useMagic && magic && box.w > 0 && box.h > 0) {
+    // Smart Sizing: square, tall and wide artwork each fit their own keyline
+    const tolerance = magic.tolerance ?? DEFAULT_SQUARE_TOLERANCE
+    const pick = smartPick(magic, { art: { w: box.w, h: box.h }, viewBox: { w: vb.w, h: vb.h }, grid }, tolerance)
+    const rule = pick.target
+    const k = magicTarget(grid, rule, box.w, box.h)
+    const sw = k.w / box.w, sh = k.h / box.h
+    s = rule.fit === "width" ? sw : rule.fit === "height" ? sh : Math.min(sw, sh)
+    // Never past the live area (or the canvas, when that's the target)
+    s = k.keyline === "canvas" ? Math.min(s, W / box.w, H / box.h) : Math.min(s, liveW / box.w, liveH / box.h)
+    // Stretch: fills the box exactly, each side on its own
+    if (rule.fit === "stretch") { s = sw; sy = sh }
+    picked?.({ group: pick.group, keyline: k.keyline, fit: rule.fit, w: box.w, h: box.h, tolerance,
+      ...(pick.rule ? { rule: pick.rule, ruleText: pick.ruleText, ...(pick.ruleGroup ? { ruleGroup: pick.ruleGroup } : {}) } : {}), ...(k.fallback ? { fallback: true } : {}) })
+  } else if (grid.fit === "centre") s = Math.min(W / vb.w, H / vb.h)
   else if (grid.fit === "keylines") {
     const k = pickKeyline(grid.keylines, box.w, box.h)
     s = k ? Math.min(Math.min(k.w, liveW) / box.w, Math.min(k.h, liveH) / box.h) : Math.min(liveW / box.w, liveH / box.h)
   } else s = Math.min(liveW / box.w, liveH / box.h)
+  const sY = sy ?? s
   const tx = W / 2 - s * (box.x + box.w / 2)
-  const ty = H / 2 - s * (box.y + box.h / 2)
+  const ty = H / 2 - sY * (box.y + box.h / 2)
   const f = (n: number) => fmtNum(n, 5)
   let root = setAttr(tag, "viewBox", `0 0 ${f(W)} ${f(H)}`)
   root = setAttr(root, "width", f(W))
   root = setAttr(root, "height", f(H))
-  return wrapContent(replaceRoot(svg, root), root, `translate(${f(tx)} ${f(ty)}) scale(${f(s)})`)
+  return wrapContent(replaceRoot(svg, root), root, `translate(${f(tx)} ${f(ty)}) scale(${sy === null ? f(s) : `${f(s)} ${f(sY)}`})`)
 }
 
 /** Scales the artwork so one side measures `px` viewBox units, around the viewBox centre like the × scale */
@@ -337,8 +354,29 @@ export function adjustSvg(svg: string, a: ArtAdjust | null | undefined) {
   if (!a || isIdentity(a)) return svg
   const vb = viewBoxOf(svg)
   if (!vb) return svg
-  return transformSvg(svg, { scale: a.scale, scaleY: a.sy, offsetX: (a.x / vb.w) * 100, offsetY: (a.y / vb.h) * 100 })
+  const { X, Y } = scalesOf(a)
+  if (X === Y && !a.r) return transformSvg(svg, { scale: X, offsetX: (a.x / vb.w) * 100, offsetY: (a.y / vb.h) * 100 })
+  // Stretched or turned: scale across and down separately, then rotate, around the same centre
+  const tag = rootTag(svg)
+  if (!tag) return svg
+  const cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2
+  const f = (n: number) => fmtNum(n, 5)
+  return wrapContent(svg, tag, `translate(${f(cx + a.x)} ${f(cy + a.y)})${a.r ? ` rotate(${f(a.r)})` : ""} scale(${f(X)} ${f(Y)}) translate(${f(-cx)} ${f(-cy)})`)
 }
+
+/** Wraps the artwork in any affine move around the viewBox centre (Quick Edit measures the artwork with its placement taken off) */
+export function affineSvg(svg: string, m: Affine) {
+  const vb = viewBoxOf(svg)
+  const tag = rootTag(svg)
+  if (!vb || !tag) return svg
+  const cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2
+  const f = (n: number) => fmtNum(n, 8)
+  return wrapContent(svg, tag, `translate(${f(cx + m.t[0])} ${f(cy + m.t[1])}) matrix(${m.L.map(f).join(" ")} 0 0) translate(${f(-cx)} ${f(-cy)})`)
+}
+
+/** The markup with an adjustment taken back off */
+export const unadjustSvg = (svg: string, a: ArtAdjust | null | undefined) => (!a || isIdentity(a) ? svg : affineSvg(svg, invertAffine(toAffine(a))))
+
 
 /** Adds raw markup just before the closing </svg> */
 export function appendMarkup(svg: string, markup: string) {
@@ -350,7 +388,7 @@ export function appendMarkup(svg: string, markup: string) {
 }
 
 /** Everything that happens after SVGO, in order */
-export async function postProcess(svg: string, settings: SvgoSettings, effects?: GeometryEffect[]) {
+export async function postProcess(svg: string, settings: SvgoSettings, effects?: GeometryEffect[], info?: { magic?: MagicPick }) {
   const t = settings.trim
   const p = settings.floatPrecision
   const step = async (effect: GeometryEffect, on: boolean, input: string, fn: () => Promise<string>) => {
@@ -368,11 +406,11 @@ export async function postProcess(svg: string, settings: SvgoSettings, effects?:
   const merge = out
   out = await step("merge", settings.mergePaths, merge, () => mergeOverlappingPaths(merge, p))
   // A design principle's canvas first, so the sizes below are in its units
-  if (settings.grid) out = await fitToGrid(out, settings.grid)
+  if (settings.grid) out = await fitToGrid(out, settings.grid, settings.magicKeylines, (pick) => { if (info) info.magic = pick })
   out = t.artUnit === "px"
     ? await sizeArtwork(out, t.artSide ?? "height", t.artSizePx ?? 0, t)
     : transformSvg(out, { scale: t.artScale, offsetX: t.offsetX, offsetY: t.offsetY })
-  // Variations and Quickview tuning, last of the artwork moves
+  // The design principle's variations for this file
   out = adjustSvg(out, settings.adjust)
   // Outside the artwork group, so it isn't moved or scaled with it
   out = appendMarkup(out, settings.appendMarkup)
@@ -381,6 +419,9 @@ export async function postProcess(svg: string, settings: SvgoSettings, effects?:
   if (t.enabled) out = await trimSvg(out, t, settings.floatPrecision)
   // After trim, so it works within the final canvas and its padding
   out = await step("centre", settings.opticalCentre, out, () => opticalCentreSvg(out, settings.opticalStrength / 100, settings.floatPrecision))
+  // The file's own Quick Edit placement goes last, in the finished canvas, so
+  // nothing in the preset (trim, optical centre) can move it again
+  out = adjustSvg(out, settings.tune)
   out = t.sizeUnit === "px"
     ? resizeSvg(out, t.sizeSide, t.sizePx, settings.floatPrecision)
     : scaleSvg(out, t.scale, settings.floatPrecision)

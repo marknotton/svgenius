@@ -1,5 +1,5 @@
 import { createContext, memo, useContext, useMemo } from "react"
-import { GUIDE_SHAPES, shapePath, type GuideShape } from "@marknotton/svgenius-core/shapes"
+import { GUIDE_SHAPES, shapePath, type GuideShape, type ShapeFrame } from "@marknotton/svgenius-core/shapes"
 
 // ── Shape guide ───────────────────────────────────────────────────────────────
 // Drawn over a preview's canvas: the shape (circle, squircle and so on) fitted
@@ -11,16 +11,26 @@ import { GUIDE_SHAPES, shapePath, type GuideShape } from "@marknotton/svgenius-c
 export const GuideShapeContext = createContext<GuideShape>("circle")
 export const useGuideShape = () => useContext(GuideShapeContext)
 
-export const ShapeGuide = memo(function ShapeGuide({ shape, forced }: { shape?: GuideShape, forced?: boolean }) {
+/** With a frame (a design principle), the shape sits in its live area rather than filling the canvas */
+export const ShapeGuide = memo(function ShapeGuide({ shape, forced, frame }: { shape?: GuideShape, forced?: boolean, frame?: ShapeFrame | null }) {
   const ctx = useGuideShape()
-  const d = useMemo(() => shapePath(shape ?? ctx), [shape, ctx])
+  const d = useMemo(() => shapePath(shape ?? ctx, frame?.box, frame?.fitHeight), [shape, ctx, frame])
   return (
-    <svg className={`shape-guide${forced ? " is-forced" : ""}`} viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-      <path className="shape-guide__tint" fillRule="evenodd" d={`M-10000 -10000H10100V10100H-10000Z${d}`} />
+    <svg className={`shape-guide${forced ? " is-forced" : ""}`} viewBox={frame ? `0 0 ${frame.w} ${frame.h}` : "0 0 100 100"} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <path className="shape-guide__tint" fillRule="evenodd" d={`${tintRect(frame)}${d}`} />
       <path className="shape-guide__line" d={d} vectorEffect="non-scaling-stroke" />
     </svg>
   )
 })
+
+/**
+ * The tint around the shape: a few canvases wide, never thousands. Huge
+ * coordinates in a small viewBox (24 units) can stop WebKit drawing the path
+ */
+function tintRect(frame?: ShapeFrame | null) {
+  const w = frame?.w ?? 100, h = frame?.h ?? 100
+  return `M${-w * 20} ${-h * 20}H${w * 21}V${h * 21}H${-w * 20}Z`
+}
 
 /** A small icon of a shape, for buttons and menus */
 export function ShapeIcon({ shape, size = 13, dashed }: { shape?: GuideShape, size?: number, dashed?: boolean }) {

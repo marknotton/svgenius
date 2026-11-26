@@ -1,6 +1,6 @@
 import { APP_VERSION } from "./about"
 import { mergeImport, sanitiseRename, sanitiseSvgoSettings } from "@marknotton/svgenius-core/settings"
-import { mergePrinciples } from "@marknotton/svgenius-core/designPrinciples"
+import { fromScales, isIdentity, mergePrinciples } from "@marknotton/svgenius-core/designPrinciples"
 import type { Saved } from "./session"
 import type { AppSettings, SvgItem } from "@marknotton/svgenius-core/types"
 
@@ -53,9 +53,10 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object
 const str = (v: unknown) => (typeof v === "string" ? v : undefined)
 const readAdjust = (v: unknown): SvgItem["adjust"] => {
   if (!isObj(v)) return undefined
-  const scale = Number(v.scale), x = Number(v.x), y = Number(v.y), sy = v.sy === undefined ? scale : Number(v.sy)
-  if (![scale, sy, x, y].every(Number.isFinite) || scale <= 0 || sy <= 0 || (scale === 1 && sy === 1 && x === 0 && y === 0)) return undefined
-  return sy === scale ? { scale, x, y } : { scale, sy, x, y }
+  const scale = Number(v.scale), x = Number(v.x), y = Number(v.y), sx = Number(v.sx ?? 1), sy = Number(v.sy ?? 1), r = Number(v.r ?? 0)
+  if (![scale, x, y, sx, sy, r].every(Number.isFinite) || scale <= 0 || sx <= 0 || sy <= 0) return undefined
+  const a = fromScales(scale * sx, scale * sy, x, y, r)
+  return isIdentity(a) ? undefined : a
 }
 
 /**

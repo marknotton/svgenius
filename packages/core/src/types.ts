@@ -72,29 +72,130 @@ export interface TrimSettings {
 export interface ArtTransform {
   /** Scales the artwork inside its viewBox, around the centre */
   scale: number
-  /** Vertical scale, when it differs (stretching). Missing = scale */
-  scaleY?: number
   /** Moves the artwork, as % of the viewBox width/height */
   offsetX: number
   offsetY: number
 }
 
-/** Per-file fine-tuning (Quickview): scales around the viewBox centre, then moves, in viewBox units */
+/** Per-file fine-tuning (Quick Edit): scales around the viewBox centre, then moves, in viewBox units */
 export interface ArtAdjust {
-  /** Horizontal scale, and vertical too unless sy is set */
   scale: number
   x: number
   y: number
-  /** Vertical scale when the artwork is stretched. Missing = the same as scale */
+  /** Extra stretch across and down, on top of scale (1 or missing when the aspect ratio is kept) */
+  sx?: number
   sy?: number
+  /** Rotation in degrees, clockwise, around the canvas centre (after scaling, before moving) */
+  r?: number
 }
 
 /** A reference shape on a design principle's grid, in canvas units, centred */
-export interface Keyline {
+export interface Keyline extends GuideLineStyle {
   id: string
   kind: "circle" | "square" | "portrait" | "landscape"
   w: number
   h: number
+}
+
+/**
+ * Alignment keylines: reference-only guides drawn with the grid (a centre circle,
+ * diagonals, centre lines…). Never used for fitting, Smart Sizing or masks
+ */
+/** How a guide line is drawn. Each field is optional: missing keeps the guide's usual look */
+export interface GuideLineStyle {
+  line?: "solid" | "dashed" | "dotted"
+  /** Screen px, whatever the zoom */
+  strokeWidth?: number
+  /** #rrggbb */
+  colour?: string
+  /** 0–1 */
+  opacity?: number
+}
+
+export interface AlignmentKeyline extends GuideLineStyle {
+  id: string
+  name: string
+  enabled: boolean
+  /** circle: diameter w, centred. rect: w × h centred, corner radius r. diagonals: corner to corner. centreLines: through the middle. lines: at offsets */
+  kind: "circle" | "diagonals" | "centreLines" | "rect" | "lines"
+  w: number
+  h: number
+  r?: number
+  /** diagonals: across the whole canvas or the live area */
+  over?: "canvas" | "live"
+  /** lines: vertical lines at these x offsets and horizontal lines at these y offsets, from the canvas's top left */
+  xs?: number[]
+  ys?: number[]
+}
+
+/** Smart Sizing: how artwork of one shape is sized into the design principle */
+export type MagicGroup = "square" | "tall" | "wide"
+/** contain = fits inside the keyline; height / width = that side matches the keyline (kept inside the live area); stretch = fills it exactly, out of proportion */
+export type MagicFit = "contain" | "height" | "width" | "stretch"
+/** Where Smart Sizing puts artwork: a keyline kind, the live area, or the whole canvas (viewBox) */
+export type SmartTarget = Keyline["kind"] | "live" | "canvas"
+export interface MagicRule {
+  keyline: SmartTarget
+  fit: MagicFit
+  /** Shape cards only: rules for just this shape, tried before the rules for every shape */
+  advanced?: SmartRule[]
+}
+/** Smart Sizing advanced rule: If [artwork|viewBox] [measure] [op] [value] → keyline, fit */
+export interface SmartRule {
+  id: string
+  enabled: boolean
+  of: "artwork" | "viewbox"
+  measure: "shape" | "ratio" | "width" | "height"
+  /** shape: is; others: less than, more than, equals (within the square tolerance), between */
+  op: "is" | "lt" | "gt" | "eq" | "between"
+  /** For shape rules */
+  shape: MagicGroup
+  /** Aspect ratio as width ÷ height (1.5 = 3:2); width and height in the unit below */
+  value: number
+  value2: number
+  /** What was typed for an aspect ratio, e.g. "3:2", so it reads back the same */
+  valueText?: string
+  value2Text?: string
+  /** Width and height: % of the canvas (viewBox), or viewBox units */
+  unit?: "%" | "units"
+  /** Compared to a number (the default), or to a keyline / the live area / the viewBox */
+  against?: "number" | "ref"
+  ref?: SmartTarget
+  /** Which side of the reference: its width, height or aspect ratio */
+  refDim?: "width" | "height" | "ratio"
+  keyline: SmartTarget
+  fit: MagicFit
+}
+/** Smart Sizing: sorts every file by its artwork's shape and fits each group to its own keyline */
+export interface MagicKeylines {
+  enabled: boolean
+  /** How far from 1:1 (in %) still counts as square. null = the app's Square tolerance (filled in at run time) */
+  tolerance: number | null
+  rules: Record<MagicGroup, MagicRule>
+  /** Rules for every shape: run after a shape's own rules, before its card; the first match wins */
+  advanced?: SmartRule[]
+}
+/** Smart Sizing: files in each group, and per advanced rule (by position) */
+/** Ids of the files each Smart Sizing group and rule placed on their last run, in list order */
+export type SmartCounts = Record<MagicGroup, string[]> & { rules: string[][], groupRules: Record<MagicGroup, string[][]> }
+
+/** What Smart Sizing did to one file */
+export interface MagicPick {
+  group: MagicGroup
+  /** The keyline kind used, "live" or "canvas" */
+  keyline: SmartTarget
+  fit: MagicFit
+  /** True when the rule's keyline wasn't there and the closest one stood in */
+  fallback?: boolean
+  /** The advanced rule that matched (1-based) and how it reads */
+  rule?: number
+  /** Set when the rule was one of a shape's own; unset for the every-shape rules */
+  ruleGroup?: MagicGroup
+  ruleText?: string
+  /** The artwork's measured size, before fitting, and the tolerance used */
+  w?: number
+  h?: number
+  tolerance?: number
 }
 
 /** A small, file-specific tweak inside a design principle, picked by file name or handle */
@@ -128,6 +229,8 @@ export interface DesignPrinciple {
   padding: number
   fit: GridFit
   keylines: Keyline[]
+  /** Reference-only guides. Missing = none (older files and Symbols exports) */
+  alignmentKeylines?: AlignmentKeyline[]
   /** Reference stroke weight and corner radius, for the guides and the report */
   stroke: number
   radius: number
@@ -171,10 +274,14 @@ export interface SvgoSettings {
   custom: Record<string, { on: boolean, params: string }>
   /** The design principle files are fitted to, if any */
   designPrincipleId?: string | null
+  /** Smart Sizing: sort files by shape (square, tall, wide) and fit each group to its own keyline. Needs a design principle */
+  magicKeylines?: MagicKeylines | null
   /** Filled in by the host at run time (never saved): the design principle's grid */
   grid?: GridSpec | null
-  /** Filled in by the host at run time (never saved): variations plus the file's own Quickview tuning */
+  /** Filled in by the host at run time (never saved): the design principle's variations for this file */
   adjust?: ArtAdjust | null
+  /** Filled in by the host at run time (never saved): the file's own Quick Edit placement, applied last of all the artwork moves */
+  tune?: ArtAdjust | null
 }
 
 /** A third-party SVGO plugin loaded from a .js/.mjs file */
@@ -261,12 +368,20 @@ export interface AppSettings {
   guideShape?: GuideShape
   /** Brand icon rules, managed in Design principles */
   designPrinciples?: DesignPrinciple[]
-  /** The design principle Quickview shows when a file's preset doesn't name one */
+  /** The design principle Quick Edit shows when a file's preset doesn't name one */
   quickviewDpId?: string | null
-  /** Quickview's move step, in viewBox units */
+  /** Quick Edit's move step, in viewBox units */
   quickviewStep?: number
-  /** Quickview's guides: grid, live area and keylines */
+  /** Quick Edit's guides: grid, live area and keylines */
   quickviewGuides?: boolean
+  /** Skip the confirm before Show in Finder / Open in app on a row */
+  skipOpenConfirm?: boolean
+  /** Draw the preset's design principle (grid, live area, keylines) over list thumbnails */
+  listGuides?: boolean
+  /** With listGuides: the design principle's alignment keylines too */
+  listAlignment?: boolean
+  /** How far from 1:1 (±%) still counts as square, not tall or wide. Filters, tags and Smart Sizing */
+  squareTolerance?: number
 }
 
 // ── Files ─────────────────────────────────────────────────────────────────────
@@ -291,7 +406,7 @@ export type PrecisionTolerance = "strict" | "balanced" | "loose"
 export interface OptimiseResult {
   output: string
   size: number
-  /** The fine-tuning baked into this output, so previews can show changes before the re-run lands */
+  /** The Quick Edit placement baked into this output, so previews can show changes before the re-run lands */
   adjust?: ArtAdjust
   /** How many find & replace matches and attribute rule changes were made */
   replaced: number
@@ -299,6 +414,8 @@ export interface OptimiseResult {
   effects?: GeometryEffect[]
   /** The precision auto precision settled on */
   precision?: number
+  /** Smart Sizing: the shape group and keyline this file was fitted to */
+  magic?: MagicPick
   /** Fingerprint of the settings used, so we can tell when a result is stale */
   key: string
 }
@@ -327,7 +444,7 @@ export interface SvgItem extends ScannedFile {
   heavy?: string
   /** Render and optimise it anyway */
   forceRender?: boolean
-  /** Quickview's fine-tuning, applied last */
+  /** Quick Edit's fine-tuning, applied last */
   adjust?: ArtAdjust
   /** A host's own name for the file (Symbols' handle), for design principle variations */
   handle?: string

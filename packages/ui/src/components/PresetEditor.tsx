@@ -1,4 +1,6 @@
-import type { CustomPlugin, DesignPrinciple, PrecisionTolerance, SvgoSettings } from "@marknotton/svgenius-core/types"
+import type { CustomPlugin, DesignPrinciple, PrecisionTolerance, SmartCounts, SvgoSettings } from "@marknotton/svgenius-core/types"
+import { SmartSizing } from "./SmartSizing"
+import { DiffBadge, SettingsDiffContext, type SettingsDiffValue } from "./SettingsDiff"
 import { fmtNum } from "@marknotton/svgenius-core/svgRoot"
 import { FIT_LABELS } from "./DesignPrinciplesDialog"
 import { AttrRuleList } from "./AttrRuleList"
@@ -25,17 +27,24 @@ interface Props {
   /** Design principles a preset can fit its files to. Without them the section is hidden */
   designPrinciples?: DesignPrinciple[]
   onManagePrinciples?: () => void
+  /** Settings › Square tolerance, ±% */
+  squareTolerance?: number
+  /** Smart Sizing: how many of this preset's files landed in each group */
+  smartCounts?: SmartCounts
+  onRevealFile?: (id: string) => void
+  /** A file's own settings: how far each section is from its preset, and putting it back */
+  diff?: SettingsDiffValue | null
 }
 
-export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, onRemovePlugin, advanced, designPrinciples, onManagePrinciples }: Props) {
+export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, onRemovePlugin, advanced, designPrinciples, onManagePrinciples, squareTolerance, smartCounts, onRevealFile, diff }: Props) {
   // Trim, viewBox and the beta geometry tools need a browser, so a host that
   // applies presets on a server (Symbols) leaves them out
   const geometry = host().capabilities.geometryPresets
   const trim = (patch: Partial<SvgoSettings["trim"]>) => edit((x) => ({ ...x, trim: { ...x.trim, ...patch } }))
   return (
-    <>
+    <SettingsDiffContext.Provider value={diff ?? null}>
       <section className="panel__section" data-nav="output" data-nav-title="Output">
-        <div className="panel__label">Output</div>
+        <div className="plugins__head"><span className="panel__label">Output</span><DiffBadge section="output" /></div>
         <Toggle label="Multipass" hint="Run the plugins repeatedly until nothing more is saved"
           checked={s.multipass} onChange={(v) => edit((x) => ({ ...x, multipass: v }))} />
         <Toggle label="Pretty print" hint="Indent the markup. Bigger files, easier to read"
@@ -67,6 +76,11 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
       {geometry && designPrinciples && <section className="panel__section" data-nav="principle" data-nav-title="Design principle">
         <PrincipleField id={s.designPrincipleId ?? null} list={designPrinciples} onManage={onManagePrinciples}
           onChange={(designPrincipleId) => edit((x) => ({ ...x, designPrincipleId }))} />
+        {s.designPrincipleId && designPrinciples.some((d) => d.id === s.designPrincipleId) && (
+          <SmartSizing magic={s.magicKeylines ?? null} dp={designPrinciples.find((d) => d.id === s.designPrincipleId)!}
+            squareTolerance={squareTolerance ?? 10} counts={smartCounts} onReveal={onRevealFile}
+            onChange={(magicKeylines) => edit((x) => ({ ...x, magicKeylines }))} />
+        )}
       </section>}
       {geometry && <>
       <section className="panel__section" data-nav="contents" data-nav-title="Edit contents">
@@ -105,7 +119,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
       {advanced && <>
       {geometry && <>
       <section className="panel__section" data-nav="beta" data-nav-title="Beta">
-        <div className="panel__label">Beta <span className="pill pill--beta">Experimental</span></div>
+        <div className="plugins__head"><span className="panel__label">Beta <span className="pill pill--beta">Experimental</span></span><DiffBadge section="beta" /></div>
         <p className="panel__hint text-3">Geometry changes made after SVGO. Check the results before exporting.</p>
         <Toggle label="Flatten transforms"
           hint="Removes transform attributes (translate, rotate, scale, matrix) and rewrites the shapes so they sit exactly where the transform put them"
@@ -152,7 +166,7 @@ export function PresetEditor({ settings: s, edit, customPlugins, onLoadPlugin, o
       {!advanced && (
         <p className="panel__simple text-3">Switch on <strong>Advanced</strong> at the top for the viewBox and contents tools, rules, custom plugins and Beta tools.</p>
       )}
-    </>
+    </SettingsDiffContext.Provider>
   )
 }
 
@@ -163,9 +177,10 @@ function PrincipleField({ id, list, onChange, onManage }: { id: string | null, l
     <>
       <div className="plugins__head">
         <span className="panel__label">Design principle</span>
+        <DiffBadge section="principle" />
         {onManage && <button className="link" onClick={onManage} title="Add, edit, import and export design principles">Manage…</button>}
       </div>
-      <p className="rules__empty text-3">Fits every file to a brand's icon grid: its canvas, live area and keylines. Edit contents and Quickview tuning apply on top.</p>
+      <p className="rules__empty text-3">Fits every file to a brand's icon grid: its canvas, live area and keylines. Edit contents and Quick Edit tuning apply on top.</p>
       <select className="input input--sm principle-select" aria-label="Design principle" value={dp ? dp.id : ""}
         onChange={(e) => onChange(e.target.value || null)}>
         <option value="">None</option>

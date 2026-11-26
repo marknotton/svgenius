@@ -1,7 +1,7 @@
 import { IconDownload, IconPencil, IconPlus, IconReset, IconStar, IconTrash, IconUpload } from "../icons"
 import { plural } from "@marknotton/svgenius-core/format"
 import type { PresetActions } from "@marknotton/svgenius-core/presets"
-import type { AppSettings, CustomPlugin, Preset } from "@marknotton/svgenius-core/types"
+import type { AppSettings, CustomPlugin, Preset, SmartCounts } from "@marknotton/svgenius-core/types"
 import { PresetEditor } from "./PresetEditor"
 import { PresetSelect } from "./PresetSelect"
 import { SectionNav } from "./SectionNav"
@@ -22,6 +22,10 @@ interface Props {
   onRemovePlugin: (p: CustomPlugin) => void
   /** Opens the design principles manager; with it, presets can pick a design principle */
   onManagePrinciples?: () => void
+  /** Smart Sizing: how many of this preset's files landed in each group */
+  smartCounts?: SmartCounts
+  /** Scrolls the file list to a file and flashes its row */
+  onRevealFile?: (id: string) => void
 }
 
 export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
@@ -74,7 +78,8 @@ export function ConfigPanel({ settings, preset, usage, actions, ...p }: Props) {
       <div className="panel__scroll" ref={scrollRef}>
         <PresetEditor settings={s} edit={edit} customPlugins={settings.customPlugins}
           onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} advanced={settings.advanced}
-          designPrinciples={p.onManagePrinciples ? settings.designPrinciples ?? [] : undefined} onManagePrinciples={p.onManagePrinciples} />
+          designPrinciples={p.onManagePrinciples ? settings.designPrinciples ?? [] : undefined} onManagePrinciples={p.onManagePrinciples}
+          squareTolerance={settings.squareTolerance} smartCounts={p.smartCounts} onRevealFile={p.onRevealFile} />
       </div>
       <SectionNav scroller={scrollRef} />
     </aside>

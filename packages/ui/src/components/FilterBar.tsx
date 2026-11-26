@@ -1,6 +1,6 @@
 import { IconDuplicate, IconPlus, IconTrash } from "../icons"
 import { canonicalColour } from "@marknotton/svgenius-core/cutOuts"
-import { ELEMENTS, FIELDS, FLAGS, STATUSES, activeRules, createFilterRule, type FilterField, type FilterRule, type FilterSet } from "@marknotton/svgenius-core/filters"
+import { ELEMENTS, FIELDS, FLAGS, SHAPES, STATUSES, activeRules, createFilterRule, type FilterField, type FilterRule, type FilterSet } from "@marknotton/svgenius-core/filters"
 import { duplicateAfter } from "@marknotton/svgenius-core/settings"
 import { Segmented } from "./Segmented"
 
@@ -41,7 +41,8 @@ export function FilterBar({ filters, onChange, shown, total, usedFlags }: Props)
       </div>
       {rules.length === 0 && (
         <p className="text-3 filters__empty">
-          Add rules to narrow the list, e.g. markup contains <code>#fff</code> and has a <code>circle</code> element, or every file without a red flag.
+          Add rules to narrow the list, e.g. markup contains <code>#fff</code> and has a <code>circle</code> element, every file without a red flag, or every tall icon.
+          In search, <code>shape:tall</code> matches by the artwork and <code>vb:wide</code> by the viewBox (<code>-shape:square</code> leaves them out).
           Optimise, Export and Select all then work on the files shown.
         </p>
       )}
@@ -80,7 +81,7 @@ function verb(field: FilterField, has: boolean) {
   switch (field) {
     case "text": case "name": return has ? "contains" : "doesn't contain"
     case "colour": return has ? "uses" : "doesn't use"
-    case "flag": case "status": return has ? "is" : "isn't"
+    case "flag": case "status": case "shape": return has ? "is" : "isn't"
     default: return has ? "has" : "doesn't have"
   }
 }
@@ -101,6 +102,19 @@ function Value({ rule: r, index: i, usedFlags, patch }: { rule: FilterRule, inde
         <select className="select select--sm filters__value" value={r.value} aria-label={label} onChange={(e) => patch({ value: e.target.value })}>
           {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+      )
+    case "shape":
+      return (
+        <span className="filters__value filters__pair">
+          <select className="select select--sm" value={r.value} aria-label={label} onChange={(e) => patch({ value: e.target.value })}>
+            {SHAPES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          <Segmented label={`Rule ${i + 1} measured by`} value={r.value2 === "viewbox" ? "viewbox" : "content"} onChange={(value2) => patch({ value2 })}
+            options={[
+              { value: "content", label: "By artwork", title: "The drawing's own bounds, whatever the canvas around it" },
+              { value: "viewbox", label: "By viewBox", title: "The canvas: the viewBox's width and height" }
+            ]} />
+        </span>
       )
     case "colour":
       return (

@@ -1,3 +1,4 @@
+import { DiffBadge } from "./SettingsDiff"
 import { useState } from "react"
 import { IconPlus, IconTrash } from "../icons"
 import type { CustomPlugin, SvgoSettings } from "@marknotton/svgenius-core/types"
@@ -32,6 +33,7 @@ export function CustomPluginList({ plugins, settings, onChange, onLoad, onRemove
     <div className="plugins__group">
       <div className="plugins__head">
         <span className="panel__label">Custom {plugins.length > 0 && <span className="text-3">{onCount}/{plugins.length}</span>}</span>
+        <DiffBadge section="custom" />
         <button className="link" onClick={onLoad} title="Load a single-file SVGO plugin (.js or .mjs)">
           <IconPlus width={11} height={11} /> Load plugin
         </button>

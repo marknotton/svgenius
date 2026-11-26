@@ -3,7 +3,8 @@ import { LIVE_BUFFER_PX } from "@marknotton/svgenius-core/config"
 import { IconFilter, IconSort, IconPlus, IconTrash, IconProject } from "../icons"
 import { plural } from "@marknotton/svgenius-core/format"
 import type { FileTag } from "@marknotton/svgenius-core/tags"
-import type { AppSettings, Preset, SvgItem } from "@marknotton/svgenius-core/types"
+import type { ShapeFrame } from "@marknotton/svgenius-core/shapes"
+import type { AppSettings, DesignPrinciple, Preset, SvgItem } from "@marknotton/svgenius-core/types"
 import { FileRow } from "./FileRow"
 
 interface Props {
@@ -39,6 +40,15 @@ interface Props {
   onSort: (e: React.MouseEvent) => void
   onClearFilters: () => void
   tagsFor: (item: SvgItem) => FileTag[]
+  /** Design principle guides over each thumbnail, when on */
+  guidesFor?: (item: SvgItem) => DesignPrinciple | null
+  /** With guidesFor: the alignment keylines too */
+  alignmentGuides?: boolean
+  /** The shape guide and clip sit in each preset's design principle live area */
+  frameFor?: (item: SvgItem) => ShapeFrame | null
+  /** Row buttons: the full editor and Quick Edit */
+  onEdit?: (id: string) => void
+  onQuickEdit?: (id: string) => void
   exportNames: Map<string, string> | null
   /** Opens the Add SVGs dialog: files, a folder or pasted code */
   onAdd: () => void
@@ -118,7 +128,7 @@ export function FileList(p: Props) {
             <IconTrash /> {selection.size ? "Remove" : "Clear"}
           </button>
         </div>
-        <input className="input input--sm list-search" type="search" placeholder="Search names" aria-label="Search files by name"
+        <input className="input input--sm list-search" type="search" placeholder="Search names, or shape:tall" title="Search names. shape:square, shape:tall or shape:wide match by the artwork, vb:… by the viewBox, is:tuned finds files placed in Quick Edit, and a leading - leaves any of them out" aria-label="Search files by name"
           value={p.query} onChange={(e) => p.onQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Escape") p.onQuery("") }} />
         {p.showFilters && <button className={`btn btn--ghost btn--sm filters-btn${p.filtersOpen || p.filterCount ? " is-on" : ""}`} onClick={p.onFilters}
@@ -140,7 +150,7 @@ export function FileList(p: Props) {
           {p.query.trim() && <button className="link" onClick={() => p.onQuery("")}>Clear search</button>}{" "}
           {p.filterCount > 0 && <button className="link" onClick={p.onClearFilters}>Clear filters</button>}</p>
       )}
-      <ul ref={listRef} className={`file-list${!settings.showDetails ? " file-list--gallery" : settings.thumbPx <= 40 ? " file-list--tiny" : ""}`}>
+      <ul ref={listRef} className={`file-list${!settings.showDetails ? " file-list--gallery" : settings.thumbPx <= 40 ? " file-list--tiny" : ""}${p.alignmentGuides === false ? " no-align" : ""}`}>
         {items.map((item) => (
           <FileRow
             key={item.id}
@@ -163,6 +173,10 @@ export function FileList(p: Props) {
             defaultPreset={p.defaultPreset}
             onToggle={p.onToggle}
             onFlag={p.onFlag}
+            guides={p.guidesFor?.(item) ?? null}
+            frame={p.frameFor?.(item) ?? null}
+            onEdit={p.onEdit}
+            onQuickEdit={p.onQuickEdit}
           />
         ))}
       </ul>

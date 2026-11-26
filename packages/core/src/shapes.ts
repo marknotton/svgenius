@@ -19,11 +19,12 @@ const f = (n: number) => String(Math.round(n * 1000) / 1000)
 
 type Pt = [number, number]
 
-/** Where each corner's arc sits: its centre and radius (clamped so corners never overlap) */
-function corners(points: Pt[], r: number) {
+/** A polygon with every corner rounded to radius r (clamped so corners never overlap) */
+export function roundedPolygon(points: Pt[], r: number) {
   const n = points.length
-  return points.map((p, i) => {
-    const prev = points[(i - 1 + n) % n], next = points[(i + 1) % n]
+  let d = ""
+  for (let i = 0; i < n; i++) {
+    const prev = points[(i - 1 + n) % n], p = points[i], next = points[(i + 1) % n]
     const v1: Pt = [prev[0] - p[0], prev[1] - p[1]], v2: Pt = [next[0] - p[0], next[1] - p[1]]
     const l1 = Math.hypot(...v1), l2 = Math.hypot(...v2)
     const angle = Math.acos(Math.max(-1, Math.min(1, (v1[0] * v2[0] + v1[1] * v2[1]) / (l1 * l2))))
@@ -32,34 +33,10 @@ function corners(points: Pt[], r: number) {
     const rr = t * Math.tan(angle / 2)
     const a: Pt = [p[0] + (v1[0] / l1) * t, p[1] + (v1[1] / l1) * t]
     const b: Pt = [p[0] + (v2[0] / l2) * t, p[1] + (v2[1] / l2) * t]
-    // The arc's centre lies along the bisector, rr / sin(angle / 2) in from the corner
-    const bx = v1[0] / l1 + v2[0] / l2, by = v1[1] / l1 + v2[1] / l2, bl = Math.hypot(bx, by) || 1
-    const k = rr / Math.sin(angle / 2)
-    const c: Pt = [p[0] + (bx / bl) * k, p[1] + (by / bl) * k]
     const sweep = v1[0] * v2[1] - v1[1] * v2[0] < 0 ? 1 : 0
-    return { a, b, c, rr, sweep }
-  })
-}
-
-/** A polygon with every corner rounded to radius r */
-export function roundedPolygon(points: Pt[], r: number) {
-  return corners(points, r).map(({ a, b, rr, sweep }, i) =>
-    `${i === 0 ? "M" : "L"}${f(a[0])} ${f(a[1])}A${f(rr)} ${f(rr)} 0 0 ${sweep} ${f(b[0])} ${f(b[1])}`).join("") + "Z"
-}
-
-/**
- * A rounded polygon scaled and centred so its real outline (after rounding,
- * which pulls sharp corners in) fills a square of side s around (cx, cy).
- * Without this a rounded triangle sits visibly low
- */
-function fittedRoundedPolygon(points: Pt[], r: number, cx: number, cy: number, s: number) {
-  const cs = corners(points, r)
-  // Each corner's extreme is its arc centre ± its radius; straight edges never go further out
-  const x0 = Math.min(...cs.map((c) => c.c[0] - c.rr)), x1 = Math.max(...cs.map((c) => c.c[0] + c.rr))
-  const y0 = Math.min(...cs.map((c) => c.c[1] - c.rr)), y1 = Math.max(...cs.map((c) => c.c[1] + c.rr))
-  const k = Math.min(s / (x1 - x0), s / (y1 - y0))
-  const mx = (x0 + x1) / 2, my = (y0 + y1) / 2
-  return roundedPolygon(points.map(([x, y]) => [cx + (x - mx) * k, cy + (y - my) * k]), r * k)
+    d += `${i === 0 ? "M" : "L"}${f(a[0])} ${f(a[1])}A${f(rr)} ${f(rr)} 0 0 ${sweep} ${f(b[0])} ${f(b[1])}`
+  }
+  return `${d}Z`
 }
 
 /** |x|^n + |y|^n = 1, sampled finely enough to look smooth at any size */
@@ -76,8 +53,14 @@ function superellipse(cx: number, cy: number, r: number, n = 5, steps = 96) {
 }
 
 /** Path data for a shape in a box (default 0 0 100 100), centred and fitted to its shorter side */
-export function shapePath(shape: GuideShape, box = { x: 0, y: 0, w: 100, h: 100 }) {
-  const s = Math.min(box.w, box.h)
+export function shapePath(shape: GuideShape, box = { x: 0, y: 0, w: 100, h: 100 }, fitHeight = false) {
+  // Default: fitted to the box's shorter side. fitHeight (design principle live
+  // areas): every shape's visible height matches the box's height and its width
+  // follows its own ratio, so the triangle (wider than tall) gets wider
+  const s = !fitHeight ? Math.min(box.w, box.h)
+    : shape === "roundedTriangle" ? box.h / (Math.sqrt(3) / 2 - 0.1)
+    // Rounding the hexagon's top and bottom points (radius 0.08s, 120° corners) trims each by 0.08s × (2/√3 − 1)
+    : shape === "roundedHexagon" ? box.h / (1 - 2 * 0.08 * (2 / Math.sqrt(3) - 1)) : box.h
   const cx = box.x + box.w / 2, cy = box.y + box.h / 2
   const r = s / 2
   switch (shape) {
@@ -87,24 +70,52 @@ export function shapePath(shape: GuideShape, box = { x: 0, y: 0, w: 100, h: 100 
       return `M${f(x + k)} ${f(y)}H${f(x + s - k)}A${f(k)} ${f(k)} 0 0 1 ${f(x + s)} ${f(y + k)}V${f(y + s - k)}A${f(k)} ${f(k)} 0 0 1 ${f(x + s - k)} ${f(y + s)}H${f(x + k)}A${f(k)} ${f(k)} 0 0 1 ${f(x)} ${f(y + s - k)}V${f(y + k)}A${f(k)} ${f(k)} 0 0 1 ${f(x + k)} ${f(y)}Z`
     }
     case "roundedTriangle": {
-      // Equilateral, as wide as the box, centred on its bounding box
+      // Equilateral, as wide as the box. Rounding the top point drops its tip
+      // by the corner radius (the arc's centre sits 2r below a 60° point), so
+      // the visible shape, not the sharp triangle, is centred
       const h = (s * Math.sqrt(3)) / 2
-      return fittedRoundedPolygon([[cx, cy - h / 2], [cx + r, cy + h / 2], [cx - r, cy + h / 2]], s * 0.1, cx, cy, s)
+      const k = s * 0.1
+      const top = cy - (h - k) / 2 - k
+      return roundedPolygon([[cx, top], [cx + r, top + h], [cx - r, top + h]], k)
     }
     case "roundedHexagon": {
       const pts: Pt[] = Array.from({ length: 6 }, (_, i) => {
         const a = -Math.PI / 2 + (i * Math.PI) / 3
         return [cx + r * Math.cos(a), cy + r * Math.sin(a)]
       })
-      return fittedRoundedPolygon(pts, s * 0.08, cx, cy, s)
+      return roundedPolygon(pts, s * 0.08)
     }
     default:
       return `M${f(cx - r)} ${f(cy)}A${f(r)} ${f(r)} 0 1 0 ${f(cx + r)} ${f(cy)}A${f(r)} ${f(r)} 0 1 0 ${f(cx - r)} ${f(cy)}Z`
   }
 }
 
-/** A black-on-transparent SVG of the shape, as a data URL, for CSS masks */
-export function shapeMaskUrl(shape: GuideShape) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="${shapePath(shape)}"/></svg>`
+/**
+ * Where a shape sits on a canvas: a design principle's canvas (w × h) with the
+ * shape fitted to its live area. Without one, the shape fills a 100 box
+ */
+export interface ShapeFrame {
+  w: number
+  h: number
+  box: { x: number, y: number, w: number, h: number }
+  /** Shapes that aren't 1:1 take the box's height and keep their aspect ratio */
+  fitHeight?: boolean
+}
+
+/**
+ * A design principle's frame: the shape fills the shorter side of a centred box,
+ * by default its live area, or a keyline's size when one is given
+ */
+export function dpShapeFrame(dp: { width: number, height: number, padding: number }, size?: { w: number, h: number } | null): ShapeFrame {
+  const p = Math.max(0, dp.padding)
+  const w = Math.max(1e-3, size ? size.w : dp.width - p * 2), h = Math.max(1e-3, size ? size.h : dp.height - p * 2)
+  return { w: dp.width, h: dp.height, box: { x: (dp.width - w) / 2, y: (dp.height - h) / 2, w, h }, fitHeight: true }
+}
+
+/** A black-on-transparent SVG of the shape, as a data URL, for CSS masks (size it with contain, centred) */
+export function shapeMaskUrl(shape: GuideShape, frame?: ShapeFrame | null) {
+  const svg = frame
+    ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f(frame.w)} ${f(frame.h)}"><path d="${shapePath(shape, frame.box, frame.fitHeight)}"/></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="${shapePath(shape)}"/></svg>`
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }

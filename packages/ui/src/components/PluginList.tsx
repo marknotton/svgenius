@@ -1,3 +1,4 @@
+import { DiffBadge } from "./SettingsDiff"
 import { useState } from "react"
 import { IconInfo } from "../icons"
 import { PLUGINS, type PluginInfo } from "@marknotton/svgenius-core/plugins"
@@ -25,6 +26,7 @@ export function PluginList({ settings, onToggle, onSetGroup }: Props) {
     <div className="plugins">
       <div className="plugins__head">
         <span className="panel__label">SVGO plugins</span>
+        <DiffBadge section="plugins" />
         <button type="button" className={`flag${details ? " is-on" : ""}`} aria-pressed={details}
           title="Show what each plugin does" onClick={() => setDetails((d) => !d)}><IconInfo /> Details</button>
       </div>

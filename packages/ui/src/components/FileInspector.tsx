@@ -11,9 +11,12 @@ import { PresetSelect } from "./PresetSelect"
 import { PresetEditor } from "./PresetEditor"
 import { SliderField } from "./SliderField"
 import { Thumb } from "./Thumb"
+import type { ShapeFrame } from "@marknotton/svgenius-core/shapes"
 import { TooComplex } from "./TooComplex"
 import { isBlocked } from "@marknotton/svgenius-core/complexity"
 import { SectionNav } from "./SectionNav"
+import { ChangeCount, type SettingsDiffValue } from "./SettingsDiff"
+import { revertSection, settingsDiff } from "@marknotton/svgenius-core/settingsDiff"
 
 // ── Per-file inspector ────────────────────────────────────────────────────────
 // Info, tags, a live markup editor and the file's preset or own settings.
@@ -37,6 +40,8 @@ interface Props {
   onConfig: (fn: (s: SvgoSettings) => SvgoSettings) => void
   onSaveAsPreset: () => void
   onUsePreset: () => void
+  /** Puts some or all of the file's own settings back to its preset (null drops them), with undo */
+  onRevertConfig?: (next: SvgoSettings | null, what: string) => void
   customPlugins: CustomPlugin[]
   onLoadPlugin: () => void
   onRemovePlugin: (p: CustomPlugin) => void
@@ -45,9 +50,15 @@ interface Props {
   /** The big markup editor (double-clicking a row opens it too) */
   markupOpen: boolean
   onMarkupOpen: (open: boolean) => void
+  /** Switches the editor to Quick Edit on this file */
+  onQuickEdit?: (id: string) => void
   /** Previous and next file, for the editor's arrows */
   nav?: { pos: number, total: number, go: (step: 1 | -1) => void }
   circle?: { on: boolean, clip: boolean, onToggle: () => void, onClip: () => void }
+  /** The preset's design principle live area: the shape guide and clip sit in it */
+  frame?: ShapeFrame | null
+  /** Settings › Square tolerance, ±% */
+  squareTolerance?: number
   /** Design principles the file's own settings can fit it to */
   designPrinciples?: DesignPrinciple[]
   onManagePrinciples?: () => void
@@ -62,6 +73,18 @@ const dims = (s: { w: number, h: number } | null) => (s ? `${fmtNum(s.w, 2)} × 
 
 export function FileInspector({ item, presets, defaultPreset, backdrop, previewPx, ...p }: Props) {
   const [tab, setTab] = useState<MarkupTab>("source")
+  // Customise this file: how far each section is from the preset, and putting it back
+  const base = (presets.find((x) => x.id === item.presetId) ?? defaultPreset).settings
+  const counts = useMemo(() => (item.config ? settingsDiff(item.config, base) : null), [item.config, base])
+  const diffTotal = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0
+  const revert = (next: SvgoSettings | null, what: string) => {
+    if (p.onRevertConfig) return p.onRevertConfig(next, what)
+    if (next) p.onConfig(() => next); else p.onUsePreset()
+  }
+  const diff: SettingsDiffValue | null = counts && item.config ? {
+    counts,
+    revert: (section) => revert(revertSection(item.config!, base, section), `Reverted ${plural(counts[section], "change")} to ${p.presetName}`)
+  } : null
   // The markup box fills whatever height the sidebar has spare (at least 180px)
   const codeSection = useRef<HTMLElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -110,7 +133,7 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             <figcaption className="text-2">Before</figcaption>
           </figure>
           <figure className="pane">
-            <Thumb svg={out} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : "Not optimised yet. Click Optimise, or turn on Live preview"} size={previewPx} backdrop={backdrop} label={`${item.name} after`} />
+            <Thumb svg={out} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : "Not optimised yet. Click Optimise, or turn on Live preview"} size={previewPx} backdrop={backdrop} label={`${item.name} after`} frame={p.frame} />
             <figcaption className="text-2">After{item.status === "running" && <span className="spinner spinner--xs" />}</figcaption>
           </figure>
         </div>}
@@ -163,11 +186,12 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
             onToggle={(e) => { if ((e.currentTarget as HTMLDetailsElement).open && !item.config) p.onCustomise() }}>
             <summary className="accordion__summary">
               <span className="panel__label">Customise this file</span>
+              {diffTotal > 0 && <ChangeCount n={diffTotal} all onRevert={() => revert(null, `Reverted ${plural(diffTotal, "change")}: ${item.name} follows ${p.presetName} again`)} />}
             </summary>
             {item.config && (
               <PresetEditor settings={item.config} edit={p.onConfig} customPlugins={p.customPlugins}
                 onLoadPlugin={p.onLoadPlugin} onRemovePlugin={p.onRemovePlugin} advanced={p.advanced}
-                designPrinciples={p.designPrinciples} onManagePrinciples={p.onManagePrinciples} />
+                designPrinciples={p.designPrinciples} onManagePrinciples={p.onManagePrinciples} squareTolerance={p.squareTolerance} diff={diff} />
             )}
           </details>
         )}
@@ -200,7 +224,8 @@ export function FileInspector({ item, presets, defaultPreset, backdrop, previewP
         {p.markupOpen && !isBlocked(item) && (
           // Keyed by file: each one gets its own undo history and selection
           <MarkupDialog key={item.id} item={item} tab={tab} onTab={setTab} nav={p.nav} circle={p.circle}
-            backdrop={backdrop} toolbarSide={p.editorToolbar} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => p.onMarkupOpen(false)} />
+            backdrop={backdrop} toolbarSide={p.editorToolbar} onEdit={p.onEdit} onRevert={p.onRevert} onClose={() => p.onMarkupOpen(false)}
+            onQuickEdit={p.onQuickEdit ? () => p.onQuickEdit?.(item.id) : undefined} />
         )}
       </div>
       <SectionNav scroller={scrollRef} />

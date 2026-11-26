@@ -1,3 +1,4 @@
+import { DiffBadge } from "./SettingsDiff"
 import { validScale } from "@marknotton/svgenius-core/settings"
 import type { TrimSettings } from "@marknotton/svgenius-core/types"
 import { Segmented } from "./Segmented"
@@ -19,6 +20,7 @@ export function EditViewBox({ trim, onChange }: Props) {
     <>
       <div className="plugins__head">
         <span className="panel__label">Edit viewBox</span>
+        <DiffBadge section="viewbox" />
         <button className="link" disabled={pristine} title="Size back to 1×, trim off"
           onClick={() => onChange({ enabled: false, padding: 0, scale: 1, sizeUnit: "%" })}>Reset</button>
       </div>
@@ -83,6 +85,7 @@ export function EditContents({ trim, onChange, markup, onMarkup }: Props & { mar
     <>
       <div className="plugins__head">
         <span className="panel__label">Edit contents</span>
+        <DiffBadge section="contents" />
         <button className="link" disabled={pristine} title="Artwork back to normal, extra markup cleared"
           onClick={() => { onChange({ artScale: 1, artUnit: "x", offsetX: 0, offsetY: 0 }); onMarkup("") }}>Reset</button>
       </div>

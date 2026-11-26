@@ -282,6 +282,12 @@ export const openInDefaultApp = (path: string) => {
   if (isDesktop && !isPasted(path)) openPath(path).catch(() => {})
 }
 
+/** The name of the app that opens this file ("VectorCraft"). Null off the desktop or when unknown */
+export const defaultAppName = async (path: string): Promise<string | null> => {
+  if (!isDesktop || isPasted(path)) return null
+  try { return await desktop.defaultAppName(path) } catch { return null }
+}
+
 export const reveal = (path: string) => {
   if (isDesktop && !isPasted(path)) revealItemInDir(path).catch(() => {})
 }
@@ -349,7 +355,9 @@ export async function saveProjectFile(path: string | null, defaultName: string, 
     download(defaultName, new Blob([contents], { type: "application/json" }))
     return defaultName
   }
-  const to = path ?? await save({ defaultPath: defaultName, filters: [{ name: "SVGenius project", extensions: [PROJECT_EXT] }] })
+  // Saving back to its own file needs no dialog (and so no "Replace?"), unless the file has gone
+  const there = path ? await desktop.readJsonFile(path).then(() => true, () => false) : false
+  const to = there ? path : await save({ defaultPath: path ?? defaultName, filters: [{ name: "SVGenius project", extensions: [PROJECT_EXT] }] })
   if (!to) return null
   const withExt = to.toLowerCase().endsWith(`.${PROJECT_EXT}`) ? to : `${to}.${PROJECT_EXT}`
   await desktop.writeJsonFile(withExt, contents)

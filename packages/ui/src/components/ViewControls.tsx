@@ -19,11 +19,17 @@ interface Props {
   /** The guide and clip shape; without onShape there's no shape picker */
   shape?: GuideShape
   onShape?: (shape: GuideShape) => void
-  /** Opens Quickview on the current file */
+  /** Opens Quick Edit on the current file */
   onQuickview?: () => void
+  /** Design principle guides over thumbnails; without onGuides there's no button */
+  guides?: boolean
+  onGuides?: () => void
+  /** Alignment keylines over the previews too (only with guides on) */
+  alignment?: boolean
+  onAlignment?: () => void
 }
 
-export function ViewControls({ size, sizeRange, onSize, details, onDetails, circle, onCircle, clip, onClip, cssOpen, cssActive, onCssToggle, shape, onShape, onQuickview }: Props) {
+export function ViewControls({ size, sizeRange, onSize, details, onDetails, circle, onCircle, clip, onClip, cssOpen, cssActive, onCssToggle, shape, onShape, onQuickview, guides, onGuides, alignment, onAlignment }: Props) {
   const name = (GUIDE_SHAPES.find((s) => s.value === shape)?.label ?? "Circle").toLowerCase()
   return (
     <div className="view-controls">
@@ -58,10 +64,23 @@ export function ViewControls({ size, sizeRange, onSize, details, onDetails, circ
           </select>
         )}
       </div>
+      {onGuides && <span className={onAlignment ? "flag-pair" : "flag-pair flag-pair--single"}>
+        <button type="button" className={`flag flag--lg${guides ? " is-on" : ""}`} aria-pressed={guides}
+          title="Design principle: draw each preset's grid, live area and keylines over the previews" onClick={onGuides}>
+          <IconGridSm />
+        </button>
+      {onAlignment && (
+        <button type="button" className={`flag flag--lg${guides && alignment ? " is-on" : ""}`} aria-pressed={!!(guides && alignment)} disabled={!guides}
+          title={guides ? "Alignment keylines: the design principle's reference guides (centre circle, diagonals…) over the previews" : "Alignment keylines: turn on the design principle guides first"}
+          aria-label="Alignment keylines" onClick={onAlignment}>
+          <IconAlignGuides />
+        </button>
+      )}
+      </span>}
       {onQuickview && (
         <button type="button" className="flag flag--lg" onClick={onQuickview}
-          title="Quickview: fine-tune each file's position and scale against a design principle's grid (Space)">
-          Quickview
+          title="Quick Edit: fine-tune each file's position and scale against a design principle's grid (Space)">
+          Quick Edit
         </button>
       )}
       <button type="button" className={`flag flag--lg${cssOpen ? " is-on" : ""}`} aria-pressed={cssOpen}
@@ -78,3 +97,17 @@ const IconImageSm = () => (
 const IconImageLg = () => (
   <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="1.5" y="1.5" width="13" height="13" rx="2" /></svg>
 )
+const IconGridSm = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.25" aria-hidden="true">
+    <rect x="1.5" y="1.5" width="13" height="13" rx="1.5" /><path d="M6 1.5v13M10 1.5v13M1.5 6h13M1.5 10h13" opacity=".55" /><circle cx="8" cy="8" r="4" />
+  </svg>
+)
+
+/** A square with its diagonals and a small centre circle */
+function IconAlignGuides() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true">
+      <rect x="2" y="2" width="12" height="12" rx="1" /><path d="M2 2l12 12M14 2 2 14" strokeWidth=".9" /><circle cx="8" cy="8" r="2.6" />
+    </svg>
+  )
+}

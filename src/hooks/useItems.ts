@@ -7,7 +7,7 @@ import { loadSession, saveSession } from "../lib/session"
 import { postProcess } from "@marknotton/svgenius-core/trim"
 import { optimiseAutoPrecision } from "@marknotton/svgenius-core/precision"
 import { assessComplexity, isBlocked } from "@marknotton/svgenius-core/complexity"
-import type { ArtAdjust, GeometryEffect, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "@marknotton/svgenius-core/types"
+import type { ArtAdjust, GeometryEffect, MagicPick, OptimiseResult, RunSpec, SvgItem, SvgoSettings } from "@marknotton/svgenius-core/types"
 
 // ── File list + optimisation queue ────────────────────────────────────────────
 
@@ -190,11 +190,6 @@ export function useItems() {
   const setConfig = useCallback((id: string, config: SvgoSettings | undefined) => patch(id, { config }), [patch])
   /** Quickview's fine-tuning; undefined clears it */
   const setAdjust = useCallback((id: string, adjust: ArtAdjust | undefined) => patch(id, { adjust }), [patch])
-  /** Many files' tuning in one go (Quickview's Apply to all) */
-  const setAdjustMany = useCallback((changes: Array<{ id: string, adjust: ArtAdjust | undefined }>) => {
-    const byId = new Map(changes.map((c) => [c.id, c.adjust]))
-    setItems((list) => list.map((i) => (byId.has(i.id) ? { ...i, adjust: byId.get(i.id) } : i)))
-  }, [])
 
   /**
    * Optimises the given items. Already up-to-date results are skipped unless
@@ -224,9 +219,10 @@ export function useItems() {
           ? await optimiseAutoPrecision(item.source as string, spec)
           : { ...await optimiseSvg(item.source as string, spec), precision: undefined }
         const effects: GeometryEffect[] = []
-        const output = await postProcess(data, precision === undefined ? spec.svgo : { ...spec.svgo, floatPrecision: precision }, effects)
+        const info: { magic?: MagicPick } = {}
+        const output = await postProcess(data, precision === undefined ? spec.svgo : { ...spec.svgo, floatPrecision: precision }, effects, info)
         if (runs.current.get(item.id) !== run) return
-        const result = { output, size: byteLength(output), replaced, effects, precision, key: spec.key, adjust: spec.svgo.adjust ?? undefined }
+        const result = { output, size: byteLength(output), replaced, effects, precision, key: spec.key, adjust: spec.svgo.tune ?? undefined, ...(info.magic ? { magic: info.magic } : {}) }
         results.set(item.id, result)
         patch(item.id, { status: "done", result, errorKey: undefined })
       } catch (e) {
@@ -237,5 +233,5 @@ export function useItems() {
     return results
   }, [patch])
 
-  return { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, setAdjustMany, optimise, reloadFromDisk, forceRender }
+  return { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, optimise, reloadFromDisk, forceRender }
 }

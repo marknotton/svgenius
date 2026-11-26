@@ -3,7 +3,10 @@ import { svgDataUrl } from "@marknotton/svgenius-core/format"
 import { svgSize } from "@marknotton/svgenius-core/svgRoot"
 import type { Backdrop } from "@marknotton/svgenius-core/types"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
-import { ShapeGuide } from "./ShapeGuide"
+import { ShapeGuide, useGuideShape } from "./ShapeGuide"
+import { shapeMaskUrl, type ShapeFrame } from "@marknotton/svgenius-core/shapes"
+import { GridGuides } from "./GridGuides"
+import type { DesignPrinciple } from "@marknotton/svgenius-core/types"
 
 interface Props {
   svg?: string
@@ -14,6 +17,10 @@ interface Props {
   pending?: boolean
   /** Shown in place of a missing preview */
   placeholder?: string
+  /** A design principle's grid, live area and keylines drawn over the preview */
+  guides?: DesignPrinciple | null
+  /** The design principle's live area: the shape guide and clip sit in it instead of filling the canvas */
+  frame?: ShapeFrame | null
 }
 
 /**
@@ -21,21 +28,24 @@ interface Props {
  * ratio, so whitespace (or the lack of it) is visible. Rendered via <img>, so
  * scripts never run.
  */
-export const Thumb = memo(function Thumb({ svg, size, backdrop, label, pending, placeholder }: Props) {
+export const Thumb = memo(function Thumb({ svg, size, backdrop, label, pending, placeholder, guides, frame }: Props) {
   const css = usePreviewCss()
   const src = useMemo(() => (svg === undefined ? undefined : svgDataUrl(withPreviewCss(svg, css))), [svg, css])
   const dims = useMemo(() => svgSize(svg), [svg])
   const ratio = dims && dims.w > 0 && dims.h > 0 ? dims.w / dims.h : 1
   // Container units keep the canvas fitted however the thumb itself is sized
-  const canvas = { "--r": ratio } as CSSProperties
+  const shape = useGuideShape()
+  const frameMask = useMemo(() => (frame ? shapeMaskUrl(shape, frame) : undefined), [shape, frame])
+  const canvas = { "--r": ratio, "--frame-mask": frameMask } as CSSProperties
   return (
     <div className={`thumb thumb--${backdrop}`} style={{ width: size, height: size }}>
-      <div className="thumb__canvas" style={canvas}>
+      <div className={`thumb__canvas${frame ? " has-frame" : ""}`} style={canvas}>
         {src !== undefined && (
           <img key={src.length} src={src} alt={label ?? ""} draggable={false}
             onError={(e) => { e.currentTarget.style.visibility = "hidden" }} />
         )}
-        <ShapeGuide />
+        {guides && <GridGuides dp={guides} />}
+        <ShapeGuide frame={frame} />
         {pending && <span className="thumb__loading" />}
         {svg === undefined && !pending && placeholder && <span className="thumb__note" title={placeholder}>{size >= 90 ? placeholder : "Not optimised"}</span>}
       </div>

@@ -34,3 +34,5 @@ export const errorMessage = (e: unknown) =>
 
 export const setUnsaved = (unsaved: boolean) => invoke<void>("set_unsaved", { unsaved })
 export const quitApp = () => invoke<void>("quit_app")
+
+export const defaultAppName = (path: string) => invoke<string | null>("default_app_name", { path })

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { EditorTabs } from "./EditorTabs"
 import { IconEye, IconEyeOff, IconLock, IconUnlock, IconChevronDown, IconChevronLeft, IconChevronRight, IconZoomIn, IconZoomOut, IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconMagnet, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
 import { ShapeIcon } from "./ShapeGuide"
 import { Resizer } from "./Resizer"
@@ -52,6 +53,8 @@ interface Props {
   circle?: { on: boolean, clip: boolean, onToggle: () => void, onClip: () => void }
   /** Extra buttons from the host (Symbols puts its Save button here) */
   actions?: React.ReactNode
+  /** Switches to Quick Edit on this file */
+  onQuickEdit?: () => void
 }
 
 // Zoom steps for + and −, and the zoom menu's presets (as real-size percentages)
@@ -101,7 +104,7 @@ const LOCKS = new Map<string, LockRef[]>()
 /** Layers hidden in the editor, kept the same way. The file isn't changed */
 const HIDES = new Map<string, LockRef[]>()
 
-export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose, nav, circle, actions: hostActions }: Props) {
+export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose, nav, circle, actions: hostActions, onQuickEdit }: Props) {
   // Switching files paints an empty editor first, then fills it in on the next
   // frame, so the arrows feel instant even when a big file takes a moment
   const [ready, setReady] = useState(false)
@@ -603,6 +606,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
     <div className="modal-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal markup-dialog" role="dialog" aria-modal="true" aria-label={`Markup for ${item.name}`}>
         <div className="markup-dialog__head">
+          {onQuickEdit && <EditorTabs value="full" onQuick={onQuickEdit} />}
           <h2 className="modal__title markup-dialog__title" title={item.relPath}>{item.name}</h2>
           <CodeTabs value={tab} onChange={onTab} peek />
           <div className="markup-dialog__spacer" />

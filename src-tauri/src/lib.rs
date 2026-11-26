@@ -293,6 +293,34 @@ fn set_unsaved(unsaved: bool) {
     UNSAVED.store(unsaved, Ordering::SeqCst);
 }
 
+// ── Default app name ──────────────────────────────────────────────────────────
+// The name of the app the system opens a file with, for the "Open in…" confirm.
+// macOS asks NSWorkspace through JavaScript for Automation, so no extra crates
+
+#[tauri::command]
+fn default_app_name(path: String) -> Option<String> {
+    #[cfg(target_os = "macos")]
+    {
+        let script = r#"function run(argv) {
+  ObjC.import("AppKit");
+  const app = $.NSWorkspace.sharedWorkspace.URLForApplicationToOpenURL($.NSURL.fileURLWithPath(argv[0]));
+  if (!app || app.isNil()) return "";
+  return ObjC.unwrap($.NSFileManager.defaultManager.displayNameAtPath(app.path)).replace(/\.app$/, "");
+}"#;
+        let out = std::process::Command::new("/usr/bin/osascript")
+            .args(["-l", "JavaScript", "-e", script, &path])
+            .output()
+            .ok()?;
+        let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if out.status.success() && !name.is_empty() { Some(name) } else { None }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = path;
+        None
+    }
+}
+
 #[tauri::command]
 fn quit_app(app: AppHandle) {
     UNSAVED.store(false, Ordering::SeqCst);
@@ -448,6 +476,7 @@ pub fn run() {
             read_plugin_file,
             take_pending_open_files,
             set_unsaved,
+            default_app_name,
             quit_app
         ])
         .build(tauri::generate_context!())

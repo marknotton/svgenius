@@ -1,3 +1,4 @@
+import { DiffBadge } from "./SettingsDiff"
 import type { ReactNode } from "react"
 import { useDragSort } from "../hooks/useDragSort"
 import { IconDuplicate, IconGrip, IconPlus, IconTrash } from "../icons"
@@ -25,6 +26,7 @@ export function ReplaceList({ rules, onChange }: Props) {
     <div className="rules">
       <div className="plugins__head">
         <span className="panel__label">Find &amp; replace {rules.length > 0 && <span className="text-3">{active}/{rules.length}</span>}</span>
+        <DiffBadge section="replace" />
         <button className="link" onClick={add}><IconPlus width={11} height={11} /> Add rule</button>
       </div>
 

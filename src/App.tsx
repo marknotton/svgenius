@@ -5,6 +5,8 @@ import { AdvancedToggle, AppBar, BrandBar } from "./components/AppBar"
 import { ConfigPanel } from "@marknotton/svgenius-ui/components/ConfigPanel"
 import { ContextMenu, type MenuState } from "@marknotton/svgenius-ui/components/ContextMenu"
 import { useDialogs } from "@marknotton/svgenius-ui/components/Dialogs"
+import { configureHost } from "@marknotton/svgenius-ui/host"
+import { dpShapeFrame, type ShapeFrame } from "@marknotton/svgenius-core/shapes"
 import { clampDrawer, clampSidebar, Divider, DRAWER } from "@marknotton/svgenius-ui/components/Divider"
 import { DropOverlay, EmptyState } from "./components/EmptyState"
 import { FileInspector } from "@marknotton/svgenius-ui/components/FileInspector"
@@ -13,7 +15,7 @@ import { Footer } from "./components/Footer"
 import { PreviewCssBar, PreviewCssContext } from "@marknotton/svgenius-ui/components/PreviewCss"
 import { RenamePanel } from "@marknotton/svgenius-ui/components/RenamePanel"
 import { FilterBar } from "@marknotton/svgenius-ui/components/FilterBar"
-import { activeRules, emptyFilters, matchesFilters, nextFlag, type FilterSet } from "@marknotton/svgenius-core/filters"
+import { activeRules, emptyFilters, matchesFilters, measureArt, needsMeasuring, nextFlag, isTuned, shapeOf, shapeTokens, type FilterSet } from "@marknotton/svgenius-core/filters"
 import { ReportDialog } from "@marknotton/svgenius-ui/components/ReportDialog"
 import { SettingsDialog } from "@marknotton/svgenius-ui/components/SettingsDialog"
 import { AboutDialog } from "./components/AboutDialog"
@@ -31,7 +33,7 @@ import { exportNames } from "@marknotton/svgenius-core/rename"
 import { fileTags } from "@marknotton/svgenius-core/tags"
 import { LIVE_DEBOUNCE_MS } from "@marknotton/svgenius-core/config"
 import { probePlugin } from "@marknotton/svgenius-core/optimiser"
-import { canReveal, isPasted, openInDefaultApp, errorMessage, exportSvgFile, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, listenForQuit, quitApp, setUnsavedGuard, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
+import { canReveal, defaultAppName, isPasted, openInDefaultApp, errorMessage, exportSvgFile, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, listenForQuit, quitApp, setUnsavedGuard, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
 import { buildProject, countChanges, readProject } from "./lib/project"
 import { forget as forgetRecent, remember } from "./lib/recent"
 import { BEFORE_AFTER_KEYS, SORT_KEYS, sortItems, sortStore, type SortState } from "@marknotton/svgenius-core/sort"
@@ -44,8 +46,8 @@ import { listenForCommands, textFocus, useCommands } from "@marknotton/svgenius-
 import { useFileWatch } from "./hooks/useFileWatch"
 import { AddDialog, type AddMode } from "@marknotton/svgenius-ui/components/AddDialog"
 import { looksLikeSvg } from "@marknotton/svgenius-core/svgImport"
-import type { AppSettings, ArtAdjust, CustomPlugin, DesignPrinciple, SvgItem, SvgoSettings } from "@marknotton/svgenius-core/types"
-import { buildPrinciplesExport, composeAdjust, gridOf, IDENTITY, isIdentity, mergePrinciples, variationAdjust } from "@marknotton/svgenius-core/designPrinciples"
+import type { AppSettings, ArtAdjust, CustomPlugin, DesignPrinciple, SmartCounts, SvgItem, SvgoSettings } from "@marknotton/svgenius-core/types"
+import { buildPrinciplesExport, gridOf, IDENTITY, isIdentity, mergePrinciples, variationAdjust } from "@marknotton/svgenius-core/designPrinciples"
 import { shapeMaskUrl, type GuideShape } from "@marknotton/svgenius-core/shapes"
 import { Quickview } from "@marknotton/svgenius-ui/components/Quickview"
 import { DesignPrinciplesDialog } from "@marknotton/svgenius-ui/components/DesignPrinciplesDialog"
@@ -54,6 +56,12 @@ import { GuideShapeContext } from "@marknotton/svgenius-ui/components/ShapeGuide
 /** Where the last page load left off: the open file and whether its editor was up */
 const lastView: { focusId?: string | null, sidebarTab?: "preset" | "names" | "file", markupOpen?: boolean } = (() => {
   try { return JSON.parse(sessionStorage.getItem("svgenius:view") ?? "{}") } catch { return {} }
+})()
+
+/** The open project, across a reload: sessionStorage survives ⌘R but not a fresh launch, like the list itself */
+const PROJECT_KEY = "svgenius:project"
+const lastProject: { project?: { path: string | null, name: string } | null, savedSig?: string | null } = (() => {
+  try { return JSON.parse(sessionStorage.getItem(PROJECT_KEY) ?? "{}") } catch { return {} }
 })()
 
 const noop = () => {}
@@ -73,13 +81,37 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, setAdjustMany, optimise, reloadFromDisk, forceRender } = useItems()
+  const { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, optimise, reloadFromDisk, forceRender } = useItems()
   // Once there are files, get the code editor ready before anyone opens it
   const hasItems = items.length > 0
   useEffect(() => { if (hasItems) preloadMonaco() }, [hasItems])
   const dialogs = useDialogs()
   const { toasts, push, dismiss } = useToasts()
   const actions = useMemo(() => presetActions(update), [update])
+
+  // Show in Finder and Open in app ask first (unless "Don't ask again"), naming the app
+  const skipOpenConfirm = useRef(false)
+  skipOpenConfirm.current = settings.skipOpenConfirm === true
+  const openExternally = useCallback(async (kind: "reveal" | "open", path: string) => {
+    if (!skipOpenConfirm.current) {
+      const name = path.split(/[\\/]/).pop() ?? path
+      const app = kind === "reveal" ? "Finder" : await defaultAppName(path)
+      const ok = await dialogs.confirm({
+        title: kind === "reveal" ? "Show in Finder?" : `Open in ${app ?? "your default app"}?`,
+        // One <p>, so the bold names flow inline (the body lays out its children as a column)
+        body: kind === "reveal"
+          ? <p>Opens Finder with <strong>{name}</strong> selected.</p>
+          : <p>Opens <strong>{name}</strong> in {app ? <strong>{app}</strong> : "the app your Mac uses for SVGs"}. Changes you save there show up here.</p>,
+        confirmLabel: kind === "reveal" ? "Show in Finder" : `Open in ${app ?? "app"}`,
+        onDontAsk: () => update((s) => ({ ...s, skipOpenConfirm: true }))
+      })
+      if (!ok) return
+    }
+    if (kind === "reveal") reveal(path); else openInDefaultApp(path)
+  }, [dialogs.confirm, update])
+  useEffect(() => {
+    configureHost({ adapter: { reveal: (p) => { openExternally("reveal", p) }, openInDefaultApp: (p) => { openExternally("open", p) } } })
+  }, [openExternally])
 
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
@@ -121,13 +153,17 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const principles = useMemo(() => settings.designPrinciples ?? [], [settings.designPrinciples])
   const guideShape: GuideShape = settings.guideShape ?? "circle"
   const principleById = useCallback((id: string | null | undefined): DesignPrinciple | null => (id ? principles.find((d) => d.id === id) ?? null : null), [principles])
-  /** The grid and the tuning (design principle variations, then Quickview's) a file runs with, if any */
+  /** The grid, the design principle's variations and the file's own Quick Edit placement a file runs with, if any */
   const extrasFor = useCallback((item: SvgItem, s: SvgoSettings) => {
     const dp = principleById(s.designPrincipleId)
-    const adjust = composeAdjust(dp ? variationAdjust(dp, item) : IDENTITY, item.adjust ?? IDENTITY)
-    if (!dp && isIdentity(adjust)) return null
-    return { ...s, grid: dp ? gridOf(dp) : null, adjust: isIdentity(adjust) ? null : adjust }
-  }, [principleById])
+    const adjust = dp ? variationAdjust(dp, item) : IDENTITY
+    const tune = item.adjust ?? IDENTITY
+    if (!dp && isIdentity(adjust) && isIdentity(tune)) return null
+    // Smart Sizing uses Settings › Square tolerance unless the preset sets its own
+    const magicKeylines = s.magicKeylines?.enabled && s.magicKeylines.tolerance === null
+      ? { ...s.magicKeylines, tolerance: settings.squareTolerance ?? 10 } : s.magicKeylines
+    return { ...s, magicKeylines, grid: dp ? gridOf(dp) : null, adjust: isIdentity(adjust) ? null : adjust, tune: isIdentity(tune) ? null : tune }
+  }, [principleById, settings.squareTolerance])
 
   /** The settings a file actually runs with: its own, or its preset's, plus its grid and tuning */
   const settingsFor = useCallback((item: SvgItem): SvgoSettings => {
@@ -288,7 +324,21 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const [filters, setFilters] = useState<FilterSet>(emptyFilters)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const filterCount = activeRules(filters).length
-  const filtered = useMemo(() => (filterCount ? items.filter((i) => matchesFilters(i, filters)) : items), [items, filters, filterCount])
+  const tolerance = settings.squareTolerance ?? 10
+  // Shape rules and shape: search words need each artwork measured; it happens in the background
+  const [measured, setMeasured] = useState(0)
+  const [query, setQuery] = useState("")
+  const queryShapes = useMemo(() => shapeTokens(query.trim().toLowerCase()), [query])
+  useEffect(() => {
+    const todo = needsMeasuring(items, filters, queryShapes.tokens.some((t) => t.by === "content"))
+    if (!todo.length) return
+    // Not cancelled on change: the cache is shared, and the list should catch up whenever it lands
+    measureArt(todo).then((n) => { if (n) setMeasured((m) => m + 1) })
+  }, [items, filters, queryShapes, measured])
+  const filtered = useMemo(
+    () => (filterCount ? items.filter((i) => matchesFilters(i, filters, { tolerance })) : items),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, filters, filterCount, tolerance, measured])
 
   const selectAll = (all: boolean) => setSelection(all ? new Set(shownItems.map((i) => i.id)) : new Set())
 
@@ -325,15 +375,17 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     }))
   }, [reportOpen, items, settings.rename, settingsFor, presetFor, previewNames, tagsFor, isStale])
 
-  // Search by original or export name; the rest of the list is hidden
-  const [query, setQuery] = useState("")
+  // Search by original or export name, plus shape:tall / vb:wide words; the rest of the list is hidden
   const usedFlags = useMemo(() => new Set(items.flatMap((i) => i.flag ? [i.flag as string] : [])), [items])
   const searched = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return filtered
-    return filtered.filter((i) => i.name.toLowerCase().includes(q) || i.relPath.toLowerCase().includes(q)
+    const { tokens, is, rest: q } = queryShapes
+    if (!q && !tokens.length && !is.length) return filtered
+    return filtered.filter((i) => (!q || i.name.toLowerCase().includes(q) || i.relPath.toLowerCase().includes(q)
       || (previewNames?.get(i.id) ?? "").toLowerCase().includes(q))
-  }, [filtered, query, previewNames])
+      && tokens.every((t) => (shapeOf(filters.markup === "output" ? i.result?.output : i.source, t.by, tolerance) === t.shape) === t.has)
+      && is.every((t) => isTuned(i) === t.has))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, queryShapes, previewNames, filters.markup, tolerance, measured])
 
   // Sort what's left after search and filters
   const [sort, setSortState] = useState<SortState>(sortStore.get)
@@ -615,7 +667,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   // ── Projects ────────────────────────────────────────────────────────────────
   // Save and open everything in the list as one .svgenius file. On the desktop
   // ⌘S saves back to the project it came from
-  const [project, setProject] = useState<{ path: string | null, name: string } | null>(null)
+  // Kept for the session, so a reload (⌘R) still knows the project and ⌘S saves straight back to it
+  const [project, setProject] = useState<{ path: string | null, name: string } | null>(() => lastProject.project ?? null)
 
   // Unsaved changes: only for a list that belongs to a project file. A
   // fingerprint of what the file holds is taken on open, new and save, and
@@ -625,7 +678,11 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     const { savedAt: _s, focusId: _f, appVersion: _v, ...rest } = buildProject(settings, items, null)
     return JSON.stringify(rest)
   }, [project, settings, items])
-  const [savedSig, setSavedSig] = useState<string | null>(null)
+  const [savedSig, setSavedSig] = useState<string | null>(() => lastProject.savedSig ?? null)
+  useEffect(() => {
+    try { sessionStorage.setItem(PROJECT_KEY, JSON.stringify({ project, savedSig })) }
+    catch { try { sessionStorage.setItem(PROJECT_KEY, JSON.stringify({ project, savedSig: null })) } catch { /* unavailable */ } }
+  }, [project, savedSig])
   const snapNext = useRef(false)
   useEffect(() => {
     if (!snapNext.current || !project) return
@@ -639,8 +696,12 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
   const leaveProject = () => { setProject(null); setSavedSig(null) }
 
   /** Saves the project; resolves true once it's written */
+  const saving = useRef(false)
   const saveProject = async (as = false): Promise<boolean> => {
     if (!items.length && !project) { push({ tone: "info", text: "Add some SVGs first, there's nothing to save yet" }); return false }
+    // One at a time: a second ⌘S while the first is still going would open a second dialog
+    if (saving.current) return false
+    saving.current = true
     try {
       const data = JSON.stringify(buildProject(settings, items, focusId), null, 2)
       const name = project?.name ?? `${items[0].relPath.includes("/") ? items[0].relPath.split("/")[0] : "SVGenius project"}.${PROJECT_EXT}`
@@ -655,6 +716,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     } catch (e) {
       push({ tone: "error", text: `Couldn't save the project: ${errorMessage(e)}` })
       return false
+    } finally {
+      saving.current = false
     }
   }
 
@@ -798,18 +861,18 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       y: e.clientY,
       items: [
         { label: "Open in editor", run: () => openMarkup(id) },
-        { label: "Quickview    Space", run: () => openQuickviewRef.current(id), disabled: item.source === undefined },
+        { label: "Quick Edit    Space", run: () => openQuickviewRef.current(id), disabled: item.source === undefined },
         { label: "Export optimised SVG…", run: () => exportOneRef.current(id), disabled: item.source === undefined || isBlocked(item) },
         ...(canReveal && !isPasted(item.path) ? [
-          { label: "Open in default app", run: () => openInDefaultApp(item.path) },
-          { label: "Reveal in Finder", run: () => reveal(item.path) }
+          { label: "Open in default app…", run: () => openExternally("open", item.path) },
+          { label: "Reveal in Finder…", run: () => openExternally("reveal", item.path) }
         ] : []),
         "-",
         { label: "Remove from list", run: () => removeIds(new Set([id])) },
         ...(inSelection ? [{ label: `Remove ${plural(selection.size, "selected file")}`, danger: true, run: () => removeIds(new Set(selection)) }] : [])
       ]
     })
-  }, [itemsRef, selection, removeIds, openMarkup])
+  }, [itemsRef, selection, removeIds, openMarkup, openExternally])
 
   // Settings: ⌘, from the menu or the keyboard
   useEffect(() => {
@@ -896,6 +959,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       shape={guideShape}
       onShape={(guideShape) => update((s) => ({ ...s, guideShape }))}
       onQuickview={() => openQuickview()}
+      guides={settings.listGuides === true}
+      onGuides={principles.length ? () => update((s) => ({ ...s, listGuides: !s.listGuides })) : undefined}
+      alignment={settings.listAlignment !== false}
+      onAlignment={principles.some((d) => d.alignmentKeylines?.length) ? () => update((s) => ({ ...s, listAlignment: s.listAlignment === false })) : undefined}
     />
   )
   // Selectors that match the original but nothing once SVGO is done with it
@@ -919,7 +986,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     />
   )
 
-  // ── Quickview and design principles ────────────────────────────────────────
+  // ── Quick Edit and design principles ────────────────────────────────────────
 
   const [quickviewId, setQuickviewId] = useState<string | null>(null)
   const [principlesOpen, setPrinciplesOpen] = useState<{ id: string | null } | null>(null)
@@ -954,6 +1021,74 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     const dp = principleById(ownSettings(item).designPrincipleId)
     return dp ? variationAdjust(dp, item) : IDENTITY
   }, [principleById, ownSettings])
+  /** What a file's preset does to its placement, for Quick Edit to show */
+  const presetNotes = useCallback((item: SvgItem) => {
+    const s = ownSettings(item), t = s.trim, notes: string[] = []
+    const dp = principleById(s.designPrincipleId)
+    const m = item.result?.magic
+    if (dp && s.magicKeylines?.enabled) notes.push(m
+      ? `Smart Sizing${m.rule ? `, ${m.ruleGroup ? `${m.ruleGroup} rule` : "all-shapes rule"} ${m.rule} (${m.ruleText})` : ""}: ${m.group} artwork, fitted to ${m.keyline === "canvas" ? "the whole viewBox" : `${dp.name}'s ${m.keyline === "live" ? "live area" : `${m.keyline} keyline`}`}, ${m.fit === "contain" ? "fit inside" : m.fit === "stretch" ? "stretched to fill it" : `fit ${m.fit}`}`
+      : `Smart Sizing: fitted to ${dp.name}'s keyline for its shape`)
+    else if (dp && dp.fit !== "none") notes.push(`Fitted to ${dp.name} (${dp.fit === "keylines" ? "its keylines" : dp.fit === "contain" ? "its live area" : "centred"})`)
+    if (t.artUnit === "px" && t.artSizePx) notes.push(`Artwork ${t.artSide === "width" ? "width" : "height"} set to ${t.artSizePx}`)
+    else if (t.artScale !== 1) notes.push(`Artwork scaled ×${+t.artScale.toFixed(4)}`)
+    if (t.offsetX || t.offsetY) notes.push(`Artwork moved ${+t.offsetX.toFixed(2)}% across, ${+t.offsetY.toFixed(2)}% down`)
+    if (t.enabled) notes.push(`Trimmed to the artwork with ${t.padding}${t.unit === "%" ? "%" : ""}  padding, which sets the canvas`)
+    if (s.opticalCentre) notes.push("Optically centred")
+    return notes
+  }, [ownSettings, principleById])
+  const openQuickEditRow = useCallback((id: string) => openQuickviewRef.current(id), [])
+  // Smart Sizing: the edited preset's files in each shape group, from their last run
+  const smartCounts = useMemo(() => {
+    if (!editing.settings.magicKeylines?.enabled) return undefined
+    const c: SmartCounts = { square: [], tall: [], wide: [], rules: [], groupRules: { square: [], tall: [], wide: [] } }
+    // In the order the list shows them, so stepping through goes down the list (hidden files last)
+    const at = new Map(shownItems.map((i, n) => [i.id, n]))
+    const order = [...items].sort((a, b) => (at.get(a.id) ?? Infinity) - (at.get(b.id) ?? Infinity))
+    for (const i of order) {
+      const m = i.config || presetFor(i).id !== editing.id ? undefined : i.result?.magic
+      if (!m) continue
+      const list = m.ruleGroup ? c.groupRules[m.ruleGroup] : c.rules
+      if (m.rule) (list[m.rule - 1] ??= []).push(i.id)
+      else c[m.group].push(i.id)
+    }
+    return c
+  }, [items, shownItems, editing, presetFor])
+  // Smart Sizing › step through a rule's files: scroll the list to the row and flash it
+  const revealItem = useCallback((id: string) => {
+    const row = document.querySelector<HTMLElement>(`.file-list [data-id="${CSS.escape(id)}"]`)
+    if (!row) {
+      const name = items.find((i) => i.id === id)?.name ?? "That file"
+      push({ tone: "info", text: `${name} is hidden by the search or filters`, action: { label: "Show all", run: () => { setQuery(""); setFilters(emptyFilters()) } } })
+      return
+    }
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    row.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "center" })
+    row.classList.remove("is-located")
+    void row.offsetWidth // restart the flash
+    row.classList.add("is-located")
+    window.setTimeout(() => row.classList.remove("is-located"), 900)
+  }, [items, push])
+  // Shape guide and clip: fitted to the design principle's live area,
+  // when the preset puts files on its canvas (frames are cached, so previews keep the same object between renders)
+  const frames = useMemo(() => {
+    const m = new Map<string, ShapeFrame>()
+    for (const d of principles) {
+      m.set(`${d.id}:live`, dpShapeFrame(d))
+      m.set(`${d.id}:canvas`, dpShapeFrame(d, { w: d.width, h: d.height }))
+      for (const k of d.keylines) if (!m.has(`${d.id}:${k.kind}`)) m.set(`${d.id}:${k.kind}`, dpShapeFrame(d, k))
+    }
+    return m
+  }, [principles])
+  // Always the live area: the shape's height matches it (Mark's call, over the chosen keyline)
+  const frameFor = useCallback((item: SvgItem) => {
+    const s = ownSettings(item)
+    const dp = principleById(s.designPrincipleId)
+    if (!dp || s.trim.enabled || (dp.fit === "none" && !s.magicKeylines?.enabled)) return null
+    return frames.get(`${dp.id}:live`) ?? null
+  }, [principleById, frames, ownSettings])
+  // List thumbnails: each file's own preset's design principle, when the toggle is on
+  const listGuidesFor = useCallback((item: SvgItem) => principleById(ownSettings(item).designPrincipleId), [principleById, ownSettings])
   const quickviewPrinciple = useCallback((item: SvgItem) => {
     const choice = settings.quickviewDpId ?? null
     if (choice === "none") return null
@@ -1029,6 +1164,11 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onFilters={() => setFiltersOpen((o) => !o)}
                 filterBar={<FilterBar filters={filters} onChange={setFilters} shown={shownItems.length} total={items.length} usedFlags={usedFlags} />}
                 tagsFor={tagsFor}
+                guidesFor={settings.listGuides ? listGuidesFor : undefined}
+                alignmentGuides={settings.listAlignment !== false}
+                frameFor={frameFor}
+                onEdit={openMarkup}
+                onQuickEdit={openQuickEditRow}
                 exportNames={previewNames}
                 onAdd={() => setAdding({ mode: "choose" })}
                 onProjectMenu={projectMenu}
@@ -1071,6 +1211,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             ) : sidebarTab === "file" && focused ? (
               <FileInspector
                 item={focused}
+                frame={frameFor(focused)}
                 presets={settings.presets}
                 defaultPreset={defaultPreset}
                 backdrop={settings.backdrop}
@@ -1086,15 +1227,22 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onConfig={(fn) => { if (focused.config) setConfig(focused.id, fn(focused.config)) }}
                 onSaveAsPreset={() => saveItemAsPreset(focused)}
                 onUsePreset={() => setPreset([focused.id], focused.presetId)}
+                onRevertConfig={(next, what) => {
+                  const id = focused.id, before = focused.config
+                  if (next) setConfig(id, next); else setPreset([id], focused.presetId)
+                  if (before) push({ tone: "info", text: what, action: { label: "Undo", run: () => setConfig(id, before) } })
+                }}
                 customPlugins={settings.customPlugins}
                 onLoadPlugin={loadPlugin}
                 onRemovePlugin={removePlugin}
                 designPrinciples={principles}
                 onManagePrinciples={() => managePrinciples(focused.config?.designPrincipleId)}
+                squareTolerance={settings.squareTolerance}
                 advanced={settings.advanced}
                 editorToolbar={settings.editorToolbar}
                 markupOpen={markupOpen}
                 onMarkupOpen={setMarkupOpen}
+                onQuickEdit={(id) => { setMarkupOpen(false); openQuickviewRef.current(id) }}
                 nav={(() => {
                   // The files as listed (filters and search applied), wrapping round at the ends
                   const list = shownItems.some((i) => i.id === focused.id) ? shownItems : items
@@ -1130,6 +1278,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 onLoadPlugin={loadPlugin}
                 onRemovePlugin={removePlugin}
                 onManagePrinciples={() => managePrinciples(editing.settings.designPrincipleId)}
+                smartCounts={smartCounts} onRevealFile={revealItem}
               />
             )}
           </aside>
@@ -1179,7 +1328,6 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             onFiles={addFiles} onFolder={addFolder} onAdd={addCode} onClose={() => setAdding(null)} />
         )}
         {dragging && <DropOverlay />}
-        {dialogs.node}
         <Toasts toasts={toasts} dismiss={dismiss} />
         {quickviewId && (
           <Quickview
@@ -1187,15 +1335,18 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             startId={quickviewId}
             backdrop={settings.backdrop}
             baseFor={quickviewBase}
+            presetNotesFor={presetNotes}
+            onFullEdit={(id) => { setQuickviewId(null); setFocusId(id); setMarkupOpen(true) }}
             principleFor={quickviewPrinciple}
             principles={principles}
             principleChoice={settings.quickviewDpId ?? null}
             onPrincipleChoice={(quickviewDpId) => update((s) => ({ ...s, quickviewDpId }))}
             onManagePrinciples={() => setPrinciplesOpen({ id: settings.quickviewDpId && settings.quickviewDpId !== "none" ? settings.quickviewDpId : null })}
             onAdjust={setAdjust}
-            onAdjustMany={setAdjustMany}
-            scope={selection.size > 1 ? "selected" : "listed"}
             onRun={(id) => { optimise([id], resolve) }}
+            onRunMany={(ids) => { optimise(ids, resolve) }}
+            selectionScope={selection.size > 1}
+            confirm={dialogs.confirm}
             overlay={settings.circleOverlay ? guideShape : null}
             onOverlay={(shape) => update((s) => (shape ? { ...s, circleOverlay: true, guideShape: shape } : { ...s, circleOverlay: false }))}
             clip={settings.circleClip}
@@ -1220,6 +1371,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
             onClose={() => setPrinciplesOpen(null)}
           />
         )}
+        {/* Last, so confirmations sit above Quick Edit and the other dialogs */}
+        {dialogs.node}
         <FastTips />
       </div>
     </GuideShapeContext.Provider>

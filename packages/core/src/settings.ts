@@ -1,7 +1,7 @@
 import type { Config } from "svgo/browser"
 import { PLUGINS, PLUGIN_NAMES } from "./plugins"
 import { CASES, defaultRename } from "./rename"
-import { builtInPrinciples, sanitisePrinciples } from "./designPrinciples"
+import { builtInPrinciples, isIdentity, sanitiseMagic, sanitisePrinciples } from "./designPrinciples"
 import { isGuideShape } from "./shapes"
 import type { RenameSettings, AppSettings, AttrRule, CustomPlugin, CutMatcher, CustomRun, Preset, Replacement, RunSpec, SvgoSettings } from "./types"
 
@@ -79,6 +79,10 @@ export function defaultAppSettings(): AppSettings {
     quickviewDpId: null,
     quickviewStep: 1,
     quickviewGuides: true,
+    skipOpenConfirm: false,
+    listGuides: false,
+    listAlignment: true,
+    squareTolerance: 10,
     ...defaultLayout()
   }
 }
@@ -156,10 +160,17 @@ export function settingsKey(settings: SvgoSettings, custom: CustomRun[] = []) {
   const art = t.artUnit === "px" ? ["px", t.artSide ?? "height", t.artSizePx ?? 0] : t.artScale
   const trim = [t.enabled ? [t.padding, t.unit, t.aspect] : null, t.sizeUnit === "px" ? [t.sizeSide, t.sizePx] : t.scale, art, t.offsetX, t.offsetY]
   // Only when present, so keys made before design principles existed stay the same
-  const extra = settings.grid || (settings.adjust && !(settings.adjust.scale === 1 && (settings.adjust.sy ?? 1) === 1 && settings.adjust.x === 0 && settings.adjust.y === 0))
-    ? [settings.grid ?? null, settings.adjust ?? null]
+  const extra = settings.grid || !isIdentity(settings.adjust) || !isIdentity(settings.tune)
+    ? [settings.grid ?? null, settings.adjust ?? null, ...(isIdentity(settings.tune) ? [] : [settings.tune])]
     : []
-  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths, settings.flattenTransforms, settings.opticalCentre && settings.opticalStrength, settings.autoPrecision && settings.autoTolerance, settings.cutOutStrokes, settings.cutOutShapes.filter((m) => m.enabled && m.value.trim()).map((m) => [m.kind, m.value.trim()]), ...extra])
+  // Smart Sizing only counts while on (and with a grid), so other keys never change
+  // (advanced rules only when there are some, so older keys stay the same)
+  const mk = settings.magicKeylines
+  const tidy = <T extends { advanced?: unknown[] }>(x: T) => ({ ...x, advanced: x.advanced?.length ? x.advanced : undefined })
+  const magic = settings.grid && mk?.enabled
+    ? [{ magic: { ...tidy(mk), rules: { square: tidy(mk.rules.square), tall: tidy(mk.rules.tall), wide: tidy(mk.rules.wide) } } }]
+    : []
+  return JSON.stringify([toSvgoConfig(settings), rules, attrs, trim, custom.map((c) => [c.hash, c.params.trim()]), settings.appendMarkup.trim(), settings.mergePaths, settings.flattenTransforms, settings.opticalCentre && settings.opticalStrength, settings.autoPrecision && settings.autoTolerance, settings.cutOutStrokes, settings.cutOutShapes.filter((m) => m.enabled && m.value.trim()).map((m) => [m.kind, m.value.trim()]), ...extra, ...magic])
 }
 
 export function runSpec(settings: SvgoSettings, plugins: CustomPlugin[]): RunSpec {
@@ -226,6 +237,7 @@ export function sanitiseSvgoSettings(raw: unknown): SvgoSettings {
       artSizePx: clampNum(trimRaw.artSizePx, 0.01, 1e5, 20)
     },
     designPrincipleId: typeof raw.designPrincipleId === "string" && raw.designPrincipleId ? raw.designPrincipleId : null,
+    magicKeylines: sanitiseMagic(raw.magicKeylines),
     appendMarkup: typeof raw.appendMarkup === "string" ? raw.appendMarkup : "",
     mergePaths: raw.mergePaths === true,
     flattenTransforms: raw.flattenTransforms === true,
@@ -390,7 +402,11 @@ export function sanitiseAppSettings(raw: unknown): AppSettings {
     designPrinciples: sanitisePrinciples(raw.designPrinciples),
     quickviewDpId: typeof raw.quickviewDpId === "string" ? raw.quickviewDpId : null,
     quickviewStep: clampNum(raw.quickviewStep, 0.0001, 1e4, 1),
-    quickviewGuides: raw.quickviewGuides !== false
+    quickviewGuides: raw.quickviewGuides !== false,
+    skipOpenConfirm: raw.skipOpenConfirm === true,
+    listGuides: raw.listGuides === true,
+    listAlignment: raw.listAlignment !== false,
+    squareTolerance: clampNum(raw.squareTolerance, 0, 50, 10)
   }
 }
 

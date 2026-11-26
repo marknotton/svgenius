@@ -1,3 +1,4 @@
+import { DiffBadge } from "./SettingsDiff"
 import { useDragSort } from "../hooks/useDragSort"
 import { IconDuplicate, IconGrip, IconPlus, IconTrash } from "../icons"
 import { ElementPicker } from "./ElementPicker"
@@ -21,6 +22,7 @@ export function AttrRuleList({ rules, onChange }: Props) {
     <div className="rules">
       <div className="plugins__head">
         <span className="panel__label">Attribute rules {rules.length > 0 && <span className="text-3">{active}/{rules.length}</span>}</span>
+        <DiffBadge section="attrs" />
         <button className="link" onClick={() => onChange([...rules, createAttrRule()])}><IconPlus width={11} height={11} /> Add rule</button>
       </div>
 

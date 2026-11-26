@@ -4,7 +4,11 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 // window.prompt/confirm don't work in Tauri's webview, so we roll our own.
 
 interface PromptOpts { title: string, initial?: string, confirmLabel?: string, hint?: string }
-interface ConfirmOpts { title: string, body?: ReactNode, confirmLabel?: string, danger?: boolean }
+interface ConfirmOpts {
+  title: string, body?: ReactNode, confirmLabel?: string, danger?: boolean
+  /** Shows a "Don't ask again" box; called with its value when the user confirms */
+  onDontAsk?: (dontAsk: boolean) => void
+}
 interface UnsavedOpts { title: string, body?: ReactNode, saveLabel?: string, discardLabel?: string }
 export type UnsavedChoice = "save" | "discard" | null
 
@@ -77,13 +81,20 @@ function PromptDialog({ opts, onDone }: { opts: PromptOpts, onDone: (v: string |
 }
 
 function ConfirmDialog({ opts, onDone }: { opts: ConfirmOpts, onDone: (v: boolean) => void }) {
+  const [dontAsk, setDontAsk] = useState(false)
   return (
     <Modal onCancel={() => onDone(false)}>
       <h2 className="modal__title">{opts.title}</h2>
       {opts.body && <div className="modal__body">{opts.body}</div>}
       <div className="modal__actions">
+        {opts.onDontAsk && (
+          <label className="modal__aside modal__dont-ask">
+            <input type="checkbox" className="checkbox" checked={dontAsk} onChange={(e) => setDontAsk(e.target.checked)} />
+            <span>Don't ask again</span>
+          </label>
+        )}
         <button type="button" className="btn btn--secondary" onClick={() => onDone(false)}>Cancel</button>
-        <button type="button" autoFocus className={`btn ${opts.danger ? "btn--danger" : "btn--primary"}`} onClick={() => onDone(true)}>
+        <button type="button" autoFocus className={`btn ${opts.danger ? "btn--danger" : "btn--primary"}`} onClick={() => { if (dontAsk) opts.onDontAsk?.(true); onDone(true) }}>
           {opts.confirmLabel ?? "OK"}
         </button>
       </div>

@@ -3,10 +3,11 @@ import { fmtNum, getAttr, parseViewBox, rootTag, svgSize } from "@marknotton/svg
 import { formatBytes, formatSaving, plural, savingPercent } from "@marknotton/svgenius-core/format"
 import type { FileTag } from "@marknotton/svgenius-core/tags"
 import { FLAGS } from "@marknotton/svgenius-core/filters"
-import { IconFlag, IconFolder, IconPencil } from "../icons"
+import { IconCode, IconFlag, IconFolder, IconPencil, IconSliders } from "../icons"
 import { adapter } from "../host"
-import type { Backdrop, Preset, SvgItem } from "@marknotton/svgenius-core/types"
+import type { Backdrop, DesignPrinciple, Preset, SvgItem } from "@marknotton/svgenius-core/types"
 import { Thumb } from "./Thumb"
+import type { ShapeFrame } from "@marknotton/svgenius-core/shapes"
 import { TooComplex } from "./TooComplex"
 import { countNodes, isBlocked } from "@marknotton/svgenius-core/complexity"
 
@@ -34,6 +35,13 @@ interface Props {
   onExportName?: (id: string) => void
   onContextMenu: (id: string, e: MouseEvent) => void
   onFlag: (id: string, e: MouseEvent) => void
+  /** The preset's design principle, drawn over the optimised preview */
+  guides?: DesignPrinciple | null
+  /** The preset's design principle live area, for the shape guide and clip on the optimised preview */
+  frame?: ShapeFrame | null
+  /** Row buttons: the full editor and Quick Edit */
+  onEdit?: (id: string) => void
+  onQuickEdit?: (id: string) => void
 }
 
 const NOT_YET = "Not optimised yet. Click Optimise, or turn on Live preview"
@@ -80,7 +88,7 @@ export const FileRow = memo(function FileRow(p: Props) {
           <span className="file-card__name" title={item.path}><Name item={item} to={p.exportName} onShow={p.onExportName} /></span>
           {p.canOpen && <span className="row-hint text-3">Double-click to edit</span>}
           <Stats item={item} stale={stale} />
-          <FileButtons item={item} />
+          <FileButtons item={item} onEdit={p.onEdit} onQuickEdit={p.onQuickEdit} />
         </div>
         <div className="file-card__panes">
           {blocked ? <TooComplex item={item} size={thumbPx} /> : <>
@@ -89,7 +97,7 @@ export const FileRow = memo(function FileRow(p: Props) {
             <figcaption className="text-3">Before{original && ` · ${fmtNum(original.w, 2)} × ${fmtNum(original.h, 2)}`}</figcaption>
           </figure>
           <figure className="file-card__pane">
-            <Thumb svg={item.result?.output} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : NOT_YET} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
+            <Thumb svg={item.result?.output} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : NOT_YET} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} guides={p.guides} frame={p.frame} />
             <figcaption className="text-3">
               After{size && item.result && <> · <span key={flash} className={`file-row__dims${flash ? " is-flash" : ""}`}>{dims}</span></>}
             </figcaption>
@@ -119,17 +127,17 @@ export const FileRow = memo(function FileRow(p: Props) {
       ) : p.compare ? (
         <div className="file-row__compare">
           <Thumb svg={item.source} size={thumbPx} backdrop={backdrop} label={`${item.name} before`} />
-          <Thumb svg={item.result?.output} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : NOT_YET} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} />
+          <Thumb svg={item.result?.output} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : NOT_YET} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} guides={p.guides} frame={p.frame} />
         </div>
       ) : (
-        <Thumb svg={item.result?.output ?? item.source} pending={item.status === "running"} size={thumbPx} backdrop={backdrop} label={item.name} />
+        <Thumb svg={item.result?.output ?? item.source} pending={item.status === "running"} size={thumbPx} backdrop={backdrop} label={item.name} guides={p.guides} frame={p.frame} />
       )}
       <div className="file-row__main">
         <div className="file-row__top">
           <div className="file-row__name" title={item.path}><Name item={item} to={p.exportName} onShow={p.onExportName} /></div>
           {p.canOpen && <span className="row-hint text-3">Double-click to edit</span>}
           <Stats item={item} stale={stale} compact />
-          <FileButtons item={item} />
+          <FileButtons item={item} onEdit={p.onEdit} onQuickEdit={p.onQuickEdit} />
         </div>
         <dl className="facts">
           <Fact label="Size">
@@ -214,21 +222,37 @@ function Check({ item, selected, onToggle }: { item: SvgItem, selected: boolean,
   )
 }
 
-/** Reveal in Finder, and open the original in the user's SVG app (desktop only: the browser has no path) */
-function FileButtons({ item }: { item: SvgItem }) {
-  if (!adapter().isDesktop || adapter().isPasted(item.path)) return null
+/** Edit and Quick Edit, then (desktop only: the browser has no path) Show in Finder and Open in your SVG app */
+function FileButtons({ item, onEdit, onQuickEdit }: { item: SvgItem, onEdit?: (id: string) => void, onQuickEdit?: (id: string) => void }) {
+  const disk = adapter().isDesktop && !adapter().isPasted(item.path)
+  const ready = item.source !== undefined
+  if (!disk && !onEdit && !onQuickEdit) return null
   return (
     <span className="file-btns">
-      <button type="button" className="btn btn--icon file-open" title="Show the original file in Finder"
-        aria-label={`Show ${item.name} in Finder`}
-        onClick={(e) => { e.stopPropagation(); adapter().reveal(item.path) }}>
-        <IconFolder />
-      </button>
-      <button type="button" className="btn btn--icon file-open" title="Open the original file in your default SVG app"
-        aria-label={`Open ${item.name} in your default app`}
-        onClick={(e) => { e.stopPropagation(); adapter().openInDefaultApp(item.path) }}>
-        <IconPencil />
-      </button>
+      {onEdit && (
+        <button type="button" className="btn btn--icon file-open" title="Edit: open the full editor" aria-label={`Edit ${item.name}`}
+          disabled={!ready} onClick={(e) => { e.stopPropagation(); onEdit(item.id) }}>
+          <IconCode />
+        </button>
+      )}
+      {onQuickEdit && (
+        <button type="button" className="btn btn--icon file-open" title="Quick Edit: move, scale and rotate it over the design principle's grid (Space)"
+          aria-label={`Quick Edit ${item.name}`} disabled={!ready} onClick={(e) => { e.stopPropagation(); onQuickEdit(item.id) }}>
+          <IconSliders />
+        </button>
+      )}
+      {disk && <>
+        <button type="button" className="btn btn--icon file-open" title="Show the original file in Finder"
+          aria-label={`Show ${item.name} in Finder`}
+          onClick={(e) => { e.stopPropagation(); adapter().reveal(item.path) }}>
+          <IconFolder />
+        </button>
+        <button type="button" className="btn btn--icon file-open" title="Open the original file in your default SVG app"
+          aria-label={`Open ${item.name} in your default app`}
+          onClick={(e) => { e.stopPropagation(); adapter().openInDefaultApp(item.path) }}>
+          <IconPencil />
+        </button>
+      </>}
     </span>
   )
 }

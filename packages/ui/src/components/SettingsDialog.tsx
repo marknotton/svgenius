@@ -1,3 +1,4 @@
+import { adapter } from "../host"
 import { useState } from "react"
 import { useDragSort } from "../hooks/useDragSort"
 import type { PresetActions } from "@marknotton/svgenius-core/presets"
@@ -85,7 +86,7 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
         {p.onDesignPrinciples && (
           <section className="settings__section">
             <h3 className="settings__title">Design principles</h3>
-            <p className="settings__desc text-3">Brand icon rules: canvas, live area, keylines and per-file variations. Presets can fit files to one, and Quickview draws its guides.</p>
+            <p className="settings__desc text-3">Brand icon rules: canvas, live area, keylines and per-file variations. Presets can fit files to one, and Quick Edit draws its guides.</p>
             <div className="settings__actions">
               <button className="btn btn--ghost btn--sm" onClick={p.onDesignPrinciples}>Manage design principles… <span className="text-3">{plural(settings.designPrinciples?.length ?? 0, "principle")}</span></button>
             </div>
@@ -147,6 +148,15 @@ export function SettingsDialog({ settings, update, actions, usage, ...p }: Props
             </span>
           </div>
           <Toggle label="Clip previews to the shape" checked={settings.circleClip} onChange={(v) => set("circleClip", v)} />
+          <label className="range settings__tolerance" title="How far from 1:1 a file can be and still count as square rather than tall or wide. Used by shape filters, shape: search and Smart Sizing">
+            <span className="range__label">Square tolerance</span>
+            <input type="range" min={0} max={30} step={1} value={settings.squareTolerance ?? 10} onChange={(e) => set("squareTolerance", Number(e.target.value))} />
+            <span className="range__value">±{settings.squareTolerance ?? 10}%</span>
+          </label>
+          <p className="text-3 settings__desc">Square, tall or wide: a file is square when its longer side is within this much of its shorter one. 18 × 20 is 11% off, so at ±10% it counts as tall.</p>
+          {adapter().isDesktop && (
+            <Toggle label="Ask before Show in Finder and Open in app" checked={settings.skipOpenConfirm !== true} onChange={(v) => set("skipOpenConfirm", !v)} />
+          )}
           <div className="settings__actions">
             <button className="btn btn--ghost btn--sm" onClick={p.onResetLayout} title="Sidebar width, preview sizes and toggles back to normal">Reset layout</button>
           </div>
