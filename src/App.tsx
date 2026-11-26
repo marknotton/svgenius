@@ -15,7 +15,7 @@ import { Footer } from "./components/Footer"
 import { PreviewCssBar, PreviewCssContext } from "@marknotton/svgenius-ui/components/PreviewCss"
 import { RenamePanel } from "@marknotton/svgenius-ui/components/RenamePanel"
 import { FilterBar } from "@marknotton/svgenius-ui/components/FilterBar"
-import { activeRules, emptyFilters, matchesFilters, measureArt, needsMeasuring, nextFlag, isTuned, shapeOf, shapeTokens, type FilterSet } from "@marknotton/svgenius-core/filters"
+import { activeRules, createFilterRule, emptyFilters, matchesFilters, measureArt, needsMeasuring, nextFlag, isTuned, shapeOf, shapeTokens, type FilterSet } from "@marknotton/svgenius-core/filters"
 import { ReportDialog } from "@marknotton/svgenius-ui/components/ReportDialog"
 import { SettingsDialog } from "@marknotton/svgenius-ui/components/SettingsDialog"
 import { AboutDialog } from "./components/AboutDialog"
@@ -35,6 +35,8 @@ import { LIVE_DEBOUNCE_MS } from "@marknotton/svgenius-core/config"
 import { probePlugin } from "@marknotton/svgenius-core/optimiser"
 import { canReveal, defaultAppName, isPasted, openInDefaultApp, errorMessage, exportSvgFile, exportSvgs, listenFor, listenForDrops, listenForOpenedFiles, listenForQuit, quitApp, setUnsavedGuard, openJson, openPlugin, openProjectFile, PROJECT_EXT, pickSvgs, readProjectFile, reveal, saveJson, saveProjectFile } from "./lib/platform"
 import { buildProject, countChanges, readProject } from "./lib/project"
+import { baseName, loadLinked, relinkFromFile, relinkFromFolders } from "./lib/links"
+import { MissingBar, MissingDialog } from "./components/MissingFiles"
 import { forget as forgetRecent, remember } from "./lib/recent"
 import { BEFORE_AFTER_KEYS, SORT_KEYS, sortItems, sortStore, type SortState } from "@marknotton/svgenius-core/sort"
 import { preloadMonaco, setEditorTheme } from "@marknotton/svgenius-ui/components/CodeEditor"
@@ -81,7 +83,7 @@ interface WorkspaceProps {
 }
 
 function Workspace({ settings, update, loadError }: WorkspaceProps) {
-  const { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, optimise, reloadFromDisk, forceRender } = useItems()
+  const { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, optimise, reloadFromDisk, forceRender, relink, lose } = useItems()
   // Once there are files, get the code editor ready before anyone opens it
   const hasItems = items.length > 0
   useEffect(() => { if (hasItems) preloadMonaco() }, [hasItems])
@@ -261,7 +263,60 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         ? `${one} changed on disk. ${kept.length === 1 ? "It has" : "Some have"} edits made here, so those were kept: use Revert to load the saved version`
         : `Reloaded ${one}: saved in another app`
     })
+  }, (paths) => {
+    lose(paths)
+    const one = paths.length === 1 ? baseName(paths[0]) : plural(paths.length, "file")
+    push({ tone: "error", text: `${one} ${paths.length === 1 ? "has" : "have"} gone missing: moved, renamed or deleted`, action: { label: "Find", run: () => setMissingOpen(true) } })
   })
+
+  // ── Missing files ───────────────────────────────────────────────────────────
+  // A project's files are read from disk when it opens; any that aren't there
+  // can be found again here (Adobe style) or removed
+  const missingItems = useMemo(() => items.filter((i) => i.missing), [items])
+  const [missingOpen, setMissingOpen] = useState(false)
+  const [relinking, setRelinking] = useState(false)
+  const linkedPaths = () => new Set(itemsRef.current.filter((i) => !i.missing).map((i) => i.path))
+  const reportFound = (found: Array<{ id: string }>, first?: string) => {
+    const left = itemsRef.current.filter((i) => i.missing).length - found.length
+    const extra = first ? found.length - 1 : found.length
+    const text = first
+      ? `Found ${first}${extra ? `, and ${plural(extra, "other missing file")} with it` : ""}`
+      : `Found ${plural(found.length, "missing file")}`
+    push({ tone: "success", text: left > 0 ? `${text}. ${plural(left, "file")} still missing` : `${text}. Nothing's missing now` })
+    if (left <= 0) setMissingOpen(false)
+  }
+  const locateFile = async (id: string) => {
+    const item = itemsRef.current.find((i) => i.id === id)
+    if (!item) return
+    const picked = await pickSvgs("files")
+    if (!picked?.length) return
+    setRelinking(true)
+    try {
+      const found = await relinkFromFile(item, picked[0], itemsRef.current.filter((i) => i.missing), linkedPaths())
+      relink(found)
+      reportFound(found, baseName(picked[0]))
+    } catch (e) {
+      push({ tone: "error", text: errorMessage(e) })
+    } finally {
+      setRelinking(false)
+    }
+  }
+  const locateFileRef = useRef(locateFile)
+  locateFileRef.current = locateFile
+  const locateFolder = async () => {
+    const picked = await pickSvgs("folder")
+    if (!picked?.length) return
+    setRelinking(true)
+    try {
+      const found = await relinkFromFolders(picked, itemsRef.current.filter((i) => i.missing), linkedPaths())
+      if (!found.length) push({ tone: "info", text: "None of the missing files are in that folder" })
+      else { relink(found); reportFound(found) }
+    } catch (e) {
+      push({ tone: "error", text: `Couldn't search that folder: ${errorMessage(e)}` })
+    } finally {
+      setRelinking(false)
+    }
+  }
 
   useEffect(() => {
     if (loadError) push({ tone: "error", text: `Couldn't load saved presets: ${loadError}` })
@@ -703,7 +758,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
     if (saving.current) return false
     saving.current = true
     try {
-      const data = JSON.stringify(buildProject(settings, items, focusId), null, 2)
+      // Each file's path relative to where the project lands goes in too
+      const data = (to: string | null) => JSON.stringify(buildProject(settings, items, focusId, { projectPath: to }), null, 2)
       const name = project?.name ?? `${items[0].relPath.includes("/") ? items[0].relPath.split("/")[0] : "SVGenius project"}.${PROJECT_EXT}`
       const to = await saveProjectFile(as ? null : project?.path ?? null, name, data)
       if (!to) return false
@@ -780,7 +836,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       if (!await settleUnsaved("open another project")) return
       const file = path ? await readProjectFile(path) : await openProjectFile()
       if (!file) return
-      const { files, focusId: fid, settings: next } = readProject(file.text, settings)
+      const { files: listed, rels, focusId: fid, settings: next } = readProject(file.text, settings)
       if (itemsRef.current.length && !dirtyRef.current && !project) {
         const ok = await dialogs.confirm({
           title: `Open ${file.name}?`,
@@ -789,6 +845,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         })
         if (!ok) return
       }
+      // The SVGs live on disk, so read them in now
+      const files = await loadLinked(listed, file.path, rels)
       update(() => next)
       replaceAll(files)
       setSelection(new Set())
@@ -798,7 +856,9 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
       snapNext.current = true
       setProject({ path: file.path, name: file.name })
       if (file.path) remember(file.path, "project")
-      push({ tone: "success", text: `Opened ${file.name}: ${plural(files.length, "file")}` })
+      const lost = files.filter((f) => f.missing).length
+      if (lost) push({ tone: "error", text: `Opened ${file.name}: ${plural(files.length, "file")}, ${lost} missing`, action: { label: "Find", run: () => setMissingOpen(true) } })
+      else push({ tone: "success", text: `Opened ${file.name}: ${plural(files.length, "file")}` })
     } catch (e) {
       if (path) forgetRecent(path)
       push({ tone: "error", text: `Couldn't open the project: ${errorMessage(e)}` })
@@ -867,6 +927,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
           { label: "Open in default app…", run: () => openExternally("open", item.path) },
           { label: "Reveal in Finder…", run: () => openExternally("reveal", item.path) }
         ] : []),
+        ...(item.missing ? [{ label: "Locate file…", run: () => { void locateFileRef.current(id) } }] : []),
         "-",
         { label: "Remove from list", run: () => removeIds(new Set([id])) },
         ...(inSelection ? [{ label: `Remove ${plural(selection.size, "selected file")}`, danger: true, run: () => removeIds(new Set(selection)) }] : [])
@@ -1161,7 +1222,11 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 filtersOpen={filtersOpen}
                 showFilters
                 onClearFilters={() => setFilters(emptyFilters())}
-                onFilters={() => setFiltersOpen((o) => !o)}
+                onFilters={() => {
+                  // Opening with no rules starts one, so there's something to fill in straight away
+                  if (!filtersOpen && filters.rules.length === 0) setFilters((f) => ({ ...f, rules: [createFilterRule()] }))
+                  setFiltersOpen((o) => !o)
+                }}
                 filterBar={<FilterBar filters={filters} onChange={setFilters} shown={shownItems.length} total={items.length} usedFlags={usedFlags} />}
                 tagsFor={tagsFor}
                 guidesFor={settings.listGuides ? listGuidesFor : undefined}
@@ -1175,7 +1240,12 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 projectName={project ? `${project.name.replace(/\.svgenius$/i, "")}${dirty ? " •" : ""}` : undefined}
                 onRemove={removeItems}
                 viewControls={viewControls}
-                cssBar={cssBar}
+                cssBar={<>
+                  {missingItems.length > 0 && (
+                    <MissingBar count={missingItems.length} standIns={missingItems.filter((i) => i.source !== undefined).length} onOpen={() => setMissingOpen(true)} />
+                  )}
+                  {cssBar}
+                </>}
               />
             )}
           </main>
@@ -1326,6 +1396,10 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
         {adding && (
           <AddDialog mode={adding.mode} text={adding.text} backdrop={settings.backdrop} taken={items.map((i) => i.relPath)}
             onFiles={addFiles} onFolder={addFolder} onAdd={addCode} onClose={() => setAdding(null)} />
+        )}
+        {missingOpen && (
+          <MissingDialog items={missingItems} busy={relinking} onLocateFile={(id) => void locateFile(id)} onLocateFolder={() => void locateFolder()}
+            onRemove={(ids) => removeIds(new Set(ids))} onClose={() => setMissingOpen(false)} />
         )}
         {dragging && <DropOverlay />}
         <Toasts toasts={toasts} dismiss={dismiss} />

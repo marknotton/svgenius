@@ -181,6 +181,7 @@ function Fact({ label, children, wide }: { label: string, children: ReactNode, w
 
 function Stats({ item, stale, compact }: { item: SvgItem, stale: boolean, compact?: boolean }) {
   if (item.status === "loading") return <div className="file-row__stats"><span className="spinner" /></div>
+  if (item.missing && item.source === undefined) return <div className="file-row__stats"><span className="pill pill--error" title={item.error}>Missing</span></div>
   if (item.status === "error") return <div className="file-row__stats"><span className="pill pill--error" title={item.error}>Error</span></div>
   if (item.status === "running") {
     return <div className="file-row__stats">{!compact && <span className="text-2">{formatBytes(item.size)}</span>}<span className="spinner" /></div>

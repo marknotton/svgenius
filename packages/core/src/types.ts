@@ -448,6 +448,11 @@ export interface SvgItem extends ScannedFile {
   adjust?: ArtAdjust
   /** A host's own name for the file (Symbols' handle), for design principle variations */
   handle?: string
+  /**
+   * The file isn't where it was (moved, renamed or deleted). With a source the
+   * saved copy stands in; without one there's nothing to show until it's found
+   */
+  missing?: boolean
 }
 
 /** Editor commands that the host's menu or shortcuts can send */

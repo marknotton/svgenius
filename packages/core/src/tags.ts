@@ -10,12 +10,17 @@ import { activeCutMatchers } from "./settings"
 export interface FileTag {
   label: string
   title: string
-  tone?: "accent" | "warning" | "tuned"
+  tone?: "accent" | "warning" | "tuned" | "error"
 }
 
 export function fileTags(item: SvgItem, settings: SvgoSettings, customOn: number): FileTag[] {
   const t = settings.trim
   const tags: FileTag[] = []
+  if (item.missing) {
+    tags.push(item.source === undefined
+      ? { label: "File missing", title: "The file isn't where it was. Locate it or remove it", tone: "error" }
+      : { label: "File missing", title: "The file isn't where it was, so the copy saved in the project is used. Locate it to link it again", tone: "warning" })
+  }
   if (item.config) tags.push({ label: "Custom settings", title: "This file uses its own settings, not a preset", tone: "accent" })
   if (item.fileSource !== undefined && item.source !== item.fileSource) {
     tags.push({ label: "Markup edited", title: "Edited in SVGenius. The original file isn't touched", tone: "warning" })

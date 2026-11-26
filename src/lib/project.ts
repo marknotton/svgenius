@@ -1,35 +1,97 @@
 import { APP_VERSION } from "./about"
 import { mergeImport, sanitiseRename, sanitiseSvgoSettings } from "@marknotton/svgenius-core/settings"
 import { fromScales, isIdentity, mergePrinciples } from "@marknotton/svgenius-core/designPrinciples"
-import type { Saved } from "./session"
+import { byteLength } from "@marknotton/svgenius-core/format"
+import { isDesktop } from "./platform"
+import { dirOf, hasEdits, isLinked, relativePath } from "./links"
 import type { AppSettings, SvgItem } from "@marknotton/svgenius-core/types"
 
 // ── Projects ──────────────────────────────────────────────────────────────────
-// A .svgenius file is JSON: every file in the list (its markup as loaded, any
-// edits made here, its flag, preset and own settings), plus the presets and
-// export options they rely on. Opening one puts all of that back, even when
-// the original files have moved, since the markup travels inside it.
+// A .svgenius file is JSON: every file in the list (where it lives on disk,
+// its flag, preset, own settings and Quick Edit tuning), plus the presets and
+// export options they rely on. The SVGs themselves stay on disk and are read
+// again when the project opens, so the project stays small. Markup only goes
+// in when there's no file to read: pasted code, edits made in here, or a copy
+// standing in for a file that's gone missing.
+// The browser can't read files back by path, so its projects carry the markup
+// (as version 1 projects did, which still open).
+
+export interface ProjectEntry {
+  id: string
+  /** Where the file was when saved */
+  path: string
+  /** The same, relative to the project file, for a project moved with its SVGs */
+  rel?: string
+  name: string
+  relPath: string
+  size?: number
+  /** Markup that can't come from the file: pasted code, edits, a stand-in copy */
+  source?: string
+  /** The file's own markup, only when carried alongside edits */
+  fileSource?: string
+  /** `source` is edits made in here, not a copy of the file */
+  edited?: boolean
+  presetId: string | null
+  config?: SvgItem["config"]
+  flag?: SvgItem["flag"]
+  adjust?: SvgItem["adjust"]
+}
 
 export interface ProjectFile {
   app: "SVGenius"
   kind: "project"
-  version: 1
+  version: 2
   savedAt: string
   appVersion: string
   settings: Pick<AppSettings, "defaultPresetId" | "presets" | "customPlugins" | "rename" | "keepStructure" | "previewCss" | "previewCssEnabled" | "designPrinciples">
-  files: Saved[]
+  files: ProjectEntry[]
   /** The file that was open in the sidebar */
   focusId: string | null
 }
 
-export function buildProject(settings: AppSettings, items: SvgItem[], focusId: string | null): ProjectFile {
-  const files: Saved[] = items
-    .filter((i) => typeof i.source === "string")
-    .map(({ id, path, name, relPath, size, source, fileSource, presetId, config, flag, adjust }) => ({ id, path, name, relPath, size, source, fileSource, presetId, config, flag, adjust }))
+export interface BuildOptions {
+  /** Carry every file's markup (the browser's projects). Defaults to the browser */
+  embed?: boolean
+  /** Where the project is being saved, for each file's relative path */
+  projectPath?: string | null
+}
+
+function entryFor(item: SvgItem, embed: boolean, projectDir: string | null): ProjectEntry | null {
+  const { id, path, name, relPath, size, presetId, config, flag, adjust } = item
+  const linked = isLinked(item)
+  // Nothing to save for pasted code that never loaded
+  if (!linked && item.source === undefined) return null
+  const e: ProjectEntry = { id, path, name, relPath, size, presetId, config, flag, adjust }
+  if (linked && projectDir) {
+    const rel = relativePath(projectDir, path)
+    if (rel) e.rel = rel
+  }
+  if (item.source === undefined) return e
+  const edited = hasEdits(item)
+  if (embed || !linked) {
+    e.source = item.source
+    if (edited && item.fileSource !== undefined) e.fileSource = item.fileSource
+    if (edited) e.edited = true
+  } else if (edited && !item.missing) {
+    // The file is re-read on open; only the edits need keeping
+    e.source = item.source
+    e.edited = true
+  } else if (item.missing) {
+    // No file to read back, so the copy we have stands in until it's found
+    e.source = item.source
+    if (edited && item.fileSource !== undefined) { e.fileSource = item.fileSource; e.edited = true }
+  }
+  return e
+}
+
+export function buildProject(settings: AppSettings, items: SvgItem[], focusId: string | null, opts: BuildOptions = {}): ProjectFile {
+  const embed = opts.embed ?? !isDesktop
+  const projectDir = opts.projectPath ? dirOf(opts.projectPath) : null
+  const files = items.map((i) => entryFor(i, embed, projectDir)).filter((e): e is ProjectEntry => e !== null)
   return {
     app: "SVGenius",
     kind: "project",
-    version: 1,
+    version: 2,
     savedAt: new Date().toISOString(),
     appVersion: APP_VERSION,
     settings: {
@@ -60,11 +122,13 @@ const readAdjust = (v: unknown): SvgItem["adjust"] => {
 }
 
 /**
- * Reads a project file. The files come back ready for the list, and the
- * settings merge into the current ones: the project's presets are added (or
- * update ones with the same ID), so every file finds its preset again
+ * Reads a project file. The files come back ready for the list, though linked
+ * ones still need reading from disk (loadLinked in links.ts); `rels` holds
+ * each one's path relative to the project. The settings merge into the
+ * current ones: the project's presets are added (or update ones with the same
+ * ID), so every file finds its preset again
  */
-export function readProject(text: string, current: AppSettings): { files: SvgItem[], focusId: string | null, settings: AppSettings } {
+export function readProject(text: string, current: AppSettings): { files: SvgItem[], rels: Map<string, string>, focusId: string | null, settings: AppSettings } {
   let raw: unknown
   try { raw = JSON.parse(text) } catch { throw new Error("That project file isn't valid JSON") }
   if (!isObj(raw) || raw.app !== "SVGenius" || raw.kind !== "project") throw new Error("That doesn't look like an SVGenius project")
@@ -81,30 +145,40 @@ export function readProject(text: string, current: AppSettings): { files: SvgIte
     try { settings = { ...settings, designPrinciples: mergePrinciples(settings.designPrinciples ?? [], s.designPrinciples).next } } catch { /* none usable */ }
   }
 
+  const rels = new Map<string, string>()
   const list = Array.isArray(raw.files) ? raw.files : []
   const files: SvgItem[] = list.flatMap((f): SvgItem[] => {
-    if (!isObj(f) || typeof f.source !== "string") return []
-    const name = str(f.name) ?? "untitled.svg"
+    if (!isObj(f)) return []
+    const source = str(f.source)
+    const path = str(f.path)
+    // Version 1 always had markup; version 2 needs at least a path to find
+    if (source === undefined && !path) return []
+    const name = str(f.name) ?? (path ? path.split(/[\\/]/).pop() as string : "untitled.svg")
     const presetId = str(f.presetId) ?? null
+    const id = str(f.id) ?? crypto.randomUUID()
+    const rel = str(f.rel)
+    if (rel) rels.set(id, rel)
+    // Version 1 carried both; a stand-in copy is the file as it was; edits leave it to the disk
+    const fileSource = str(f.fileSource) ?? (f.edited === true ? undefined : source)
     return [{
-      id: str(f.id) ?? crypto.randomUUID(),
-      path: str(f.path) ?? name,
+      id,
+      path: path ?? name,
       name,
       relPath: str(f.relPath) ?? name,
-      size: typeof f.size === "number" ? f.size : new Blob([f.source]).size,
-      source: f.source,
-      fileSource: str(f.fileSource),
+      size: typeof f.size === "number" ? f.size : source !== undefined ? byteLength(source) : 0,
+      source,
+      fileSource,
       presetId: presetId && presetIds.has(presetId) ? presetId : null,
       config: isObj(f.config) ? sanitiseSvgoSettings(f.config) : undefined,
       flag: str(f.flag) as SvgItem["flag"],
       adjust: readAdjust(f.adjust),
-      status: "idle",
+      status: source === undefined ? "loading" : "idle",
       rev: 0
     }]
   })
   if (!files.length) throw new Error("That project has no files in it")
   const focusId = str(raw.focusId) ?? null
-  return { files, focusId: focusId && files.some((f) => f.id === focusId) ? focusId : null, settings }
+  return { files, rels, focusId: focusId && files.some((f) => f.id === focusId) ? focusId : null, settings }
 }
 
 /**

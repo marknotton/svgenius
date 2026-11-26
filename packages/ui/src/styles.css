@@ -669,6 +669,7 @@ body.is-resizing * { user-select: none !important; }
 .tag { font-size: 10.5px; line-height: 1; padding: 3px 6px; border-radius: 99px; border: 1px solid var(--border); color: var(--text-2); background: var(--surface-2); white-space: nowrap; }
 .tag--accent { color: var(--accent-ink); background: var(--accent-soft); border-color: var(--accent-border); }
 .tag--warning { color: var(--warning); background: var(--warning-soft); border-color: var(--warning-border); }
+.tag--error { color: var(--error); background: var(--error-soft); border-color: var(--error-border); }
 /* Tuned in Quick Edit: soft yellow, dark amber text (muted amber in dark mode) */
 .tag--tuned { color: #8a5a00; background: #fdf3c4; border-color: #f0d97a; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .tag--tuned { color: #e9c46a; background: rgba(233, 196, 106, .12); border-color: rgba(233, 196, 106, .3); } }
@@ -1761,3 +1762,16 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 /* Alignment keylines: size, diagonals area and style on one row, wrapping only when narrow */
 .dp__align-fields { flex-wrap: wrap; gap: 6px 10px; }
 .dp__align-fields .dp__num { width: 60px; }
+
+/* Missing files: the bar over the list and the dialog that finds them */
+.missing-bar { display: flex; align-items: center; gap: 8px; padding: 7px 16px; font-size: 12px; background: var(--warning-soft); border-bottom: 1px solid var(--warning-border); }
+.missing-bar__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--warning); flex: none; }
+.modal:has(.missing) { width: min(620px, calc(100vw - 32px)); max-height: calc(100vh - 80px); overflow-y: auto; }
+.missing { gap: 12px; }
+.missing p { margin: 0; font-size: 12px; }
+.missing__list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); max-height: 320px; overflow-y: auto; }
+.missing__item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; }
+.missing__item + .missing__item { border-top: 1px solid var(--border); }
+.missing__name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.missing__file { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.missing__path { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -367,9 +367,10 @@ export async function readProjectFile(path: string): Promise<{ path: string, nam
  * otherwise a save dialog asks; the browser downloads it. Returns where it
  * went (the file name in the browser), or null when cancelled
  */
-export async function saveProjectFile(path: string | null, defaultName: string, contents: string): Promise<string | null> {
+export async function saveProjectFile(path: string | null, defaultName: string, contents: string | ((to: string | null) => string)): Promise<string | null> {
+  const text = (to: string | null) => (typeof contents === "string" ? contents : contents(to))
   if (!isDesktop) {
-    download(defaultName, new Blob([contents], { type: "application/json" }))
+    download(defaultName, new Blob([text(null)], { type: "application/json" }))
     return defaultName
   }
   // Saving back to its own file needs no dialog (and so no "Replace?"), unless the file has gone
@@ -377,7 +378,7 @@ export async function saveProjectFile(path: string | null, defaultName: string, 
   const to = there ? path : await save({ defaultPath: path ?? defaultName, filters: [{ name: "SVGenius project", extensions: [PROJECT_EXT] }] })
   if (!to) return null
   const withExt = to.toLowerCase().endsWith(`.${PROJECT_EXT}`) ? to : `${to}.${PROJECT_EXT}`
-  await desktop.writeJsonFile(withExt, contents)
+  await desktop.writeJsonFile(withExt, text(withExt))
   return withExt
 }
 

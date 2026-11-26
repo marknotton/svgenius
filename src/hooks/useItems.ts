@@ -4,6 +4,7 @@ import { CONCURRENCY, optimiseSvg, runLimited } from "@marknotton/svgenius-core/
 import { newId } from "@marknotton/svgenius-core/settings"
 import { errorMessage, forgetFiles, isDesktop, pastedPath, readSvg, scanPaths } from "../lib/platform"
 import { loadSession, saveSession } from "../lib/session"
+import { found as foundAt, markMissing, type Found } from "../lib/links"
 import { postProcess } from "@marknotton/svgenius-core/trim"
 import { optimiseAutoPrecision } from "@marknotton/svgenius-core/precision"
 import { assessComplexity, isBlocked } from "@marknotton/svgenius-core/complexity"
@@ -175,12 +176,35 @@ export function useItems() {
    */
   const reloadFromDisk = useCallback((path: string, text: string): "updated" | "kept" | "same" => {
     const item = itemsRef.current.find((i) => i.path === path)
-    if (!item || item.fileSource === text) return "same"
+    if (!item) return "same"
+    // A missing file turned up again where it was
+    if (item.missing) {
+      setItems((list) => list.map((i) => (i.path === path ? { ...foundAt(i, path, text), heavy: assessComplexity(foundAt(i, path, text).source ?? ""), rev: i.rev + 1 } : i)))
+      return "updated"
+    }
+    if (item.fileSource === text) return "same"
     const edited = item.fileSource !== undefined && item.source !== item.fileSource
     setItems((list) => list.map((i) => (i.path !== path ? i
       : edited ? { ...i, fileSource: text }
       : { ...i, source: text, fileSource: text, size: byteLength(text), heavy: assessComplexity(text), rev: i.rev + 1, mtime: Date.now(), status: i.status === "error" ? "idle" : i.status, errorKey: undefined })))
     return edited ? "kept" : "updated"
+  }, [])
+
+  /** Files found again (relinked). Edits made here are kept */
+  const relink = useCallback((found: Found[]) => {
+    const byId = new Map(found.map((f) => [f.id, f]))
+    setItems((list) => list.map((i) => {
+      const f = byId.get(i.id)
+      if (!f) return i
+      const next = foundAt(i, f.path, f.text)
+      return { ...next, heavy: assessComplexity(next.source ?? ""), rev: i.rev + 1 }
+    }))
+  }, [])
+
+  /** A file that was there has gone (deleted or moved while open) */
+  const lose = useCallback((paths: string[]) => {
+    const set = new Set(paths)
+    setItems((list) => list.map((i) => (set.has(i.path) && !i.missing ? markMissing(i) : i)))
   }, [])
 
   /** Render and optimise a heavy file at the user's own risk */
@@ -233,5 +257,5 @@ export function useItems() {
     return results
   }, [patch])
 
-  return { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, optimise, reloadFromDisk, forceRender }
+  return { items, ready, itemsRef, addPaths, addPasted, remove, clear, setPreset, setFlag, editSource, revertSource, travelSource, replaceAll, setConfig, setAdjust, optimise, reloadFromDisk, forceRender, relink, lose }
 }
