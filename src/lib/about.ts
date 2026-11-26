@@ -25,6 +25,7 @@ export const HISTORY: Release[] = [
       "⌘S saves straight back to the open project, even after a reload, with no Save dialog or Replace prompt. ⇧⌘S is Save As",
       "Alignment keylines on design principles: reference-only guides (a centre circle, diagonals, centre lines, rectangles or your own lines), drawn fainter than the keylines. Never used for Smart Sizing or masks. Material gets a 10 centre circle, diagonals and centre lines; Lucide, Font Awesome and Meta get diagonals and centre lines. Shown in Quick Edit, the keyline explorer, and on list previews with their own toggle beside the guides button. Each one, and each keyline, can have its own line style (solid, dashed or dotted), width, colour and opacity",
       "The Tuned tag (placed in Quick Edit) is now amber, and filterable: Status › Tuned in Quick Edit in the filters, or is:tuned / -is:tuned in the search",
+      "Export as zip: the export menu can save everything (or everything, then clear the list) as one .zip, keeping folders when Keep folder structure is on",
       "Keyline explorer: the design principle drawn big, with each keyline and the live area to hover or pin, its size, ratio and corner radius, and which Smart Sizing group uses it",
       "Square tolerance in Settings (±10% to start) decides when a file counts as square rather than tall or wide, for filters, search and Smart Sizing. A preset can set its own",
       "Shape filters: square, tall or wide, by the artwork or by the viewBox. In search, shape:tall, vb:wide and -shape:square",
