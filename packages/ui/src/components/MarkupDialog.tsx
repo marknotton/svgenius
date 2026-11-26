@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { EditorTabs } from "./EditorTabs"
-import { IconEye, IconEyeOff, IconLock, IconUnlock, IconChevronDown, IconChevronLeft, IconChevronRight, IconZoomIn, IconZoomOut, IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconMagnet, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
-import { ShapeIcon } from "./ShapeGuide"
+import { IconGridLines, IconKeylines, IconEye, IconEyeOff, IconLock, IconUnlock, IconChevronDown, IconChevronLeft, IconChevronRight, IconZoomIn, IconZoomOut, IconBreakApart, IconDuplicate, IconGroup, IconStrokeToPath, IconToPath, IconTrash, IconUngroup, IconArrowHollow, IconArrowSolid, IconCopy, IconPanelBottom, IconPanelRight, IconRedo, IconReset, IconUndo, IconX } from "../icons"
+import { ShapeIcon, ShapeOptions, useGuideShape } from "./ShapeGuide"
+import { SnapTools, useSnap } from "./SnapTools"
+import { GUIDE_SHAPES, type GuideShape } from "@marknotton/svgenius-core/shapes"
 import { Resizer } from "./Resizer"
 import { elementRanges, rangeAt } from "@marknotton/svgenius-core/markupMap"
 import { moveElement, pasteAfter, removeElement, setAttr, setAttrs, translateAttrs, type DropPlace } from "@marknotton/svgenius-core/markupEdit"
@@ -53,7 +55,7 @@ interface Props {
   /** Previous and next file in the list, and where this one sits */
   nav?: { pos: number, total: number, go: (step: 1 | -1) => void }
   /** The circle guide and clip, shared with the list's previews */
-  circle?: { on: boolean, clip: boolean, onToggle: () => void, onClip: () => void }
+  circle?: { on: boolean, clip: boolean, onToggle: () => void, onClip: () => void, onShape?: (shape: GuideShape) => void }
   /** Extra buttons from the host (Symbols puts its Save button here) */
   actions?: React.ReactNode
   /** Switches to Quick Edit on this file */
@@ -408,8 +410,9 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
   }
 
   // Snapping while dragging, remembered on this device
-  const [snap, setSnapState] = useState(() => { try { return localStorage.getItem("svgenius:snap") !== "0" } catch { return true } })
-  const setSnap = (v: boolean) => { setSnapState(v); try { localStorage.setItem("svgenius:snap", v ? "1" : "0") } catch { /* unavailable */ } }
+  const snapping = useSnap()
+  const guideShape = useGuideShape()
+  const shapeName = (GUIDE_SHAPES.find((x) => x.value === guideShape)?.label ?? "Circle").toLowerCase()
   // The design principle's grid and keylines over the canvas. Shown ones are snapped to as well
   const [dpGrid, setDpGridState] = useState(() => { try { return localStorage.getItem("svgenius:editor-dp-grid") !== "0" } catch { return true } })
   const [dpKeylines, setDpKeylinesState] = useState(() => { try { return localStorage.getItem("svgenius:editor-dp-keylines") !== "0" } catch { return true } })
@@ -694,18 +697,8 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
               )
             })}
             <span className="edit-toolbar__sep" />
-            <button className={`btn btn--secondary btn--sm edit-toolbar__btn${snap ? " is-on" : ""}`} aria-pressed={snap} onClick={() => setSnap(!snap)}
-              title={snap ? "Snapping on: dragged items line up with other items and the viewBox. Hold ⌘ to drag freely" : "Snapping off. Click to snap dragged items to other items and the viewBox"}
-              aria-label="Snapping"><IconMagnet width={14} height={14} /></button>
+            <SnapTools snap={snapping} side={toolbarSide} hasDp={!!principle} />
           </>}
-          {principle && (
-            <div className="btn-join dp-switch" role="group" aria-label={`${principle.name} guides`}>
-              <button className={`btn btn--secondary btn--sm${dpGrid ? " is-on" : ""}`} aria-pressed={dpGrid} onClick={() => setDpGrid(!dpGrid)}
-                title={`${principle.name} grid${editable ? ". While it shows, dragged shapes and points snap to it" : ""}`}>Grid</button>
-              <button className={`btn btn--secondary btn--sm${dpKeylines ? " is-on" : ""}`} aria-pressed={dpKeylines} onClick={() => setDpKeylines(!dpKeylines)}
-                title={`${principle.name} live area and keylines${editable ? ". While they show, dragged shapes and points snap to their edges" : ""}`}>Keylines</button>
-            </div>
-          )}
           <span className="edit-toolbar__spacer" />
           <div className="btn-join zoom-control" role="group" aria-label="Zoom">
             <button className="btn btn--secondary btn--sm edit-toolbar__btn" onClick={() => stepZoom(-1)} title="Zoom out (⌘−). ⌘ and the wheel, or a pinch, zooms at the pointer" aria-label="Zoom out"><IconZoomOut width={14} height={14} /></button>
@@ -714,12 +707,26 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             </button>
             <button className="btn btn--secondary btn--sm edit-toolbar__btn" onClick={() => stepZoom(1)} title="Zoom in (⌘+)" aria-label="Zoom in"><IconZoomIn width={14} height={14} /></button>
           </div>
+          {principle && (
+            <div className="btn-join" role="group" aria-label={`${principle.name} guides`}>
+              <button className={`btn btn--secondary btn--sm edit-toolbar__btn${dpGrid ? " is-on" : ""}`} aria-pressed={dpGrid} onClick={() => setDpGrid(!dpGrid)}
+                title={`Grid: ${principle.name}`} aria-label="Grid"><IconGridLines width={14} height={14} /></button>
+              <button className={`btn btn--secondary btn--sm edit-toolbar__btn${dpKeylines ? " is-on" : ""}`} aria-pressed={dpKeylines} onClick={() => setDpKeylines(!dpKeylines)}
+                title={`Live area and keylines: ${principle.name}`} aria-label="Keylines"><IconKeylines width={14} height={14} /></button>
+            </div>
+          )}
           {circle && (
             <div className="btn-join" role="group" aria-label="Shape guide">
               <button className={`btn btn--secondary btn--sm edit-toolbar__btn${circle.on ? " is-on" : ""}`} aria-pressed={circle.on} onClick={circle.onToggle}
-                title="Shape guide: shows what survives the crop, e.g. avatars and app icons" aria-label="Shape guide"><ShapeIcon size={14} dashed /></button>
+                title={`Shape guide: shows what survives a ${shapeName} crop, e.g. avatars and app icons`} aria-label="Shape guide"><ShapeIcon size={14} dashed /></button>
               <button className={`btn btn--secondary btn--sm edit-toolbar__btn${circle.clip ? " is-on" : ""}`} aria-pressed={circle.clip} onClick={circle.onClip}
-                title="Clip the preview to the guide's shape" aria-label="Clip to the shape"><ShapeIcon size={14} /></button>
+                title={`Clip the preview to the ${shapeName}`} aria-label="Clip to the shape"><ShapeIcon size={14} /></button>
+              {circle.onShape && (
+                <select className="btn btn--secondary btn--sm shape-select edit-toolbar__shape" aria-label="Guide shape" title="The shape the guide and clip use, everywhere"
+                  value={guideShape} onChange={(e) => circle.onShape?.(e.target.value as GuideShape)}>
+                  <ShapeOptions />
+                </select>
+              )}
             </div>
           )}
           <CanvasBackground />
@@ -768,7 +775,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             {/* Floats over the canvas, so it never pushes the preview down */}
             {editable && <EditStatus tool={tool} count={selection.length} note={note} />}
             {peekMarkup !== null && <span className="peek-badge">After</span>}
-            <InspectPreview markup={peekMarkup ?? markup} backdrop={backdrop} checker={principle} dpGrid={!!principle && dpGrid} dpKeylines={!!principle && dpKeylines} selection={peekMarkup !== null ? [] : selection} locked={ownLocked} hidden={peekMarkup !== null ? undefined : ownHidden} snap={snap}
+            <InspectPreview markup={peekMarkup ?? markup} backdrop={backdrop} checker={principle} dpGrid={!!principle && dpGrid} dpKeylines={!!principle && dpKeylines} selection={peekMarkup !== null ? [] : selection} locked={ownLocked} hidden={peekMarkup !== null ? undefined : ownHidden} snap={snapping.on} snapTo={snapping.opts}
               zoom={zoom} onZoom={setZoom} onActual={setActual}
               onPick={(i, add) => { (document.activeElement as HTMLElement | null)?.blur?.(); pick(i, add ? "add" : "only") }}
               onSelect={(found, add) => setSelection((s) => (add ? [...s, ...found.filter((i) => !s.includes(i))] : found))}

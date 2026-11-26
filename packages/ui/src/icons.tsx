@@ -103,3 +103,7 @@ export const IconEyeOff = (p: P) => <Icon {...p}><path d="M1.5 8S4 3.5 8 3.5c1.3
 export const IconEditPath = (p: P) => <Icon {...p}><path d="M2.5 13.5c3-1 4.5-3 5.5-6" /><rect x="7" y="3.5" width="3" height="3" rx=".5" /><path d="m10 3.5 3.5-1v3.5L10 6.5" /><circle cx="2.5" cy="13.5" r="1" fill="currentColor" /></Icon>
 /** A project: a box of files */
 export const IconProject = (p: P) => <Icon {...p}><path d="M2.5 5.5h11v7.75a.75.75 0 0 1-.75.75H3.25a.75.75 0 0 1-.75-.75z" /><path d="M2.5 5.5 4 2.5h8l1.5 3M6.5 8.5h3" /></Icon>
+
+// Design principle guides in the editor: the grid, and the live area and keylines
+export const IconGridLines = (p: P) => <Icon {...p}><rect x="2" y="2" width="12" height="12" rx="1" /><path d="M6 2v12M10 2v12M2 6h12M2 10h12" strokeWidth="1" opacity=".6" /></Icon>
+export const IconKeylines = (p: P) => <Icon {...p}><rect x="3" y="3" width="10" height="10" rx="2" /><circle cx="8" cy="8" r="5.5" strokeWidth="1" /><rect x="1.5" y="1.5" width="13" height="13" rx=".5" strokeWidth=".75" strokeDasharray="1.5 1.5" /></Icon>

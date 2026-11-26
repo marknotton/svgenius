@@ -1,3 +1,4 @@
+import type { GuideShape } from "@marknotton/svgenius-core/shapes"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { CodeEditor } from "./CodeEditor"
 import { CodeTabs, MarkupDialog, type MarkupTab } from "./MarkupDialog"
@@ -56,7 +57,7 @@ interface Props {
   onQuickEdit?: (id: string) => void
   /** Previous and next file, for the editor's arrows */
   nav?: { pos: number, total: number, go: (step: 1 | -1) => void }
-  circle?: { on: boolean, clip: boolean, onToggle: () => void, onClip: () => void }
+  circle?: { on: boolean, clip: boolean, onToggle: () => void, onClip: () => void, onShape?: (shape: GuideShape) => void }
   /** The preset's design principle live area: the shape guide and clip sit in it */
   frame?: ShapeFrame | null
   /** Settings › Square tolerance, ±% */

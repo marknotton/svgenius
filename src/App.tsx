@@ -1324,7 +1324,8 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 circle={{
                   on: settings.circleOverlay, clip: settings.circleClip,
                   onToggle: () => setViewPrefs({ circleOverlay: !settings.circleOverlay }),
-                  onClip: () => setViewPrefs({ circleClip: !settings.circleClip })
+                  onClip: () => setViewPrefs({ circleClip: !settings.circleClip }),
+                  onShape: (guideShape) => update((s) => ({ ...s, guideShape }))
                 }}
               />
             ) : (

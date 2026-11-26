@@ -37,8 +37,10 @@ interface Props {
   hidden?: Set<number>
   /** When set, the selection gets a box with scale and rotate handles */
   onTransform?: (changes: ElementTransform[]) => void
-  /** Dragged items snap to other items' edges and centres, and to the viewBox. ⌘ while dragging skips it */
+  /** Snapping on. Shift snaps while it's off, ⌘ drags freely while it's on */
   snap?: boolean
+  /** What snapping pulls onto */
+  snapTo?: SnapOptions
   /** Zoom, where 1 fits the canvas in the view. ⌘ or Ctrl with the wheel (or a pinch) zooms at the pointer */
   zoom?: number
   onZoom?: (zoom: number) => void
@@ -46,36 +48,45 @@ interface Props {
   onActual?: (zoom: number) => void
   /** The design principle whose grid the checkerboard follows, and whose guides can be drawn and snapped to */
   checker?: DesignPrinciple | null
-  /** Draw (and snap to) the principle's grid, and its live area and keylines */
+  /** Draw the principle's grid, and its live area and keylines */
   dpGrid?: boolean
   dpKeylines?: boolean
 }
 
-/** What a design principle adds to snapping */
-interface DpSnap { dp: DesignPrinciple, grid: boolean, keylines: boolean }
+/** What dragging, point moves and resizing snap to. grid and keylines need a design principle; pixel is whole viewBox units */
+export interface SnapOptions { objects: boolean, grid: boolean, keylines: boolean, pixel: boolean }
+export const SNAP_DEFAULTS: SnapOptions = { objects: true, grid: true, keylines: true, pixel: false }
+interface SnapCfg extends SnapOptions { dp: DesignPrinciple | null }
 
-/** A design principle's grid lines and keyline edges, on screen, fitted to the svg like GridGuides draws them */
-function dpLines(svg: Element, s: DpSnap) {
+/** Evenly spaced lines, worked out rather than listed. Pulls from up to half a gap away, so it always catches */
+interface Lattice { ox: number, oy: number, gap: number, guides: boolean, edgesOnly: boolean }
+
+/** A design principle's keyline edges (listed) and grid, plus whole units, on screen */
+function snapTargets(svg: SVGSVGElement, c: SnapCfg) {
   const r = svg.getBoundingClientRect()
-  const W = s.dp.width, H = s.dp.height
-  const k = Math.min(r.width / W, r.height / H)
-  const ox = r.left + (r.width - W * k) / 2, oy = r.top + (r.height - H * k) / 2
   const x: number[] = [], y: number[] = []
-  const grid = { x: [] as number[], y: [] as number[], gap: 0 }
-  if (s.grid) {
-    const step = gridStep(Math.max(W, H))
-    for (let u = 0; u <= W + 1e-9; u += step) grid.x.push(ox + u * k)
-    for (let u = 0; u <= H + 1e-9; u += step) grid.y.push(oy + u * k)
-    grid.gap = step * k
-  }
-  if (s.keylines) {
-    for (const a of dpAreas(s.dp)) {
-      x.push(ox + a.x * k, ox + (a.x + a.w) * k)
-      y.push(oy + a.y * k, oy + (a.y + a.h) * k)
+  const lattices: Lattice[] = []
+  if (c.dp && (c.grid || c.keylines)) {
+    // Fitted like GridGuides draws it
+    const W = c.dp.width, H = c.dp.height
+    const k = Math.min(r.width / W, r.height / H)
+    const ox = r.left + (r.width - W * k) / 2, oy = r.top + (r.height - H * k) / 2
+    if (c.grid) lattices.push({ ox, oy, gap: gridStep(Math.max(W, H)) * k, guides: true, edgesOnly: false })
+    if (c.keylines) {
+      for (const a of dpAreas(c.dp)) {
+        x.push(ox + a.x * k, ox + (a.x + a.w) * k)
+        y.push(oy + a.y * k, oy + (a.y + a.h) * k)
+      }
+      x.push(ox + (W / 2) * k); y.push(oy + (H / 2) * k)
     }
-    x.push(ox + (W / 2) * k); y.push(oy + (H / 2) * k)
   }
-  return { x, y, grid }
+  const vb = svg.viewBox?.baseVal
+  if (c.pixel && vb && vb.width > 0 && vb.height > 0) {
+    const k = Math.min(r.width / vb.width, r.height / vb.height)
+    // Too dense to mean anything when zoomed right out
+    if (k >= 2) lattices.push({ ox: r.left + (r.width - vb.width * k) / 2 - vb.x * k, oy: r.top + (r.height - vb.height * k) / 2 - vb.y * k, gap: k, guides: false, edgesOnly: true })
+  }
+  return { x, y, lattices }
 }
 
 export const ZOOM_MIN = 0.1, ZOOM_MAX = 64
@@ -104,48 +115,66 @@ const outerBox = (rs: DOMRect[]) => rs.length ? rs.reduce((u, r) => {
 
 /**
  * Snapping, like a drawing app. A dragged box's edges and centre pull onto
- * other items' edges and centres and the viewBox's, within SNAP_PX. Its own
- * starting lines count too, so a mostly sideways drag sticks to its row (and
- * an up-and-down one to its column) until you pull clear. Returns the snapped
- * screen distance and the guide lines to draw, in stage pixels
+ * other items' edges and centres and the viewBox's, and the design principle's
+ * keylines, within SNAP_PX. Its own starting lines count too, so a mostly
+ * sideways drag sticks to its row until you pull clear. Failing those, the
+ * grid and then whole units catch it from up to half a cell away. Returns the
+ * snapped screen distance and the guide lines to draw, in stage pixels
  */
-function snapper(shadow: ShadowRoot, skip: Element[], moving: DOMRect | null, base: DOMRect, dp?: DpSnap | null) {
+function snapper(shadow: ShadowRoot, skip: Element[], moving: DOMRect | null, base: DOMRect, cfg: SnapCfg) {
   const lines = { x: [] as number[], y: [] as number[] }
-  // The design principle's grid: always pulls (from up to half a cell away), after anything closer has had its chance
-  let grid = { x: [] as number[], y: [] as number[], gap: 0 }
+  let lattices: Lattice[] = []
   if (moving) {
     const add = (r: DOMRect) => {
-      if (r.width + r.height <= 0 && !(r.width === 0 && r.height === 0)) return
       lines.x.push(r.left, (r.left + r.right) / 2, r.right)
       lines.y.push(r.top, (r.top + r.bottom) / 2, r.bottom)
     }
     const svg = shadow.querySelector("svg")
-    if (svg) add(svg.getBoundingClientRect())
-    if (svg && dp && (dp.grid || dp.keylines)) { const d = dpLines(svg, dp); lines.x.push(...d.x); lines.y.push(...d.y); grid = d.grid }
-    for (const other of shadow.querySelectorAll(PICKABLE)) {
-      if (other.closest(UNPAINTED) || skip.some((x) => x === other || x.contains(other))) continue
-      if (getComputedStyle(other).pointerEvents === "none" || getComputedStyle(other).display === "none") continue
-      const r = other.getBoundingClientRect()
-      if (r.width + r.height > 0) add(r)
+    if (svg) {
+      const t = snapTargets(svg, cfg)
+      lines.x.push(...t.x); lines.y.push(...t.y)
+      lattices = t.lattices
     }
-    add(moving)
+    if (cfg.objects) {
+      if (svg) add(svg.getBoundingClientRect())
+      for (const other of shadow.querySelectorAll(PICKABLE)) {
+        if (other.closest(UNPAINTED) || skip.some((x) => x === other || x.contains(other))) continue
+        if (getComputedStyle(other).pointerEvents === "none" || getComputedStyle(other).display === "none") continue
+        const r = other.getBoundingClientRect()
+        if (r.width + r.height > 0) add(r)
+      }
+      add(moving)
+    }
   }
   return (dx: number, dy: number, on: boolean) => {
     const gx: number[] = [], gy: number[] = []
     if (moving && on) {
-      const pull = (own: number[], to: number[], d: number, hit: number[], reach = SNAP_PX): number => {
+      const axis = (own: number[], to: number[], d: number, hit: number[], o0: "ox" | "oy") => {
         let best: number | null = null
         for (const o of own) for (const t of to) {
           const diff = t - (o + d)
-          if (Math.abs(diff) <= reach && (best === null || Math.abs(diff) < Math.abs(best))) best = diff
+          if (Math.abs(diff) <= SNAP_PX && (best === null || Math.abs(diff) < Math.abs(best))) best = diff
         }
-        if (best === null) return reach === SNAP_PX && grid.gap > 0 ? pull(own, to === lines.x ? grid.x : grid.y, d, hit, grid.gap / 2 + 0.5) : d
-        const nd = d + best
-        for (const o of own) for (const t of to) if (Math.abs(t - (o + nd)) < 0.5 && !hit.includes(t)) hit.push(t)
-        return nd
+        if (best !== null) {
+          const nd = d + best
+          for (const o of own) for (const t of to) if (Math.abs(t - (o + nd)) < 0.5 && !hit.includes(t)) hit.push(t)
+          return nd
+        }
+        for (const l of lattices) {
+          if (l.gap <= 0) continue
+          const mine = l.edgesOnly ? [own[0], own[2]] : own
+          let pick: { diff: number, t: number } | null = null
+          for (const o of mine) {
+            const t = l[o0] + Math.round((o + d - l[o0]) / l.gap) * l.gap
+            const diff = t - (o + d)
+            if (Math.abs(diff) <= l.gap / 2 + 0.5 && (!pick || Math.abs(diff) < Math.abs(pick.diff))) pick = { diff, t }
+          }
+          if (pick) { if (l.guides) hit.push(pick.t); return d + pick.diff }
+        }
+        return d
       }
-      dx = pull([moving.left, (moving.left + moving.right) / 2, moving.right], lines.x, dx, gx)
-      dy = pull([moving.top, (moving.top + moving.bottom) / 2, moving.bottom], lines.y, dy, gy)
+      dx = axis([moving.left, (moving.left + moving.right) / 2, moving.right], lines.x, dx, gx, "ox")
+      dy = axis([moving.top, (moving.top + moving.bottom) / 2, moving.bottom], lines.y, dy, gy, "oy")
     }
     return { dx, dy, gx: gx.map((x) => x - base.x), gy: gy.map((y) => y - base.y) }
   }
@@ -187,16 +216,18 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked, hidden, snap = true, zoom = 1, onZoom, onActual, checker, dpGrid = false, dpKeylines = false }: Props) {
+export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked, hidden, snap = true, zoom = 1, onZoom, onActual, checker, dpGrid = false, dpKeylines = false, snapTo = SNAP_DEFAULTS }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
   const swallowClick = useRef(false)
   const [boxes, setBoxes] = useState<{ sel: DOMRect[], hov: DOMRect | null }>({ sel: [], hov: null })
   const [marquee, setMarquee] = useState<{ x0: number, y0: number, x1: number, y1: number } | null>(null)
-  const dpSnap: DpSnap | null = checker && (dpGrid || dpKeylines) ? { dp: checker, grid: dpGrid, keylines: dpKeylines } : null
-  const live = useRef({ selection, path, readOnly, onSelect, onMoveBy, snap, dpSnap })
-  live.current = { selection, path, readOnly, onSelect, onMoveBy, snap, dpSnap }
+  const snapCfg: SnapCfg = { ...snapTo, dp: checker ?? null }
+  /** Snapping for this pointer event: on, or Shift held. ⌘ (Ctrl) always drags freely */
+  const snapping = (ev: { shiftKey: boolean, metaKey: boolean, ctrlKey: boolean }) => (live.current.snap || ev.shiftKey) && !ev.metaKey && !ev.ctrlKey
+  const live = useRef({ selection, path, readOnly, onSelect, onMoveBy, snap, snapCfg })
+  live.current = { selection, path, readOnly, onSelect, onMoveBy, snap, snapCfg }
   // While items are dragged: how far they've gone on screen, so their boxes
   // go with them, and the snap guides to draw (stage coordinates)
   const [shift, setShift] = useState<{ x: number, y: number } | null>(null)
@@ -404,12 +435,12 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
         let moved = false
 
         const moving = outerBox(els.filter((x): x is SVGGraphicsElement => !!x).map((x) => x.getBoundingClientRect()))
-        const snapTo = snapper(shadow, els.filter((x): x is SVGGraphicsElement => !!x), moving, base, live.current.dpSnap)
+        const snapTo = snapper(shadow, els.filter((x): x is SVGGraphicsElement => !!x), moving, base, live.current.snapCfg)
         const snapped = (ev: PointerEvent) =>
-          snapTo(ev.clientX - e.clientX, ev.clientY - e.clientY, live.current.snap && !ev.metaKey && !ev.ctrlKey)
-        const delta = (s: { dx: number, dy: number }, ev: PointerEvent, k: number) => {
+          snapTo(ev.clientX - e.clientX, ev.clientY - e.clientY, snapping(ev))
+        const delta = (s: { dx: number, dy: number }, _ev: PointerEvent, k: number) => {
           const p = new DOMPoint(s.dx, s.dy).matrixTransform(inv[k] ?? new DOMMatrix())
-          return ev.shiftKey ? { x: Math.round(p.x), y: Math.round(p.y) } : { x: p.x, y: p.y }
+          return { x: p.x, y: p.y }
         }
         listen((ev) => {
           if (!moved && Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 3) return
@@ -491,6 +522,8 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
     const ax = kind.includes("w") ? R : kind.includes("e") ? L : cx
     const ay = kind.includes("n") ? B : kind.includes("s") ? T : cy
     const a0 = Math.atan2(e.clientY - cy, e.clientX - cx)
+    // The dragged handle snaps like a point does
+    const snapTo = kind === "rot" ? null : snapper(shadow, els.filter((x): x is SVGGraphicsElement => !!x), new DOMRect(hx, hy, 0, 0), base, live.current.snapCfg)
     let m = new DOMMatrix()
     let moved = false
     const inParent = (k: number) => parents[k] ? parents[k]!.inverse().multiply(m).multiply(parents[k]!) : null
@@ -508,8 +541,11 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
           const r = Math.abs(h - o) < 1e-6 ? 1 : (p - o) / (h - o)
           return Math.abs(r) < 0.01 ? (r < 0 ? -0.01 : 0.01) : r
         }
-        let sx = hasX ? ratio(ev.clientX, hx, ox) : 1
-        let sy = hasY ? ratio(ev.clientY, hy, oy) : 1
+        const sn = snapTo?.(ev.clientX - e.clientX, ev.clientY - e.clientY, snapping(ev))
+        if (sn) setGuides({ x: hasX ? sn.gx : [], y: hasY ? sn.gy : [] })
+        const px = sn ? hx + sn.dx : ev.clientX, py = sn ? hy + sn.dy : ev.clientY
+        let sx = hasX ? ratio(px, hx, ox) : 1
+        let sy = hasY ? ratio(py, hy, oy) : 1
         if (ev.shiftKey) {
           // Same scale both ways: corners follow the larger pull, edges take the other axis along
           const u = hasX && hasY ? (Math.abs(sx) > Math.abs(sy) ? sx : sy) : hasX ? sx : sy
@@ -530,6 +566,7 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
       window.removeEventListener("pointerup", up)
       window.removeEventListener("pointercancel", up)
       setXf(null)
+      setGuides({ x: [], y: [] })
       if (!moved) return
       swallowClick.current = true
       setTimeout(() => { swallowClick.current = false }, 0)
@@ -564,7 +601,7 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
         }}
         onContextMenu={(e) => { if (onContextMenu) { const i = indexOf(e); onContextMenu(i > 0 ? i : -1, e) } }} />
       <ShapeGuide />
-      {dpSnap && <GridGuides dp={dpSnap.dp} grid={dpGrid} keylines={dpKeylines} alignment={dpKeylines} />}
+      {checker && (dpGrid || dpKeylines) && <GridGuides dp={checker} grid={dpGrid} keylines={dpKeylines} alignment={dpKeylines} />}
       {boxes.hov && <div className="inspect__box inspect__box--hover" style={rect(boxes.hov)} />}
       {!path && boxes.sel.map((b, k) => <div key={k} className="inspect__box" style={shifted(rect(b), shift)} />)}
       {showXf && union && (
@@ -577,7 +614,7 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
       {guides.y.map((y) => <div key={`y${y}`} className="inspect__guide inspect__guide--h" style={{ top: y }} />)}
       {marquee && <div className="inspect__marquee" style={{ left: Math.min(marquee.x0, marquee.x1), top: Math.min(marquee.y0, marquee.y1), width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0) }} />}
       {path && root && <PathOverlay stage={stage} box={box} root={root} edit={path} swallowClick={swallowClick}
-        snap={() => live.current.snap} dpSnap={() => live.current.dpSnap} onGuides={setGuides} />}
+        snap={snapping} snapCfg={() => live.current.snapCfg} onGuides={setGuides} />}
       </div>
       {!root && <p className="inspect__error text-3">This markup doesn't parse, so it can't be previewed.</p>}
     </div>
@@ -596,9 +633,9 @@ interface Drag { pointer: number, from: DOMPoint, base: Seg[], points: PointRef[
 interface Marquee { pointer: number, x0: number, y0: number, x1: number, y1: number, add: boolean }
 
 interface OverlayProps {
-  /** Snapping on (and not held off with ⌘), and where to draw its guides */
-  snap: () => boolean
-  dpSnap: () => DpSnap | null
+  /** Whether this pointer event snaps, what to, and where to draw its guides */
+  snap: (ev: { shiftKey: boolean, metaKey: boolean, ctrlKey: boolean }) => boolean
+  snapCfg: () => SnapCfg
   onGuides: (g: { x: number[], y: number[] }) => void
   stage: React.RefObject<HTMLDivElement | null>
   box: React.RefObject<HTMLDivElement | null>
@@ -612,7 +649,7 @@ const isTyping = (t: EventTarget | null) => {
   return !!el?.closest?.("input, textarea, select, [contenteditable=true], .monaco-editor")
 }
 
-function PathOverlay({ stage, box, root, edit, swallowClick, snap, dpSnap, onGuides }: OverlayProps) {
+function PathOverlay({ stage, box, root, edit, swallowClick, snap, snapCfg, onGuides }: OverlayProps) {
   // Maps the path's own coordinates to the stage's pixels
   const [ctm, setCtm] = useState<DOMMatrix | null>(null)
   const [draft, setDraft] = useState<Seg[] | null>(null)
@@ -668,13 +705,13 @@ function PathOverlay({ stage, box, root, edit, swallowClick, snap, dpSnap, onGui
     const m0 = live.current.ctm
     const pointRect = d.grab && m0 && stageBox ? (() => { const q = new DOMPoint(d.grab![0], d.grab![1]).matrixTransform(m0); return new DOMRect(q.x + stageBox.x, q.y + stageBox.y, 0, 0) })() : null
     const snapTo = shadow && stageBox
-      ? snapper(shadow, whole && self ? [self] : [], whole ? self?.getBoundingClientRect() ?? null : pointRect, stageBox, dpSnap())
+      ? snapper(shadow, whole && self ? [self] : [], whole ? self?.getBoundingClientRect() ?? null : pointRect, stageBox, snapCfg())
       : null
     const move = (ev: PointerEvent) => {
       if (ev.pointerId !== d.pointer) return
       let cx = ev.clientX, cy = ev.clientY
       if (snapTo) {
-        const sn = snapTo(ev.clientX - e.clientX, ev.clientY - e.clientY, snap() && !ev.metaKey && !ev.ctrlKey && !ev.shiftKey)
+        const sn = snapTo(ev.clientX - e.clientX, ev.clientY - e.clientY, snap(ev))
         cx = e.clientX + sn.dx
         cy = e.clientY + sn.dy
         onGuides({ x: sn.gx, y: sn.gy })
@@ -684,8 +721,6 @@ function PathOverlay({ stage, box, root, edit, swallowClick, snap, dpSnap, onGui
       let dx = p.x - d.from.x, dy = p.y - d.from.y
       if (!d.moved && Math.hypot(ev.clientX - (e.clientX), ev.clientY - (e.clientY)) < 2) return
       d.moved = true
-      // Shift snaps the grabbed point to whole numbers
-      if (ev.shiftKey && d.grab) { dx = Math.round(d.grab[0] + dx) - d.grab[0]; dy = Math.round(d.grab[1] + dy) - d.grab[1] }
       const next = shiftPoints(d.base, d.points, dx, dy)
       d.last = next
       setDraft(next)

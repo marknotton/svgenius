@@ -1185,8 +1185,13 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
 /* Tools: Select (whole objects) and Direct select (points) */
 .tool-switch .btn { padding-inline: 6px; }
 .tool-switch .btn.is-on { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
-/* The editor's design principle guides: Grid and Keylines */
-.dp-switch .btn.is-on { background: var(--accent-soft); color: var(--accent-ink); }
+/* Editor snapping: magnet, ▾ for what it snaps to */
+.snap-tools__more { padding-inline: 4px; }
+.snap-tools__list { display: grid; gap: 6px; margin-top: 6px; }
+.snap-tools__row { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
+.snap-tools__row.is-off { opacity: .5; cursor: default; }
+.snap-tools__note { max-width: 220px; margin: 10px 0 0; font-size: 11px; line-height: 1.4; }
+.edit-toolbar__shape { width: auto; max-width: 140px; }
 .arrange__to { max-width: 240px; }
 .arrange__head > .text-3 { white-space: nowrap; }
 
