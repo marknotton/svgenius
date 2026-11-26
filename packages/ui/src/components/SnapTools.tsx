@@ -40,12 +40,15 @@ export function SnapTools({ snap, side, hasDp }: { snap: ReturnType<typeof useSn
   }, [open])
   const what = ROWS.filter((r) => snap.opts[r.key] && (!r.dp || hasDp)).map((r) => r.label.toLowerCase()).join(", ") || "nothing yet"
   return (
-    <span ref={ref} className="btn-join snap-tools arrange__anchor">
-      <button className={`btn btn--secondary btn--sm edit-toolbar__btn${snap.on ? " is-on" : ""}`} aria-pressed={snap.on} onClick={() => snap.setOn(!snap.on)}
+    // The popover sits outside the joined buttons, so the toolbar's button sizing and corners leave it alone
+    <span ref={ref} className="snap-tools arrange__anchor">
+      <span className="btn-join">
+        <button className={`btn btn--secondary btn--sm edit-toolbar__btn${snap.on ? " is-on" : ""}`} aria-pressed={snap.on} onClick={() => snap.setOn(!snap.on)}
         title={snap.on ? `Snapping on, to ${what}. Hold ⌘ to drag freely` : `Snapping off. Hold Shift to snap while dragging, or click to turn it on`}
         aria-label="Snapping"><IconMagnet width={14} height={14} /></button>
-      <button className={`btn btn--secondary btn--sm edit-toolbar__btn snap-tools__more${open ? " is-on" : ""}`} aria-expanded={open}
+        <button className={`btn btn--secondary btn--sm edit-toolbar__btn snap-tools__more${open ? " is-on" : ""}`} aria-expanded={open}
         title="What to snap to" aria-label="Snap options" onClick={() => setOpen((o) => !o)}><IconChevronDown width={10} height={10} /></button>
+      </span>
       {open && (
         <Pop title="Snap to" side={side}>
           <div className="snap-tools__list">
