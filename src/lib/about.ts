@@ -11,6 +11,18 @@ export interface Release {
 
 export const HISTORY: Release[] = [
   {
+    version: "1.4.1",
+    date: "26 November 2026",
+    notes: [
+      "With a design principle, the checkerboard draws one square per grid cell (24 across for a 24 × 24 grid), so keylines line up with the squares. In the list, the inspector, Quick Edit and the editor",
+      "Editor: Grid and Keylines buttons (beside zoom) draw the file's design principle over the canvas",
+      "Editor snapping: ▾ beside the magnet picks what it snaps to: other shapes, keylines, the grid and whole pixels. Works when moving shapes, dragging points and resizing from the handles. Hold Shift to snap while it's off, ⌘ to drag freely while it's on",
+      "Editor Align: with a design principle, Align to can be its live area or any keyline, as well as the viewBox or the selection",
+      "Direct select: drag a box across several paths to pick all their points, then drag any of them to move them together. Arrow keys nudge, Shift-click adds or drops a point, Esc lets go",
+      "Editor: the shape guide has the same shape picker as the list"
+    ]
+  },
+  {
     version: "1.4.0",
     date: "25 November 2026",
     notes: [
