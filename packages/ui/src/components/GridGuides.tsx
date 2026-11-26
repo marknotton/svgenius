@@ -16,6 +16,23 @@ export function gridStep(size: number) {
   return [1, 2, 5, 10].map((m) => m * p).find((s) => s >= raw) ?? raw
 }
 
+/**
+ * Checkerboard sized to a design principle: one square per grid step (the same
+ * step GridGuides draws, so a 24 × 24 principle gets 24 squares across). Only
+ * when the canvas has the principle's shape, otherwise undefined and the usual
+ * fixed squares stay. With px (the canvas's longest side on screen), steps
+ * double up until a square is at least 3px, so tiny thumbnails don't turn to mush
+ */
+export function checkerSize(dp: Pick<DesignPrinciple, "width" | "height"> | null | undefined, ratio: number, px?: number) {
+  if (!dp || !(dp.width > 0 && dp.height > 0)) return undefined
+  if (Math.abs(ratio / (dp.width / dp.height) - 1) > 0.01) return undefined
+  const long = Math.max(dp.width, dp.height)
+  let step = gridStep(long)
+  if (px) while ((px * step) / long < 3 && step * 2 <= long / 2) step *= 2
+  // The tile holds two squares each way
+  return `${((200 * step) / dp.width).toFixed(4)}% ${((200 * step) / dp.height).toFixed(4)}%`
+}
+
 /** Alignment keylines are reference only, drawn fainter than the keylines (a list can hide them with CSS) */
 export const GridGuides = memo(function GridGuides({ dp, grid = true, keylines = true, alignment = true }: { dp: Guides, grid?: boolean, keylines?: boolean, alignment?: boolean }) {
   const W = dp.width, H = dp.height, p = dp.padding

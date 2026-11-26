@@ -39,6 +39,8 @@ interface Props {
   guides?: DesignPrinciple | null
   /** The preset's design principle live area, for the shape guide and clip on the optimised preview */
   frame?: ShapeFrame | null
+  /** The design principle whose grid the checkerboard follows */
+  checker?: DesignPrinciple | null
   /** Row buttons: the full editor and Quick Edit */
   onEdit?: (id: string) => void
   onQuickEdit?: (id: string) => void
@@ -97,7 +99,7 @@ export const FileRow = memo(function FileRow(p: Props) {
             <figcaption className="text-3">Before{original && ` · ${fmtNum(original.w, 2)} × ${fmtNum(original.h, 2)}`}</figcaption>
           </figure>
           <figure className="file-card__pane">
-            <Thumb svg={item.result?.output} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : NOT_YET} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} guides={p.guides} frame={p.frame} />
+            <Thumb svg={item.result?.output} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : NOT_YET} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} guides={p.guides} frame={p.frame} checker={p.checker} />
             <figcaption className="text-3">
               After{size && item.result && <> · <span key={flash} className={`file-row__dims${flash ? " is-flash" : ""}`}>{dims}</span></>}
             </figcaption>
@@ -127,10 +129,10 @@ export const FileRow = memo(function FileRow(p: Props) {
       ) : p.compare ? (
         <div className="file-row__compare">
           <Thumb svg={item.source} size={thumbPx} backdrop={backdrop} label={`${item.name} before`} />
-          <Thumb svg={item.result?.output} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : NOT_YET} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} guides={p.guides} frame={p.frame} />
+          <Thumb svg={item.result?.output} pending={item.status === "running"} placeholder={item.status === "error" ? undefined : NOT_YET} size={thumbPx} backdrop={backdrop} label={`${item.name} after`} guides={p.guides} frame={p.frame} checker={p.checker} />
         </div>
       ) : (
-        <Thumb svg={item.result?.output ?? item.source} pending={item.status === "running"} size={thumbPx} backdrop={backdrop} label={item.name} guides={p.guides} frame={p.frame} />
+        <Thumb svg={item.result?.output ?? item.source} pending={item.status === "running"} size={thumbPx} backdrop={backdrop} label={item.name} guides={p.guides} frame={p.frame} checker={p.checker} />
       )}
       <div className="file-row__main">
         <div className="file-row__top">

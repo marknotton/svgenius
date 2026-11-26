@@ -1232,6 +1232,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
                 guidesFor={settings.listGuides ? listGuidesFor : undefined}
                 alignmentGuides={settings.listAlignment !== false}
                 frameFor={frameFor}
+                checkerFor={listGuidesFor}
                 onEdit={openMarkup}
                 onQuickEdit={openQuickEditRow}
                 exportNames={previewNames}
@@ -1282,6 +1283,7 @@ function Workspace({ settings, update, loadError }: WorkspaceProps) {
               <FileInspector
                 item={focused}
                 frame={frameFor(focused)}
+                checker={listGuidesFor(focused)}
                 presets={settings.presets}
                 defaultPreset={defaultPreset}
                 backdrop={settings.backdrop}

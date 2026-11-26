@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import type { Backdrop } from "@marknotton/svgenius-core/types"
+import type { Backdrop, DesignPrinciple } from "@marknotton/svgenius-core/types"
 import { svgSize } from "@marknotton/svgenius-core/svgRoot"
 import { allAnchors, geometry, pointAt, pointKey, serialisePath, shiftPoints, type PointKind, type PointRef, type Seg } from "@marknotton/svgenius-core/pathData"
 import { deletePoints, toggleCorner } from "@marknotton/svgenius-core/pathPoints"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 import { ShapeGuide } from "./ShapeGuide"
+import { checkerSize } from "./GridGuides"
 
 // ── Inspectable preview ───────────────────────────────────────────────────────
 // Renders the SVG inline (scripts and event handlers stripped) so elements can
@@ -42,6 +43,8 @@ interface Props {
   onZoom?: (zoom: number) => void
   /** The zoom that shows the artwork at its real size (100%) */
   onActual?: (zoom: number) => void
+  /** The design principle whose grid the checkerboard follows */
+  checker?: DesignPrinciple | null
 }
 
 export const ZOOM_MIN = 0.1, ZOOM_MAX = 64
@@ -150,7 +153,7 @@ function prepare(markup: string) {
   return root
 }
 
-export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked, hidden, snap = true, zoom = 1, onZoom, onActual }: Props) {
+export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, onMoveBy, onContextMenu, readOnly, onHover, hover = -1, path, onTransform, locked, hidden, snap = true, zoom = 1, onZoom, onActual, checker }: Props) {
   const stage = useRef<HTMLDivElement>(null)
   const box = useRef<HTMLDivElement>(null)
   // Set by the path overlay when a press was a drag, not a click
@@ -514,7 +517,7 @@ export function InspectPreview({ markup, backdrop, selection, onPick, onSelect, 
   return (
     <div ref={box} className={`inspect thumb--${backdrop}${zoom > 1 ? " is-zoomed" : ""}${panReady ? " is-pan-ready" : ""}`}>
       {/* The SVG's own canvas, at its real shape, with nothing around it */}
-      <div ref={canvasRef} className="inspect__canvas" style={{ "--r": ratio, "--z": zoom } as React.CSSProperties}>
+      <div ref={canvasRef} className="inspect__canvas" style={{ "--r": ratio, "--z": zoom, "--checker": checkerSize(checker, ratio) } as React.CSSProperties}>
       <div ref={stage} className="inspect__stage"
         onMouseMove={(e) => { const i = Math.max(indexOf(e), 0) || -1; if (i !== hover) onHover(i) }}
         onMouseLeave={() => onHover(-1)}

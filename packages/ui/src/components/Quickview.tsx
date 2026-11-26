@@ -11,7 +11,7 @@ import { adapter } from "../host"
 import { IconArrowSolid, IconChevronDown, IconChevronLeft, IconChevronRight, IconCopy, IconMagnet, IconRedo, IconReset, IconUndo, IconX } from "../icons"
 import { useCommands } from "../lib/commands"
 import { EditorTabs } from "./EditorTabs"
-import { GridGuides, gridStep } from "./GridGuides"
+import { GridGuides, checkerSize, gridStep } from "./GridGuides"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 import { ShapeGuide, ShapeOptions } from "./ShapeGuide"
 
@@ -779,7 +779,7 @@ export function Quickview(p: QuickviewProps) {
             </div>
             <div key={item.id} ref={canvasRef}
               className={`quickview__canvas thumb__canvas${dir ? ` is-${dir}` : ""} is-${tool}${dragging ? " is-dragging" : ""}`}
-              style={{ "--r": ratio } as CSSProperties} onPointerDown={onStageDown}>
+              style={{ "--r": ratio, "--checker": checkerSize(dp, ratio) } as CSSProperties} onPointerDown={onStageDown}>
               <div className="quickview__art" style={artMask}>
                 {showing && <img src={showing.src} alt={item.name} draggable={false} style={{ transform }} />}
               </div>

@@ -46,6 +46,8 @@ interface Props {
   alignmentGuides?: boolean
   /** The shape guide and clip sit in each preset's design principle live area */
   frameFor?: (item: SvgItem) => ShapeFrame | null
+  /** The design principle whose grid each thumbnail's checkerboard follows */
+  checkerFor?: (item: SvgItem) => DesignPrinciple | null
   /** Row buttons: the full editor and Quick Edit */
   onEdit?: (id: string) => void
   onQuickEdit?: (id: string) => void
@@ -175,6 +177,7 @@ export function FileList(p: Props) {
             onFlag={p.onFlag}
             guides={p.guidesFor?.(item) ?? null}
             frame={p.frameFor?.(item) ?? null}
+            checker={p.checkerFor?.(item) ?? null}
             onEdit={p.onEdit}
             onQuickEdit={p.onQuickEdit}
           />

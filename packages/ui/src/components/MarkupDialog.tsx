@@ -10,7 +10,7 @@ import { addPointAfter, convertPoints, deletePoints, SEG_TYPES, setPointsCase, t
 import { ACTIONS, topLevel, type ActionContext, type EditorAction } from "@marknotton/svgenius-core/editorActions"
 import { ContextMenu, type MenuItem, type MenuState } from "./ContextMenu"
 import { textFocus, useCommands } from "../lib/commands"
-import type { Backdrop, SvgItem } from "@marknotton/svgenius-core/types"
+import type { Backdrop, DesignPrinciple, SvgItem } from "@marknotton/svgenius-core/types"
 import { CodeEditor } from "./CodeEditor"
 import { adapter } from "../host"
 import { CanvasBackground } from "./CanvasBackground"
@@ -55,6 +55,8 @@ interface Props {
   actions?: React.ReactNode
   /** Switches to Quick Edit on this file */
   onQuickEdit?: () => void
+  /** The design principle whose grid the checkerboard follows */
+  checker?: DesignPrinciple | null
 }
 
 // Zoom steps for + and −, and the zoom menu's presets (as real-size percentages)
@@ -104,7 +106,7 @@ const LOCKS = new Map<string, LockRef[]>()
 /** Layers hidden in the editor, kept the same way. The file isn't changed */
 const HIDES = new Map<string, LockRef[]>()
 
-export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose, nav, circle, actions: hostActions, onQuickEdit }: Props) {
+export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", onEdit, onRevert, onClose, nav, circle, actions: hostActions, onQuickEdit, checker }: Props) {
   // Switching files paints an empty editor first, then fills it in on the next
   // frame, so the arrows feel instant even when a big file takes a moment
   const [ready, setReady] = useState(false)
@@ -738,7 +740,7 @@ export function MarkupDialog({ item, tab, onTab, backdrop, toolbarSide = "top", 
             {/* Floats over the canvas, so it never pushes the preview down */}
             {editable && <EditStatus tool={tool} count={selection.length} note={note} />}
             {peekMarkup !== null && <span className="peek-badge">After</span>}
-            <InspectPreview markup={peekMarkup ?? markup} backdrop={backdrop} selection={peekMarkup !== null ? [] : selection} locked={ownLocked} hidden={peekMarkup !== null ? undefined : ownHidden} snap={snap}
+            <InspectPreview markup={peekMarkup ?? markup} backdrop={backdrop} checker={checker} selection={peekMarkup !== null ? [] : selection} locked={ownLocked} hidden={peekMarkup !== null ? undefined : ownHidden} snap={snap}
               zoom={zoom} onZoom={setZoom} onActual={setActual}
               onPick={(i, add) => { (document.activeElement as HTMLElement | null)?.blur?.(); pick(i, add ? "add" : "only") }}
               onSelect={(found, add) => setSelection((s) => (add ? [...s, ...found.filter((i) => !s.includes(i))] : found))}

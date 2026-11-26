@@ -5,7 +5,7 @@ import type { Backdrop } from "@marknotton/svgenius-core/types"
 import { usePreviewCss, withPreviewCss } from "./PreviewCss"
 import { ShapeGuide, useGuideShape } from "./ShapeGuide"
 import { shapeMaskUrl, type ShapeFrame } from "@marknotton/svgenius-core/shapes"
-import { GridGuides } from "./GridGuides"
+import { GridGuides, checkerSize } from "./GridGuides"
 import type { DesignPrinciple } from "@marknotton/svgenius-core/types"
 
 interface Props {
@@ -21,6 +21,8 @@ interface Props {
   guides?: DesignPrinciple | null
   /** The design principle's live area: the shape guide and clip sit in it instead of filling the canvas */
   frame?: ShapeFrame | null
+  /** The design principle whose grid the checkerboard squares follow */
+  checker?: DesignPrinciple | null
 }
 
 /**
@@ -28,7 +30,7 @@ interface Props {
  * ratio, so whitespace (or the lack of it) is visible. Rendered via <img>, so
  * scripts never run.
  */
-export const Thumb = memo(function Thumb({ svg, size, backdrop, label, pending, placeholder, guides, frame }: Props) {
+export const Thumb = memo(function Thumb({ svg, size, backdrop, label, pending, placeholder, guides, frame, checker }: Props) {
   const css = usePreviewCss()
   const src = useMemo(() => (svg === undefined ? undefined : svgDataUrl(withPreviewCss(svg, css))), [svg, css])
   const dims = useMemo(() => svgSize(svg), [svg])
@@ -36,7 +38,8 @@ export const Thumb = memo(function Thumb({ svg, size, backdrop, label, pending, 
   // Container units keep the canvas fitted however the thumb itself is sized
   const shape = useGuideShape()
   const frameMask = useMemo(() => (frame ? shapeMaskUrl(shape, frame) : undefined), [shape, frame])
-  const canvas = { "--r": ratio, "--frame-mask": frameMask } as CSSProperties
+  const checkers = useMemo(() => checkerSize(checker, ratio, size), [checker, ratio, size])
+  const canvas = { "--r": ratio, "--frame-mask": frameMask, "--checker": checkers } as CSSProperties
   return (
     <div className={`thumb thumb--${backdrop}`} style={{ width: size, height: size }}>
       <div className={`thumb__canvas${frame ? " has-frame" : ""}`} style={canvas}>

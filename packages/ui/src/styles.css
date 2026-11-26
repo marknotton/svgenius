@@ -322,7 +322,8 @@ input[type="text"], input[type="search"], input:not([type]) { user-select: text;
   aspect-ratio: var(--r);
   background-color: var(--a);
   background-image: conic-gradient(var(--b) 25%, transparent 0 50%, var(--b) 0 75%, transparent 0);
-  background-size: 12px 12px;
+  /* --checker: a design principle's grid (see checkerSize) */
+  background-size: var(--checker, 12px 12px);
 }
 .thumb__canvas img { width: 100%; height: 100%; object-fit: fill; display: block; }
 
@@ -895,7 +896,7 @@ body.is-resizing * { user-select: none !important; }
 .inspect.is-zoomed { overflow: auto; }
 .inspect.is-pan-ready, .inspect.is-pan-ready .inspect__stage { cursor: grab; }
 .inspect.is-panning, .inspect.is-panning .inspect__stage { cursor: grabbing; }
-.inspect__canvas { position: relative; flex: none; margin: auto; width: calc(min(100cqw, 100cqh * var(--r)) * var(--z, 1)); aspect-ratio: var(--r); --a: var(--check-light-a); --b: var(--check-light-b); background-color: var(--a); background-image: conic-gradient(var(--b) 25%, transparent 0 50%, var(--b) 0 75%, transparent 0); background-size: 16px 16px; }
+.inspect__canvas { position: relative; flex: none; margin: auto; width: calc(min(100cqw, 100cqh * var(--r)) * var(--z, 1)); aspect-ratio: var(--r); --a: var(--check-light-a); --b: var(--check-light-b); background-color: var(--a); background-image: conic-gradient(var(--b) 25%, transparent 0 50%, var(--b) 0 75%, transparent 0); background-size: var(--checker, 16px 16px); }
 .inspect.thumb--dark .inspect__canvas { --a: var(--check-dark-a); --b: var(--check-dark-b); }
 .inspect__stage { position: absolute; inset: 0; cursor: crosshair; }
 .inspect__box { position: absolute; pointer-events: none; outline: 2px solid var(--accent); background: rgba(var(--accent-rgb), .12); }
@@ -1533,7 +1534,7 @@ body.is-resizing-y, body.is-resizing-y * { cursor: row-resize !important; user-s
   padding: 28px; container-type: size; overflow: hidden; background: var(--surface);
 }
 .quickview__stage.thumb--dark { --a: var(--check-dark-a); --b: var(--check-dark-b); }
-.quickview__canvas.thumb__canvas { --w: min(100cqw, 100cqh * var(--r)); width: var(--w); background-size: 16px 16px; box-shadow: 0 0 0 1px var(--border); }
+.quickview__canvas.thumb__canvas { --w: min(100cqw, 100cqh * var(--r)); width: var(--w); background-size: var(--checker, 16px 16px); box-shadow: 0 0 0 1px var(--border); }
 .quickview__art { position: absolute; inset: 0; overflow: hidden; -webkit-mask-position: center; mask-position: center; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
 .quickview__art img { width: 100%; height: 100%; display: block; transform-origin: 50% 50%; }
 .quickview__canvas.is-next { animation: qv-from-right .22s ease-out; }
